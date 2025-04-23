@@ -4,14 +4,14 @@
   <a href="https://ci.woodpecker-ci.org/woodpecker-ci/plugin-s3" title="Build Status">
     <img src="https://ci.woodpecker-ci.org/api/badges/woodpecker-ci/plugin-s3/status.svg" alt="Build Status">
   </a>
-  <a href="https://goreportcard.com/badge/github.com/woodpecker-ci/plugin-s3" title="Go Report Card">
-    <img src="https://goreportcard.com/badge/github.com/woodpecker-ci/plugin-s3" alt="Go Report Card">
+  <a href="https://goreportcard.com/badge/codeberg.org/woodpecker-plugins/plugin-s3" title="Go Report Card">
+    <img src="https://goreportcard.com/badge/codeberg.org/woodpecker-plugins/plugin-s3" alt="Go Report Card">
   </a>
-  <a href="https://app.fossa.com/projects/git%2Bgithub.com%2Fwoodpecker-ci%2Fplugin-s3?ref=badge_shield" alt="FOSSA Status">
-    <img src="https://app.fossa.com/api/projects/git%2Bgithub.com%2Fwoodpecker-ci%2Fplugin-s3.svg?type=shield" alt="FOSSA Status">
+  <a href="https://app.fossa.com/projects/git%2Bcodeberg.org%2Fwoodpecker-plugins%2Fplugin-s3?ref=badge_shield" alt="FOSSA Status">
+    <img src="https://app.fossa.com/api/projects/git%2Bcodeberg.org%2Fwoodpecker-plugins%2Fplugin-s3.svg?type=shield" alt="FOSSA Status">
   </a>
-  <a href="https://godoc.org/github.com/woodpecker-ci/plugin-s3" title="GoDoc">
-    <img src="https://godoc.org/github.com/woodpecker-ci/plugin-s3?status.svg" alt="GoDoc">
+  <a href="https://godoc.org/codeberg.org/woodpecker-plugins/plugin-s3" title="GoDoc">
+    <img src="https://godoc.org/codeberg.org/woodpecker-plugins/plugin-s3?status.svg" alt="GoDoc">
   </a>
   <a href="https://hub.docker.com/r/woodpeckerci/plugin-s3" title="Docker pulls">
     <img src="https://img.shields.io/docker/pulls/woodpeckerci/plugin-s3" alt="Docker pulls">
