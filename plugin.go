@@ -121,7 +121,14 @@ func (p *Plugin) Exec() error {
 		log.Warn("AWS Key and/or Secret not provided (falling back to ec2 instance profile)")
 	}
 
-	client := s3.New(session.New(), conf)
+	sess, err := session.NewSession(conf)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Error("Failed to create AWS session")
+		return err
+	}
+	client := s3.New(sess)
 
 	// find the bucket
 	log.WithFields(log.Fields{
@@ -409,7 +416,13 @@ func matchExtension(match string, stringMap map[string]string) string {
 }
 
 func assumeRole(roleArn, roleSessionName string) *credentials.Credentials {
-	client := sts.New(session.New())
+	sess, err := session.NewSession()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Error("Failed to create AWS session for assume role")
+	}
+	client := sts.New(sess)
 	duration := time.Hour * 1
 	stsProvider := &stscreds.AssumeRoleProvider{
 		Client:          client,
