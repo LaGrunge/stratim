@@ -6,7 +6,7 @@ description: Plugin to publish files and artifacts to Amazon S3 or Minio.
 tags: [publish, s3, amazon, minio, storage]
 containerImage: woodpeckerci/plugin-s3
 containerImageUrl: https://hub.docker.com/r/woodpeckerci/plugin-s3
-url: https://github.com/woodpecker-ci/plugin-s3
+url: https://codeberg.org/woodpecker-plugins/plugin-s3
 ---
 
 # S3 Plugin
@@ -21,7 +21,7 @@ steps:
     settings:
       bucket: my-bucket-name
       access_key: a50d28f4dd477bc184fbd10b376de753
-      secret_key: ****************************************
+      secret_key: dummy-secret-key
       source: public/**/*
       target: /target/location
 ```
@@ -58,14 +58,14 @@ Override the default acl and region:
 
 ```yml
 steps:
-- name: upload
-  image: woodpeckerci/plugin-s3
-  settings:
-    bucket: my-bucket-name
-    acl: public-read
-    region: us-east-1
-    source: public/**/*
-    target: /target/location
+  - name: upload
+    image: woodpeckerci/plugin-s3
+    settings:
+      bucket: my-bucket-name
+      acl: public-read
+      region: us-east-1
+      source: public/**/*
+      target: /target/location
 ```
 
 Configure the plugin to strip path prefixes when uploading:
