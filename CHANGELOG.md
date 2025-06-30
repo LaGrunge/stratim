@@ -1,5 +1,53 @@
 # Changelog
 
+## [1.4.0](https://codeberg.org/woodpecker-plugins/plugin-s3/releases/tag/v1.4.0) - 2025-06-29
+
+### ❤️ Thanks to all contributors! ❤️
+
+@Ghost, @JnCrMx, @pat-s, @woodpecker-bot, @xoxys
+
+### 📈 Enhancement
+
+- ci: add linux/riscv64 to build platforms [[#261](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/261)]
+- Migrate to golangci-lint v2 and improve error log [[#249](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/249)]
+
+### 📚 Documentation
+
+- Cleanup readme after migration [[#251](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/251)]
+
+### 📦️ Dependency
+
+- chore(deps): update pre-commit hook golangci/golangci-lint to v2.2.1 [[#263](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/263)]
+- chore(deps): update pre-commit hook golangci/golangci-lint to v2.2.0 [[#262](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/262)]
+- fix(deps): update module github.com/urfave/cli/v2 to v2.27.7 [[#258](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/258)]
+- chore(deps): update pre-commit hook igorshubovych/markdownlint-cli to v0.45.0 [[#257](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/257)]
+- chore(deps): update woodpeckerci/plugin-docker-buildx docker tag to v6.0.1 [[#255](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/255)]
+- chore(deps): update pre-commit hook golangci/golangci-lint to v2.1.6 [[#256](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/256)]
+- chore(deps): update woodpeckerci/plugin-docker-buildx docker tag to v6 [[#254](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/254)]
+- chore(deps): update docker.io/woodpeckerci/plugin-ready-release-go docker tag to v3.2.0 [[#253](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/253)]
+- chore(deps): update pre-commit hook golangci/golangci-lint to v2.1.5 [[#252](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/252)]
+- fix(deps): update module github.com/aws/aws-sdk-go to v1.55.7 [[#250](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/250)]
+- chore(deps): update woodpeckerci/plugin-ready-release-go docker tag to v3.2.0 [[#246](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/246)]
+- chore(deps): update pre-commit hook golangci/golangci-lint to v2.1.2 [[#245](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/245)]
+- chore(deps): update pre-commit hook golangci/golangci-lint to v2.1.1 [[#244](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/244)]
+- chore(deps): update pre-commit hook golangci/golangci-lint to v2.1.0 [[#243](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/243)]
+- chore(deps): update pre-commit hook golangci/golangci-lint to v2 [[#241](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/241)]
+- chore(deps): update woodpeckerci/plugin-ready-release-go docker tag to v3.1.4 [[#240](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/240)]
+- chore(deps): update woodpeckerci/plugin-docker-buildx docker tag to v5.2.2 [[#239](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/239)]
+- chore(deps): update pre-commit hook golangci/golangci-lint to v1.64.8 [[#238](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/238)]
+- chore(deps): update pre-commit hook golangci/golangci-lint to v1.64.7 [[#237](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/237)]
+- fix(deps): update module github.com/urfave/cli/v2 to v2.27.6 [[#236](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/236)]
+- chore(deps): update pre-commit hook golangci/golangci-lint to v1.64.5 [[#234](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/234)]
+- chore(deps): update golang docker tag to v1.24 [[#233](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/233)]
+- chore(deps): update woodpeckerci/plugin-docker-buildx docker tag to v5.2.1 [[#232](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/232)]
+- chore(deps): update woodpeckerci/plugin-docker-buildx docker tag to v5.2.0 [[#231](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/231)]
+- chore(deps): update pre-commit hook igorshubovych/markdownlint-cli to v0.44.0 [[#229](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/229)]
+- chore(deps): update woodpeckerci/plugin-ready-release-go docker tag to v3.1.3 [[#228](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/228)]
+
+### Misc
+
+- [pre-commit.ci] pre-commit autoupdate [[#235](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/235)]
+
 ## [1.3.2](https://github.com/woodpecker-ci/plugin-s3/releases/tag/v1.3.2) - 2025-01-17
 
 ### 📦️ Dependency
