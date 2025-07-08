@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
@@ -134,6 +135,18 @@ func main() {
 			Usage:   "overwrite existing files",
 			EnvVars: []string{"PLUGIN_OVERWRITE"},
 		},
+		&cli.IntFlag{
+			Name:    "retry-count",
+			Usage:   "number of times to retry an upload of a file if it fails",
+			EnvVars: []string{"PLUGIN_RETRY_COUNT"},
+			Value:   0,
+		},
+		&cli.DurationFlag{
+			Name:    "retry-delay",
+			Usage:   "tamount of time to wait before each retry",
+			EnvVars: []string{"PLUGIN_RETRY_DELAY"},
+			Value:   time.Duration(5) * time.Second,
+		},
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -168,6 +181,8 @@ func run(c *cli.Context) error {
 		DryRun:                c.Bool("dry-run"),
 		Compress:              c.Bool("compress"),
 		Overwrite:             c.Bool("overwrite"),
+		RetryCount:            c.Int("retry-count"),
+		RetryDelay:            c.Duration("retry-delay"),
 	}
 
 	return plugin.Exec()

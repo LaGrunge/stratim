@@ -96,6 +96,10 @@ type Plugin struct {
 	Compress bool
 	// Overwrite existing files
 	Overwrite bool
+	// Number of time to retry upload
+	RetryCount int
+	// Time to sleep between retries in milliseconds
+	RetryDelay time.Duration
 }
 
 // Exec runs the plugin
@@ -252,7 +256,25 @@ func (p *Plugin) Exec() error {
 			}).Info("Uploading file")
 
 			// do upload
-			_, err = client.PutObject(putObjectInput)
+			retryIndex := 0
+			for {
+				_, err = client.PutObject(putObjectInput)
+				retryIndex++
+				if err == nil || retryIndex > p.RetryCount {
+					break
+				} else {
+					log.WithFields(log.Fields{
+						"name":        match,
+						"bucket":      p.Bucket,
+						"target":      target,
+						"error":       err,
+						"retry_index": retryIndex,
+						"retry_count": p.RetryCount,
+						"retry_delay": p.RetryDelay,
+					}).Error("Could not upload file, retrying...")
+					time.Sleep(p.RetryDelay)
+				}
+			}
 
 			if err != nil {
 				log.WithFields(log.Fields{
@@ -320,7 +342,25 @@ func (p *Plugin) Exec() error {
 				}).Info("Uploading file")
 
 				// do upload
-				_, err = client.PutObject(putObjectInput)
+				retryIndex := 0
+				for {
+					_, err = client.PutObject(putObjectInput)
+					retryIndex++
+					if err == nil || retryIndex > p.RetryCount {
+						break
+					} else {
+						log.WithFields(log.Fields{
+							"name":        match,
+							"bucket":      p.Bucket,
+							"target":      target,
+							"error":       err,
+							"retry_index": retryIndex,
+							"retry_count": p.RetryCount,
+							"retry_delay": p.RetryDelay,
+						}).Error("Could not upload file, retrying...")
+						time.Sleep(p.RetryDelay)
+					}
+				}
 
 				if err != nil {
 					log.WithFields(log.Fields{

@@ -156,3 +156,9 @@ compress
 
 overwrite
 : overwrite existing files (true by default)
+
+retry_count
+: number of times to retry an upload of a file if it fails (0 by default)
+
+retry_delay
+: amount of time to wait before each retry (5s by default)
