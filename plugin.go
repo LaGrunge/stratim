@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"io"
+	"log/slog"
 	"mime"
 	"os"
 	"path/filepath"
@@ -18,7 +19,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/mattn/go-zglob"
-	log "github.com/sirupsen/logrus"
 )
 
 // Plugin defines the S3 plugin parameters.
@@ -105,9 +105,7 @@ type Plugin struct {
 // Exec runs the plugin
 func (p *Plugin) Exec() error {
 	// normalize the target URL
-	if strings.HasPrefix(p.Target, "/") {
-		p.Target = p.Target[1:]
-	}
+	p.Target = strings.TrimPrefix(p.Target, "/")
 
 	// create the client
 	conf := &aws.Config{
@@ -122,36 +120,30 @@ func (p *Plugin) Exec() error {
 	} else if p.AssumeRole != "" {
 		conf.Credentials = assumeRole(p.AssumeRole, p.AssumeRoleSessionName)
 	} else {
-		log.Warn("AWS Key and/or Secret not provided (falling back to ec2 instance profile)")
+		slog.Warn("AWS Key and/or Secret not provided (falling back to ec2 instance profile)")
 	}
 
 	sess, err := session.NewSession(conf)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Error("Failed to create AWS session")
+		slog.Error("Failed to create AWS session", slog.String("err", err.Error()))
 		return err
 	}
 	client := s3.New(sess)
 
 	// find the bucket
-	log.WithFields(log.Fields{
-		"region":   p.Region,
-		"endpoint": p.Endpoint,
-		"bucket":   p.Bucket,
-	}).Info("Attempting to upload")
+	slog.Info("Attempting to upload",
+		slog.String("region", p.Region),
+		slog.String("endpoint", p.Endpoint),
+		slog.String("bucket", p.Bucket))
 
 	matches, err := matches(p.Source, p.Exclude)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Error("Could not match files")
+		slog.Error("Could not match files", slog.String("err", err.Error()))
 		return err
 	}
 
-	for _, match := range matches {
-
-		stat, err := os.Stat(match)
+	for _, file := range matches {
+		stat, err := os.Stat(file)
 		if err != nil {
 			continue // should never happen
 		}
@@ -161,17 +153,17 @@ func (p *Plugin) Exec() error {
 			continue
 		}
 
-		target := filepath.Join(p.Target, strings.TrimPrefix(match, p.StripPrefix))
+		target := filepath.Join(p.Target, strings.TrimPrefix(file, p.StripPrefix))
 		if !strings.HasPrefix(target, "/") {
 			target = "/" + target
 		}
 
-		contentType := matchExtension(match, p.ContentType)
-		contentEncoding := matchExtension(match, p.ContentEncoding)
-		cacheControl := matchExtension(match, p.CacheControl)
+		contentType := matchExtension(file, p.ContentType)
+		contentEncoding := matchExtension(file, p.ContentEncoding)
+		cacheControl := matchExtension(file, p.CacheControl)
 
 		if contentType == "" {
-			contentType = mime.TypeByExtension(filepath.Ext(match))
+			contentType = mime.TypeByExtension(filepath.Ext(file))
 
 			if contentType == "" {
 				contentType = "application/octet-stream"
@@ -184,12 +176,9 @@ func (p *Plugin) Exec() error {
 			continue
 		}
 
-		f, err := os.Open(match)
+		f, err := os.Open(file)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-				"file":  match,
-			}).Error("Problem opening file")
+			slog.Error("Problem opening file", slog.String("file", file), slog.String("err", err.Error()))
 			return err
 		}
 		defer f.Close()
@@ -200,6 +189,25 @@ func (p *Plugin) Exec() error {
 			Key:    &target,
 			ACL:    &(p.Access),
 		}
+		if contentType != "" {
+			putObjectInput.ContentType = aws.String(contentType)
+		}
+
+		if contentEncoding != "" {
+			putObjectInput.ContentEncoding = aws.String(contentEncoding)
+		}
+
+		if cacheControl != "" {
+			putObjectInput.CacheControl = aws.String(cacheControl)
+		}
+
+		if p.Encryption != "" {
+			putObjectInput.ServerSideEncryption = aws.String(p.Encryption)
+		}
+
+		if p.StorageClass != "" {
+			putObjectInput.StorageClass = &(p.StorageClass)
+		}
 
 		// Check if the object exists
 		headObjectInput := &s3.HeadObjectInput{
@@ -208,176 +216,67 @@ func (p *Plugin) Exec() error {
 		}
 
 		_, err = client.HeadObject(headObjectInput)
-		if err != nil {
+		if err != nil || p.Overwrite {
 			// If the error indicates the object does not exist, upload the file
-			if contentType != "" {
-				putObjectInput.ContentType = aws.String(contentType)
-			}
-
-			if contentEncoding != "" {
-				putObjectInput.ContentEncoding = aws.String(contentEncoding)
-			}
-
-			if cacheControl != "" {
-				putObjectInput.CacheControl = aws.String(cacheControl)
-			}
-
-			if p.Encryption != "" {
-				putObjectInput.ServerSideEncryption = aws.String(p.Encryption)
-			}
-
-			if p.StorageClass != "" {
-				putObjectInput.StorageClass = &(p.StorageClass)
-			}
-
-			// optionally compress
-			if p.Compress {
-				gr, err := gzip.NewReader(f)
-				if err != nil {
-					log.WithFields(log.Fields{
-						"error": err,
-						"file":  match,
-					}).Error("Problem gzipping file")
-					return err
-				}
-				// wrap with gzip
-				putObjectInput.Body = &gzipReadSeeker{rs: f, z: gr}
-				// set encoding
-				putObjectInput.ContentEncoding = aws.String("gzip")
-			} else {
-				putObjectInput.Body = f
-			}
-
-			// Upload the object
-			log.WithFields(log.Fields{
-				"name":   match,
-				"bucket": p.Bucket,
-				"target": target,
-			}).Info("Uploading file")
-
-			// do upload
-			retryIndex := 0
-			for {
-				_, err = client.PutObject(putObjectInput)
-				retryIndex++
-				if err == nil || retryIndex > p.RetryCount {
-					break
-				} else {
-					log.WithFields(log.Fields{
-						"name":        match,
-						"bucket":      p.Bucket,
-						"target":      target,
-						"error":       err,
-						"retry_index": retryIndex,
-						"retry_count": p.RetryCount,
-						"retry_delay": p.RetryDelay,
-					}).Error("Could not upload file, retrying...")
-					time.Sleep(p.RetryDelay)
-				}
-			}
-
-			if err != nil {
-				log.WithFields(log.Fields{
-					"name":   match,
-					"bucket": p.Bucket,
-					"target": target,
-					"error":  err,
-				}).Error("Could not upload file")
-
-				return err
-			}
-		} else {
-
-			if !p.Overwrite {
-				// Object exists, write log message
-				log.WithFields(log.Fields{
-					"name":   match,
-					"bucket": p.Bucket,
-					"target": target,
-				}).Info("File already exists, skipping upload due to overwrite=false")
-			} else {
-
-				if contentType != "" {
-					putObjectInput.ContentType = aws.String(contentType)
-				}
-
-				if contentEncoding != "" {
-					putObjectInput.ContentEncoding = aws.String(contentEncoding)
-				}
-
-				if cacheControl != "" {
-					putObjectInput.CacheControl = aws.String(cacheControl)
-				}
-
-				if p.Encryption != "" {
-					putObjectInput.ServerSideEncryption = aws.String(p.Encryption)
-				}
-
-				if p.StorageClass != "" {
-					putObjectInput.StorageClass = &(p.StorageClass)
-				}
-
-				// optionally compress
-				if p.Compress {
-					gr, err := gzip.NewReader(f)
-					if err != nil {
-						log.WithFields(log.Fields{
-							"error": err,
-							"file":  match,
-						}).Error("Problem gzipping file")
-						return err
-					}
-					// wrap with gzip
-					putObjectInput.Body = &gzipReadSeeker{rs: f, z: gr}
-					// set encoding
-					putObjectInput.ContentEncoding = aws.String("gzip")
-				} else {
-					putObjectInput.Body = f
-				}
-
-				log.WithFields(log.Fields{
-					"name":   match,
-					"bucket": p.Bucket,
-					"target": target,
-				}).Info("Uploading file")
-
-				// do upload
-				retryIndex := 0
-				for {
-					_, err = client.PutObject(putObjectInput)
-					retryIndex++
-					if err == nil || retryIndex > p.RetryCount {
-						break
-					} else {
-						log.WithFields(log.Fields{
-							"name":        match,
-							"bucket":      p.Bucket,
-							"target":      target,
-							"error":       err,
-							"retry_index": retryIndex,
-							"retry_count": p.RetryCount,
-							"retry_delay": p.RetryDelay,
-						}).Error("Could not upload file, retrying...")
-						time.Sleep(p.RetryDelay)
-					}
-				}
-
-				if err != nil {
-					log.WithFields(log.Fields{
-						"name":   match,
-						"bucket": p.Bucket,
-						"target": target,
-						"error":  err,
-					}).Error("Could not upload file")
-
-					return err
-				}
-			}
+			p.doUpload(client, putObjectInput, f, file)
+		} else if !p.Overwrite {
+			// Object exists, write log message
+			slog.Info("File already exists, skipping upload due to overwrite=false",
+				slog.String("file", file))
 		}
 
 		f.Close()
 	}
 
+	return nil
+}
+
+func (p *Plugin) doUpload(client *s3.S3, putObjectInput *s3.PutObjectInput, f *os.File, file string) error {
+	// optionally compress
+	if p.Compress {
+		gr, err := gzip.NewReader(f)
+		if err != nil {
+			slog.Error("Problem gzipping file", slog.String("file", file), slog.String("err", err.Error()))
+			return err
+		}
+		// wrap with gzip
+		putObjectInput.Body = &gzipReadSeeker{rs: f, z: gr}
+		// set encoding
+		putObjectInput.ContentEncoding = aws.String("gzip")
+	} else {
+		putObjectInput.Body = f
+	}
+
+	slog.Info("Uploading file",
+		slog.String("file", file),
+		slog.String("target", *putObjectInput.Key))
+
+	// do upload
+	retryIndex := 0
+	var err error
+	for {
+		_, err = client.PutObject(putObjectInput)
+		retryIndex++
+		if err == nil || retryIndex > p.RetryCount {
+			break
+		} else {
+			slog.Error("Could not upload file, retrying...",
+				slog.String("file", file),
+				slog.String("target", *putObjectInput.Key),
+				slog.String("err", err.Error()),
+				slog.Int("retry_index", retryIndex))
+			time.Sleep(p.RetryDelay)
+		}
+	}
+
+	if err != nil {
+		slog.Error("Could not upload file",
+			slog.String("file", file),
+			slog.String("target", *putObjectInput.Key),
+			slog.String("err", err.Error()))
+
+		return err
+	}
 	return nil
 }
 
@@ -458,9 +357,7 @@ func matchExtension(match string, stringMap map[string]string) string {
 func assumeRole(roleArn, roleSessionName string) *credentials.Credentials {
 	sess, err := session.NewSession()
 	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Error("Failed to create AWS session for assume role")
+		slog.Error("Failed to create AWS session for assume role", slog.String("err", err.Error()))
 	}
 	client := sts.New(sess)
 	duration := time.Hour * 1

@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"os"
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v3"
 )
 
@@ -150,7 +150,7 @@ func main() {
 	}
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
-		logrus.Fatal(err)
+		log.Fatal(err)
 	}
 }
 
