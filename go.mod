@@ -2,7 +2,7 @@ module codeberg.org/woodpecker-plugins/plugin-s3
 
 go 1.22
 
-toolchain go1.24.4
+toolchain go1.24.5
 
 require (
 	github.com/aws/aws-sdk-go v1.55.7
