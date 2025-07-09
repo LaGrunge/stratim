@@ -180,6 +180,9 @@ func run(ctx context.Context, c *cli.Command) error {
 		Overwrite:             c.Bool("overwrite"),
 		RetryCount:            c.Int("retry-count"),
 		RetryDelay:            c.Duration("retry-delay"),
+		ContentType:           map[string]string{},
+		ContentEncoding:       map[string]string{},
+		CacheControl:          map[string]string{},
 	}
 
 	if err := json.Unmarshal([]byte(c.String("content-type")), &plugin.ContentType); err != nil {
