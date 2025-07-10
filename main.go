@@ -155,7 +155,7 @@ func main() {
 	}
 }
 
-func run(_ context.Context, c *cli.Command) error {
+func run(ctx context.Context, c *cli.Command) error {
 	if c.String("env-file") != "" {
 		_ = godotenv.Load(c.String("env-file"))
 	}
@@ -198,5 +198,5 @@ func run(_ context.Context, c *cli.Command) error {
 		plugin.CacheControl[".*"] = c.String("cache-control")
 	}
 
-	return plugin.Exec()
+	return plugin.Exec(ctx)
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"compress/gzip"
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -12,12 +13,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/mattn/go-zglob"
 )
 
@@ -103,33 +105,32 @@ type Plugin struct {
 }
 
 // Exec runs the plugin
-func (p *Plugin) Exec() error {
+func (p *Plugin) Exec(ctx context.Context) error {
 	// normalize the target URL
 	p.Target = strings.TrimPrefix(p.Target, "/")
 
-	// create the client
-	conf := &aws.Config{
-		Region:           aws.String(p.Region),
-		Endpoint:         &p.Endpoint,
-		DisableSSL:       aws.Bool(strings.HasPrefix(p.Endpoint, "http://")),
-		S3ForcePathStyle: aws.Bool(p.PathStyle),
-	}
-
-	switch {
-	case p.Key != "" && p.Secret != "":
-		conf.Credentials = credentials.NewStaticCredentials(p.Key, p.Secret, "")
-	case p.AssumeRole != "":
-		conf.Credentials = assumeRole(p.AssumeRole, p.AssumeRoleSessionName)
-	default:
-		slog.Warn("AWS Key and/or Secret not provided (falling back to ec2 instance profile)")
-	}
-
-	sess, err := session.NewSession(conf)
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(p.Region), config.WithBaseEndpoint(p.Endpoint))
 	if err != nil {
 		slog.Error("Failed to create AWS session", slog.String("err", err.Error()))
 		return err
 	}
-	client := s3.New(sess)
+
+	switch {
+	case p.Key != "" && p.Secret != "":
+		cfg.Credentials = credentials.NewStaticCredentialsProvider(p.Key, p.Secret, "")
+	case p.AssumeRole != "":
+		client := sts.NewFromConfig(cfg)
+		cfg.Credentials = stscreds.NewAssumeRoleProvider(client, p.AssumeRole, func(o *stscreds.AssumeRoleOptions) {
+			o.RoleSessionName = p.AssumeRoleSessionName
+		})
+	default:
+		slog.Warn("AWS Key and/or Secret not provided (falling back to ec2 instance profile)")
+	}
+
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.UsePathStyle = p.PathStyle
+		o.EndpointOptions.DisableHTTPS = strings.HasPrefix(p.Endpoint, "http://")
+	})
 
 	// find the bucket
 	slog.Info("Attempting to upload",
@@ -186,9 +187,9 @@ func (p *Plugin) Exec() error {
 
 		putObjectInput := &s3.PutObjectInput{
 			Body:   f,
-			Bucket: &(p.Bucket),
-			Key:    &target,
-			ACL:    &(p.Access),
+			Bucket: aws.String(p.Bucket),
+			Key:    aws.String(target),
+			ACL:    types.ObjectCannedACL(p.Access),
 		}
 		if contentType != "" {
 			putObjectInput.ContentType = aws.String(contentType)
@@ -203,11 +204,11 @@ func (p *Plugin) Exec() error {
 		}
 
 		if p.Encryption != "" {
-			putObjectInput.ServerSideEncryption = aws.String(p.Encryption)
+			putObjectInput.ServerSideEncryption = types.ServerSideEncryption(p.Encryption)
 		}
 
 		if p.StorageClass != "" {
-			putObjectInput.StorageClass = &(p.StorageClass)
+			putObjectInput.StorageClass = types.StorageClass(p.StorageClass)
 		}
 
 		// Check if the object exists
@@ -216,10 +217,10 @@ func (p *Plugin) Exec() error {
 			Key:    &target,
 		}
 
-		_, err = client.HeadObject(headObjectInput)
+		_, err = client.HeadObject(ctx, headObjectInput)
 		if err != nil || p.Overwrite {
 			// If the error indicates the object does not exist, upload the file
-			if err := p.doUpload(client, putObjectInput, f, file); err != nil {
+			if err := p.doUpload(ctx, client, putObjectInput, f, file); err != nil {
 				return err
 			}
 		} else if !p.Overwrite {
@@ -234,7 +235,7 @@ func (p *Plugin) Exec() error {
 	return nil
 }
 
-func (p *Plugin) doUpload(client *s3.S3, putObjectInput *s3.PutObjectInput, f *os.File, file string) error {
+func (p *Plugin) doUpload(ctx context.Context, client *s3.Client, putObjectInput *s3.PutObjectInput, f *os.File, file string) error {
 	// optionally compress
 	if p.Compress {
 		gr, err := gzip.NewReader(f)
@@ -258,7 +259,7 @@ func (p *Plugin) doUpload(client *s3.S3, putObjectInput *s3.PutObjectInput, f *o
 	retryIndex := 0
 	var err error
 	for {
-		_, err = client.PutObject(putObjectInput)
+		_, err = client.PutObject(ctx, putObjectInput)
 		retryIndex++
 		if err == nil || retryIndex > p.RetryCount {
 			break
@@ -355,21 +356,4 @@ func matchExtension(match string, stringMap map[string]string) string {
 	}
 
 	return ""
-}
-
-func assumeRole(roleArn, roleSessionName string) *credentials.Credentials {
-	sess, err := session.NewSession()
-	if err != nil {
-		slog.Error("Failed to create AWS session for assume role", slog.String("err", err.Error()))
-	}
-	client := sts.New(sess)
-	duration := time.Hour * 1
-	stsProvider := &stscreds.AssumeRoleProvider{
-		Client:          client,
-		Duration:        duration,
-		RoleARN:         roleArn,
-		RoleSessionName: roleSessionName,
-	}
-
-	return credentials.NewCredentials(stsProvider)
 }
