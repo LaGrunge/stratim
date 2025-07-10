@@ -42,7 +42,7 @@ steps:
       target: /target/location
 ```
 
-Use the build number in the S3 target prefix:
+Use the pipeline number in the S3 target prefix:
 
 ```yml
 steps:
@@ -51,7 +51,7 @@ steps:
     settings:
       bucket: my-bucket-name
       source: public/**/*
-      target: /target/location/${CI_BUILD_NUMBER}
+      target: /target/location/${CI_PIPELINE_NUMBER}
 ```
 
 Override the default acl and region:
@@ -110,55 +110,31 @@ steps:
       endpoint: https://play.minio.io:9000
 ```
 
-## Parameter Reference
+## Settings Reference
 
-endpoint
-: custom endpoint URL (optional, to use a S3 compatible non-Amazon service)
-
-access_key
-: amazon key (optional)
-
-secret_key
-: amazon secret key (optional)
-
-bucket
-: bucket name
-
-region
-: bucket region (`us-east-1`, `eu-west-1`, etc)
-
-acl
-: access to files that are uploaded (`private`, `public-read`, etc)
-
-source
-: source location of the files, using a glob matching pattern. Location must be within the woodpecker workspace.
-
-target
-: target location of files in the bucket
-
-encryption
-: if provided, use server-side encryption
-
-strip_prefix
-: strip the prefix from source path
-
-exclude
-: glob exclusion patterns
-
-path_style
-: whether path style URLs should be used (true for minio)
-
-env_file
-: load env vars from file
-
-compress
-: prior to upload, compress files and use gzip content-encoding (false by default)
-
-overwrite
-: overwrite existing files (true by default)
-
-retry_count
-: number of times to retry an upload of a file if it fails (0 by default)
-
-retry_delay
-: amount of time to wait before each retry (5s by default)
+| Setting                    | Description                                                                                                    |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `endpoint`                 | custom endpoint URL (optional, to use a S3 compatible non-Amazon service)                                      |
+| `access_key`               | amazon key (optional)                                                                                          |
+| `secret_key`               | amazon secret key (optional)                                                                                   |
+| `assume_role`              | aws iam role to assume (optional)                                                                              |
+| `assume_role_session_name` | aws iam role session name to assume (default `woodpecker-s3`)                                                  |
+| `bucket`                   | bucket name                                                                                                    |
+| `region`                   | bucket region (`us-east-1`, `eu-west-1`, etc)                                                                  |
+| `acl`                      | access to files that are uploaded (`private`, `public-read`, etc)                                              |
+| `source`                   | source location of the files, using a glob matching pattern. Location must be within the woodpecker workspace. |
+| `target`                   | target location of files in the bucket                                                                         |
+| `encryption`               | if provided, use server-side encryption                                                                        |
+| `strip_prefix`             | strip the prefix from source path                                                                              |
+| `exclude`                  | glob exclusion patterns                                                                                        |
+| `path_style`               | whether path style URLs should be used (true for minio)                                                        |
+| `env_file`                 | load env vars from file                                                                                        |
+| `compress`                 | prior to upload, compress files and use gzip content-encoding (false by default)                               |
+| `overwrite`                | overwrite existing files (true by default)                                                                     |
+| `retry_count`              | number of times to retry an upload of a file if it fails (0 by default)                                        |
+| `retry_delay`              | amount of time to wait before each retry (5s by default)                                                       |
+| `content_type`             | JSON map of content types with globs as keys                                                                   |
+| `content_encoding`         | JSON map of content encoding with globs as keys                                                                |
+| `cache_control`            | JSON map of cache-control header with globs as keys                                                            |
+| `storage_class`            | set storage class to choose the best backend                                                                   |
+| `dry_run`                  | dry run for debug purposes                                                                                     |
