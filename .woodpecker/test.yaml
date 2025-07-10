@@ -7,6 +7,11 @@ when:
     branch: "renovate/*"
 
 steps:
+  markdownlint:
+    image: ghcr.io/igorshubovych/markdownlint-cli:v0.45.0
+    commands:
+      - markdownlint --ignore CHANGELOG.md .
+
   vendor:
     image: *golang
     commands:
