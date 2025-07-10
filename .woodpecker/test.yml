@@ -13,11 +13,10 @@ steps:
       - go mod vendor
 
   lint:
-    image: *golang
+    image: golangci/golangci-lint:v2.2.1
     depends_on: [ vendor ]
     commands:
-      - make vet
-      - make formatcheck
+      - make lint
 
   test:
     image: *golang

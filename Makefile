@@ -27,21 +27,17 @@ vendor:
 	go mod tidy
 	go mod vendor
 
-formatcheck:
-	@([ -z "$(shell gofmt -d $(GOFILES_NOVENDOR) | head)" ]) || (echo "Source is unformatted"; exit 1)
-
 format:
-	@gofmt -w ${GOFILES_NOVENDOR}
+	@gofumpt -extra -w ${GOFILES_NOVENDOR}
 
 .PHONY: clean
 clean:
 	go clean -i ./...
 	rm -rf release/
 
-.PHONY: vet
-vet:
-	@echo "Running go vet..."
-	@go vet $(GO_PACKAGES)
+.PHONY: lint
+lint:
+	@golangci-lint run
 
 .PHONY: test
 test:

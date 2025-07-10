@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -144,17 +144,18 @@ func main() {
 				Name:    "retry-delay",
 				Usage:   "tamount of time to wait before each retry",
 				Sources: cli.EnvVars("PLUGIN_RETRY_DELAY"),
-				Value:   time.Duration(5) * time.Second,
+				Value:   time.Duration(5) * time.Second, //nolint:mnd
 			},
 		},
 	}
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
-		log.Fatal(err)
+		slog.Error(err.Error())
+		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, c *cli.Command) error {
+func run(_ context.Context, c *cli.Command) error {
 	if c.String("env-file") != "" {
 		_ = godotenv.Load(c.String("env-file"))
 	}

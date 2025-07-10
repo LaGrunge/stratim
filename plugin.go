@@ -115,11 +115,12 @@ func (p *Plugin) Exec() error {
 		S3ForcePathStyle: aws.Bool(p.PathStyle),
 	}
 
-	if p.Key != "" && p.Secret != "" {
+	switch {
+	case p.Key != "" && p.Secret != "":
 		conf.Credentials = credentials.NewStaticCredentials(p.Key, p.Secret, "")
-	} else if p.AssumeRole != "" {
+	case p.AssumeRole != "":
 		conf.Credentials = assumeRole(p.AssumeRole, p.AssumeRoleSessionName)
-	} else {
+	default:
 		slog.Warn("AWS Key and/or Secret not provided (falling back to ec2 instance profile)")
 	}
 
@@ -218,7 +219,9 @@ func (p *Plugin) Exec() error {
 		_, err = client.HeadObject(headObjectInput)
 		if err != nil || p.Overwrite {
 			// If the error indicates the object does not exist, upload the file
-			p.doUpload(client, putObjectInput, f, file)
+			if err := p.doUpload(client, putObjectInput, f, file); err != nil {
+				return err
+			}
 		} else if !p.Overwrite {
 			// Object exists, write log message
 			slog.Info("File already exists, skipping upload due to overwrite=false",
@@ -259,14 +262,14 @@ func (p *Plugin) doUpload(client *s3.S3, putObjectInput *s3.PutObjectInput, f *o
 		retryIndex++
 		if err == nil || retryIndex > p.RetryCount {
 			break
-		} else {
-			slog.Error("Could not upload file, retrying...",
-				slog.String("file", file),
-				slog.String("target", *putObjectInput.Key),
-				slog.String("err", err.Error()),
-				slog.Int("retry_index", retryIndex))
-			time.Sleep(p.RetryDelay)
 		}
+
+		slog.Error("Could not upload file, retrying...",
+			slog.String("file", file),
+			slog.String("target", *putObjectInput.Key),
+			slog.String("err", err.Error()),
+			slog.Int("retry_index", retryIndex))
+		time.Sleep(p.RetryDelay)
 	}
 
 	if err != nil {
@@ -299,7 +302,7 @@ func (grs *gzipReadSeeker) Seek(offset int64, whence int) (int64, error) {
 		}
 		return grs.rs.Seek(0, 0)
 	}
-	return 0, errors.New("Non-zero seek not supported")
+	return 0, errors.New("non-zero seek not supported")
 }
 
 // matches is a helper function that returns a list of all files matching the
@@ -341,9 +344,9 @@ func matches(include string, exclude []string) ([]string, error) {
 func matchExtension(match string, stringMap map[string]string) string {
 	for pattern := range stringMap {
 		matched, err := regexp.MatchString(pattern, match)
-
 		if err != nil {
-			panic(err)
+			slog.Error(err.Error())
+			os.Exit(1)
 		}
 
 		if matched {
