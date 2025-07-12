@@ -10,7 +10,7 @@ steps:
   markdownlint:
     image: ghcr.io/igorshubovych/markdownlint-cli:v0.45.0
     commands:
-      - markdownlint --ignore CHANGELOG.md .
+      - markdownlint --ignore CHANGELOG.md --ignore vendor/ .
 
   vendor:
     image: *golang

@@ -125,6 +125,7 @@ steps:
 | `source`                   | source location of the files, using a glob matching pattern. Location must be within the woodpecker workspace. |
 | `target`                   | target location of files in the bucket                                                                         |
 | `encryption`               | if provided, use server-side encryption                                                                        |
+| `encryption-key`           | server-side encryption key for KMS                                                                             |
 | `strip_prefix`             | strip the prefix from source path                                                                              |
 | `exclude`                  | glob exclusion patterns                                                                                        |
 | `path_style`               | whether path style URLs should be used (true for minio)                                                        |
