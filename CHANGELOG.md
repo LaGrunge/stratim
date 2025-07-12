@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.5.0](https://codeberg.org/woodpecker-plugins/plugin-s3/releases/tag/v1.5.0) - 2025-07-12
+
+### ❤️ Thanks to all contributors! ❤️
+
+@JnCrMx, @qwerty287, @woodpecker-bot
+
+### 📈 Enhancement
+
+- Allow specifying KMS key [[#277](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/277)]
+- Refactor plugin [[#269](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/269)]
+- Support retrying an upload if it fails [[#267](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/267)]
+
+### 📚 Documentation
+
+- Improve settings list [[#274](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/274)]
+
+### 📦️ Dependency
+
+- chore(deps): update golangci/golangci-lint docker tag to v2.2.2 [[#278](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/278)]
+- Migrate AWS SDK to v2 [[#273](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/273)]
+- chore(deps): update dependency go to v1.24.5 [[#270](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/270)]
+- fix(deps): update module github.com/urfave/cli/v2 to v3 [[#268](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/268)]
+- chore(deps): update docker.io/woodpeckerci/plugin-ready-release-go docker tag to v3.3.0 [[#265](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/265)]
+- chore(deps): update woodpeckerci/plugin-docker-buildx docker tag to v6.0.2 [[#264](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/264)]
+
+### Misc
+
+- Add markdownlint [[#276](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/276)]
+- Enable golangci-lint [[#275](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/275)]
+
 ## [1.4.0](https://codeberg.org/woodpecker-plugins/plugin-s3/releases/tag/v1.4.0) - 2025-06-29
 
 ### ❤️ Thanks to all contributors! ❤️
