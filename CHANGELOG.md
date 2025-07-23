@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.5.1](https://codeberg.org/woodpecker-plugins/plugin-s3/releases/tag/v1.5.1) - 2025-07-23
+
+### ❤️ Thanks to all contributors! ❤️
+
+@qwerty287, @woodpecker-bot
+
+### 🐛 Bug Fixes
+
+- Don't prepend `/` [[#283](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/283)]
+
+### 📦️ Dependency
+
+- chore(deps): update golangci/golangci-lint docker tag to v2.3.0 [[#284](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/284)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#280](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/280)]
+
 ## [1.5.0](https://codeberg.org/woodpecker-plugins/plugin-s3/releases/tag/v1.5.0) - 2025-07-12
 
 ### ❤️ Thanks to all contributors! ❤️
