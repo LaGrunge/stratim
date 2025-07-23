@@ -160,9 +160,6 @@ func (p *Plugin) Exec(ctx context.Context) error {
 		}
 
 		target := filepath.Join(p.Target, strings.TrimPrefix(file, p.StripPrefix))
-		if !strings.HasPrefix(target, "/") {
-			target = "/" + target
-		}
 
 		contentType := matchExtension(file, p.ContentType)
 		contentEncoding := matchExtension(file, p.ContentEncoding)
