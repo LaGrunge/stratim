@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"mime"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -159,7 +160,7 @@ func (p *Plugin) Exec(ctx context.Context) error {
 			continue
 		}
 
-		target := filepath.Join(p.Target, strings.TrimPrefix(file, p.StripPrefix))
+		target := path.Join(p.Target, strings.TrimPrefix(file, p.StripPrefix))
 
 		contentType := matchExtension(file, p.ContentType)
 		contentEncoding := matchExtension(file, p.ContentEncoding)
