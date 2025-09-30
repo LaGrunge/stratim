@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.5.2](https://codeberg.org/woodpecker-plugins/plugin-s3/releases/tag/v1.5.2) - 2025-09-27
+
+### ❤️ Thanks to all contributors! ❤️
+
+@flimmy, @woodpecker-bot
+
+### 🐛 Bug Fixes
+
+- switch pathbuilding to / instead of os-specific for upload-target [[#285](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/285)]
+
+### 📦️ Dependency
+
+- fix(deps): update aws-sdk-go-v2 monorepo [[#298](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/298)]
+- chore(deps): update golangci/golangci-lint docker tag to v2.5.0 [[#297](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/297)]
+- chore(deps): update dependency go to v1.25.1 [[#292](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/292)]
+- chore(deps): update golangci/golangci-lint docker tag to v2.4.0 [[#294](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/294)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#295](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/295)]
+- fix(deps): update module github.com/urfave/cli/v3 to v3.4.1 [[#296](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/296)]
+- chore(deps): update golang docker tag to v1.25 [[#293](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/293)]
+- chore(deps): update docker.io/woodpeckerci/plugin-ready-release-go docker tag to v3.4.0 [[#291](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/291)]
+- chore(deps): update dependency go to v1.24.6 [[#289](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/289)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#290](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/290)]
+- chore(deps): update golangci/golangci-lint docker tag to v2.3.1 [[#288](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/288)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#286](https://codeberg.org/woodpecker-plugins/plugin-s3/pulls/286)]
+
 ## [1.5.1](https://codeberg.org/woodpecker-plugins/plugin-s3/releases/tag/v1.5.1) - 2025-07-23
 
 ### ❤️ Thanks to all contributors! ❤️
