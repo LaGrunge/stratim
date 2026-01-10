@@ -1,23 +1,24 @@
 ---
-name: S3 Plugin
+name: S3
 author: Woodpecker Authors
-icon: https://raw.githubusercontent.com/woodpecker-ci/plugin-s3/main/s3.svg
+icon: https://codeberg.org/woodpecker-plugins/s3/raw/branch/main/s3.svg
 description: Plugin to publish files and artifacts to Amazon S3 or Minio.
 tags: [publish, s3, amazon, minio, storage]
 containerImage: woodpeckerci/plugin-s3
 containerImageUrl: https://hub.docker.com/r/woodpeckerci/plugin-s3
-url: https://codeberg.org/woodpecker-plugins/plugin-s3
+url: https://codeberg.org/woodpecker-plugins/s3
 ---
 
 # S3 Plugin
 
 The S3 plugin uploads files and build artifacts to your S3 bucket, or S3-compatible bucket such as Minio.
+If you can not use docker.io there is an mirror at `codeberg.org/woodpecker-plugins/s3`.
 The below pipeline configuration demonstrates simple usage:
 
 ```yml
 steps:
   upload:
-    image: woodpeckerci/plugin-s3
+    image: docker.io/woodpeckerci/plugin-s3
     settings:
       bucket: my-bucket-name
       access_key: a50d28f4dd477bc184fbd10b376de753
@@ -31,7 +32,7 @@ Source the aws credentials from secrets:
 ```yml
 steps:
   upload:
-    image: woodpeckerci/plugin-s3
+    image: docker.io/woodpeckerci/plugin-s3
     settings:
       bucket: my-bucket-name
       access_key:
@@ -47,7 +48,7 @@ Use the pipeline number in the S3 target prefix:
 ```yml
 steps:
   upload:
-    image: woodpeckerci/plugin-s3
+    image: docker.io/woodpeckerci/plugin-s3
     settings:
       bucket: my-bucket-name
       source: public/**/*
@@ -59,7 +60,7 @@ Override the default acl and region:
 ```yml
 steps:
   - name: upload
-    image: woodpeckerci/plugin-s3
+    image: docker.io/woodpeckerci/plugin-s3
     settings:
       bucket: my-bucket-name
       acl: public-read
@@ -73,7 +74,7 @@ Configure the plugin to strip path prefixes when uploading:
 ```yml
 steps:
   upload:
-    image: woodpeckerci/plugin-s3
+    image: docker.io/woodpeckerci/plugin-s3
     settings:
       bucket: my-bucket-name
       source: public/**/*
@@ -86,7 +87,7 @@ Configure the plugin to exclude files from upload and compress:
 ```yml
 steps:
   upload:
-    image: woodpeckerci/plugin-s3
+    image: docker.io/woodpeckerci/plugin-s3
     settings:
       bucket: my-bucket-name
       source: public/**/*
@@ -101,7 +102,7 @@ Configure the plugin to connect to a Minio server:
 ```yml
 steps:
   upload:
-    image: woodpeckerci/plugin-s3
+    image: docker.io/woodpeckerci/plugin-s3
     settings:
       bucket: my-bucket-name
       source: public/**/*

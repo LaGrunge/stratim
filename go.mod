@@ -1,4 +1,4 @@
-module codeberg.org/woodpecker-plugins/plugin-s3
+module codeberg.org/woodpecker-plugins/s3
 
 go 1.23
 
