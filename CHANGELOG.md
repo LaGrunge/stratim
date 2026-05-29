@@ -1,5 +1,54 @@
 # Changelog
 
+## [1.5.4](https://codeberg.org/woodpecker-plugins/s3/releases/tag/v1.5.4) - 2026-05-29
+
+### ❤️ Thanks to all contributors! ❤️
+
+@woodpecker-bot
+
+### 📦️ Dependency
+
+- fix(deps): update aws-sdk-go-v2 monorepo [[#371](https://codeberg.org/woodpecker-plugins/s3/pulls/371)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#370](https://codeberg.org/woodpecker-plugins/s3/pulls/370)]
+- fix(deps): update module github.com/urfave/cli/v3 to v3.9.0 [[#369](https://codeberg.org/woodpecker-plugins/s3/pulls/369)]
+- chore(deps): update go toolchain directive to v1.26.3 [[#368](https://codeberg.org/woodpecker-plugins/s3/pulls/368)]
+- fix(deps): update module github.com/aws/aws-sdk-go-v2/service/s3 to v1.101.0 [[#367](https://codeberg.org/woodpecker-plugins/s3/pulls/367)]
+- chore(deps): update golangci/golangci-lint docker tag to v2.12.2 [[#366](https://codeberg.org/woodpecker-plugins/s3/pulls/366)]
+- chore(deps): update golangci/golangci-lint docker tag to v2.12.1 [[#365](https://codeberg.org/woodpecker-plugins/s3/pulls/365)]
+- chore(deps): update golangci/golangci-lint docker tag to v2.12.0 [[#364](https://codeberg.org/woodpecker-plugins/s3/pulls/364)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#363](https://codeberg.org/woodpecker-plugins/s3/pulls/363)]
+- fix(deps): update module github.com/aws/aws-sdk-go-v2/service/s3 to v1.100.0 [[#362](https://codeberg.org/woodpecker-plugins/s3/pulls/362)]
+- chore(deps): update docker.io/woodpeckerci/plugin-ready-release-go docker tag to v4.1.1 [[#360](https://codeberg.org/woodpecker-plugins/s3/pulls/360)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#361](https://codeberg.org/woodpecker-plugins/s3/pulls/361)]
+- chore(deps): update dependency go to v1.26.2 [[#358](https://codeberg.org/woodpecker-plugins/s3/pulls/358)]
+- fix(deps): update module github.com/aws/aws-sdk-go-v2/service/s3 to v1.99.0 [[#359](https://codeberg.org/woodpecker-plugins/s3/pulls/359)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#357](https://codeberg.org/woodpecker-plugins/s3/pulls/357)]
+- fix(deps): update module github.com/urfave/cli/v3 to v3.8.0 [[#356](https://codeberg.org/woodpecker-plugins/s3/pulls/356)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#354](https://codeberg.org/woodpecker-plugins/s3/pulls/354)]
+- chore(deps): update docker.io/woodpeckerci/plugin-ready-release-go docker tag to v4.1.0 [[#355](https://codeberg.org/woodpecker-plugins/s3/pulls/355)]
+- chore(deps): update golangci/golangci-lint docker tag to v2.11.4 [[#353](https://codeberg.org/woodpecker-plugins/s3/pulls/353)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#352](https://codeberg.org/woodpecker-plugins/s3/pulls/352)]
+- chore(deps): update golangci/golangci-lint docker tag to v2.11.3 [[#351](https://codeberg.org/woodpecker-plugins/s3/pulls/351)]
+- chore(deps): update golangci/golangci-lint docker tag to v2.11.2 [[#350](https://codeberg.org/woodpecker-plugins/s3/pulls/350)]
+- chore(deps): update ghcr.io/igorshubovych/markdownlint-cli docker tag to v0.48.0 [[#349](https://codeberg.org/woodpecker-plugins/s3/pulls/349)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#348](https://codeberg.org/woodpecker-plugins/s3/pulls/348)]
+- chore(deps): update dependency go to v1.26.1 [[#347](https://codeberg.org/woodpecker-plugins/s3/pulls/347)]
+- fix(deps): update module github.com/urfave/cli/v3 to v3.7.0 [[#346](https://codeberg.org/woodpecker-plugins/s3/pulls/346)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#345](https://codeberg.org/woodpecker-plugins/s3/pulls/345)]
+- chore(deps): update docker.io/woodpeckerci/plugin-ready-release-go docker tag to v4 [[#344](https://codeberg.org/woodpecker-plugins/s3/pulls/344)]
+- chore(deps): update golangci/golangci-lint docker tag to v2.10.1 [[#343](https://codeberg.org/woodpecker-plugins/s3/pulls/343)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#342](https://codeberg.org/woodpecker-plugins/s3/pulls/342)]
+- chore(deps): update dependency go to v1.26.0 [[#339](https://codeberg.org/woodpecker-plugins/s3/pulls/339)]
+- chore(deps): update golangci/golangci-lint docker tag to v2.9.0 [[#341](https://codeberg.org/woodpecker-plugins/s3/pulls/341)]
+- chore(deps): update golang docker tag to v1.26 [[#340](https://codeberg.org/woodpecker-plugins/s3/pulls/340)]
+- chore(deps): update dependency go to v1.25.7 [[#338](https://codeberg.org/woodpecker-plugins/s3/pulls/338)]
+- fix(deps): update module github.com/aws/aws-sdk-go-v2/service/s3 to v1.96.0 [[#337](https://codeberg.org/woodpecker-plugins/s3/pulls/337)]
+- fix(deps): update module github.com/urfave/cli/v3 to v3.6.2 [[#336](https://codeberg.org/woodpecker-plugins/s3/pulls/336)]
+- chore(deps): update dependency go to v1.25.6 [[#335](https://codeberg.org/woodpecker-plugins/s3/pulls/335)]
+- chore(deps): update docker.io/woodpeckerci/plugin-ready-release-go docker tag to v3.4.1 [[#333](https://codeberg.org/woodpecker-plugins/s3/pulls/333)]
+- fix(deps): update aws-sdk-go-v2 monorepo [[#330](https://codeberg.org/woodpecker-plugins/s3/pulls/330)]
+- chore(deps): update golangci/golangci-lint docker tag to v2.8.0 [[#331](https://codeberg.org/woodpecker-plugins/s3/pulls/331)]
+
 ## [1.5.3](https://codeberg.org/woodpecker-plugins/s3/releases/tag/v1.5.3) - 2026-01-10
 
 ### ❤️ Thanks to all contributors! ❤️
