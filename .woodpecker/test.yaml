@@ -8,7 +8,7 @@ when:
 
 steps:
   markdownlint:
-    image: ghcr.io/igorshubovych/markdownlint-cli:v0.48.0
+    image: ghcr.io/igorshubovych/markdownlint-cli:v0.49.0
     commands:
       - markdownlint --ignore CHANGELOG.md --ignore vendor/ .
 
