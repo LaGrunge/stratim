@@ -111,6 +111,22 @@ steps:
       endpoint: https://play.minio.io:9000
 ```
 
+Some settings allow you to map regexes so you can assign different values to matching files.
+Here's how you could add specific cache control headers for different types of files:
+
+```yml
+steps:
+  upload:
+    image: docker.io/woodpeckerci/plugin-s3
+    settings:
+      # ...
+      cache_control:
+        "\\\\.html$": "public,max_age=600"
+        "\\\\.(woff2|js|css|png|svg)$": "public,max_age=12000"
+```
+
+> Note that \\\\. means a literal '.' - you need to escape backslashes twice, once for the regex (\. becomes \\.), then againg for the yaml string (\\ becomes \\\\), resulting in 4.
+
 ## Settings Reference
 
 | Setting                    | Description                                                                                                    |
@@ -135,8 +151,8 @@ steps:
 | `overwrite`                | overwrite existing files (true by default)                                                                     |
 | `retry_count`              | number of times to retry an upload of a file if it fails (0 by default)                                        |
 | `retry_delay`              | amount of time to wait before each retry (5s by default)                                                       |
-| `content_type`             | JSON map of content types with globs as keys                                                                   |
-| `content_encoding`         | JSON map of content encoding with globs as keys                                                                |
-| `cache_control`            | JSON map of cache-control header with globs as keys                                                            |
+| `content_type`             | map of content types with regexes as keys                                                                      |
+| `content_encoding`         | map of content encoding with regexes as keys                                                                   |
+| `cache_control`            | map of cache-control header with regexes as keys                                                               |
 | `storage_class`            | set storage class to choose the best backend                                                                   |
 | `dry_run`                  | dry run for debug purposes                                                                                     |
