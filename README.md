@@ -1,7 +1,6 @@
 # plugin-s3
 
 [![Build Status](https://ci.codeberg.org/api/badges/15974/status.svg)](https://ci.codeberg.org/woodpecker-plugins/s3)
-[![Go Report Card](https://goreportcard.com/badge/codeberg.org/woodpecker-plugins/s3)](https://goreportcard.com/badge/codeberg.org/woodpecker-plugins/s3)
 [![GoDoc](https://godoc.org/codeberg.org/woodpecker-plugins/s3?status.svg)](https://godoc.org/codeberg.org/woodpecker-plugins/s3)
 [![Docker pulls](https://img.shields.io/docker/pulls/woodpeckerci/plugin-s3)](https://hub.docker.com/r/woodpeckerci/plugin-s3)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
