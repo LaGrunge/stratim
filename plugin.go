@@ -218,7 +218,7 @@ func (p *Plugin) Exec(ctx context.Context) error {
 
 		// Check if the object exists
 		headObjectInput := &s3.HeadObjectInput{
-			Bucket: &(p.Bucket),
+			Bucket: &p.Bucket,
 			Key:    &target,
 		}
 
