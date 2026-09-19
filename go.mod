@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.1
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.0
 	github.com/joho/godotenv v1.5.1
-	github.com/mattn/go-zglob v0.0.6
+	github.com/mattn/go-zglob v0.0.8
 	github.com/urfave/cli/v3 v3.12.0
 )
 
