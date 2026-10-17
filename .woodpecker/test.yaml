@@ -18,7 +18,7 @@ steps:
       - go mod vendor
 
   lint:
-    image: golangci/golangci-lint:v2.14.0
+    image: golangci/golangci-lint:v2.15.0
     depends_on: [ vendor ]
     commands:
       - make lint
