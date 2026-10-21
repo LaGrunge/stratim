@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 #
-# Build the Stratim server, agent and autoscaler images from this checkout
-# and push them to Docker Hub:
+# Build the Stratim server, agent, autoscaler and secrets extension images
+# from this checkout and push them to Docker Hub:
 #
-#   lagrunge/stratim-server      linux/amd64
-#   lagrunge/stratim-agent       linux/amd64, linux/arm64
-#   lagrunge/stratim-autoscaler  linux/amd64
+#   lagrunge/stratim-server       linux/amd64
+#   lagrunge/stratim-agent        linux/amd64, linux/arm64
+#   lagrunge/stratim-autoscaler   linux/amd64
+#   lagrunge/stratim-secrets-aws  linux/amd64
 #
 # Each is tagged with the short commit and with `next`. The binaries are
 # built here (Go on the host, the UI in a node container) and only copied
@@ -65,11 +66,12 @@ fi
 
 build() { # build <binary> <package> <ldflags> <arch>...
   local bin="$1" pkg="$2" ldflags="$3"; shift 3
-  local arch
+  local arch dir="${bin#woodpecker-}"
+  dir="${dir#stratim-}"
   for arch in "$@"; do
     log "building $bin for linux/$arch"
     CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -tags grpcnotrace \
-      -ldflags "-s -w $ldflags" -o "$STAGE/${bin#woodpecker-}/linux_$arch/$bin" "$pkg"
+      -ldflags "-s -w $ldflags" -o "$STAGE/$dir/linux_$arch/$bin" "$pkg"
   done
 }
 
@@ -78,6 +80,7 @@ build woodpecker-server "$MODULE/cmd/server" "-X $MODULE/version.Version=$VERSIO
 build woodpecker-agent "$MODULE/cmd/agent" "-X $MODULE/version.Version=$VERSION" amd64 arm64
 build woodpecker-autoscaler "$MODULE/autoscaler/cmd/woodpecker-autoscaler" \
   "-X $MODULE/autoscaler/version.Version=$VERSION" amd64
+build stratim-secrets-aws "$MODULE/cmd/secrets-aws" "" amd64
 
 image() { # image <name> <platforms>
   local name="$1" platforms="$2" out
@@ -96,6 +99,7 @@ image() { # image <name> <platforms>
 image server linux/amd64
 image agent linux/amd64,linux/arm64
 image autoscaler linux/amd64
+image secrets-aws linux/amd64
 
-log "done: $REPO_PREFIX-{server,agent,autoscaler}:$SHA"
+log "done: $REPO_PREFIX-{server,agent,autoscaler,secrets-aws}:$SHA"
 echo "$SHA"
