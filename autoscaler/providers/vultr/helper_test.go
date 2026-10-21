@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vultr/govultr/v3"
 
-	"go.woodpecker-ci.org/autoscaler/engine/types"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/types"
 )
 
 func TestMatchImagesOnlyAcceptsX64(t *testing.T) {

@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"go.woodpecker-ci.org/autoscaler/config"
-	"go.woodpecker-ci.org/autoscaler/engine/types"
-	mocks_provider "go.woodpecker-ci.org/autoscaler/engine/types/mocks"
-	mocks_server "go.woodpecker-ci.org/autoscaler/server/mocks"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/config"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/types"
+	mocks_provider "go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/types/mocks"
+	mocks_server "go.woodpecker-ci.org/woodpecker/v3/autoscaler/server/mocks"
 	"go.woodpecker-ci.org/woodpecker/v3/woodpecker-go/woodpecker"
 )
 

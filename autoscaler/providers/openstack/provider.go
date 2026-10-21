@@ -14,9 +14,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v3"
 
-	"go.woodpecker-ci.org/autoscaler/config"
-	"go.woodpecker-ci.org/autoscaler/engine/inits/cloudinit"
-	"go.woodpecker-ci.org/autoscaler/engine/types"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/config"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/inits/cloudinit"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/types"
 	"go.woodpecker-ci.org/woodpecker/v3/woodpecker-go/woodpecker"
 )
 

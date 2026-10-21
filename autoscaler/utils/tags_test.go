@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"go.woodpecker-ci.org/autoscaler/utils"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/utils"
 )
 
 func TestCheckReservedTags(t *testing.T) {

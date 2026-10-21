@@ -7,7 +7,7 @@ import (
 	"strings"
 	"text/template"
 
-	"go.woodpecker-ci.org/autoscaler/config"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/config"
 	"go.woodpecker-ci.org/woodpecker/v3/woodpecker-go/woodpecker"
 )
 

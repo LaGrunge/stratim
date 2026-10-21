@@ -215,13 +215,20 @@ test-ui: ui-dependencies ## Test UI code
 	(cd web/; pnpm run test)
 
 test-lib: ## Test lib code
-	go test -race -cover -coverpkg=./... -coverprofile coverage.out -timeout 60s -tags 'test $(TAGS)' $(shell go list ./... | grep -v '/cmd\|/agent\|/cli\|/server')
+	go test -race -cover -coverpkg=./... -coverprofile coverage.out -timeout 60s -tags 'test $(TAGS)' $(shell go list ./... | grep -v '/cmd\|/agent\|/cli\|/server\|/autoscaler\|/plugins')
 
 test-e2e: ## Test by running yaml config and compare expected result
 	go test -race -cover -coverpkg=./... -coverprofile e2e-coverage.out -timeout 60s -tags 'test $(TAGS)' ./e2e/...
 
+test-autoscaler: ## Test autoscaler code
+	go test -race -cover -coverpkg=./autoscaler/... -coverprofile autoscaler-coverage.out -timeout 60s -tags 'test $(TAGS)' ./autoscaler/...
+
+# The clone plugin tests clone public repositories and need git-lfs.
+test-plugins: ## Test plugin code
+	go test -race -cover -coverprofile plugins-coverage.out -timeout 300s -tags 'test $(TAGS)' ./plugins/...
+
 .PHONY: test
-test: test-agent test-server test-server-datastore test-cli test-lib test-e2e ## Run all tests
+test: test-agent test-server test-server-datastore test-cli test-lib test-e2e test-autoscaler test-plugins ## Run all tests
 
 FUZZ_TIME ?= 30s
 

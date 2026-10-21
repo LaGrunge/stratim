@@ -8,8 +8,8 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"go.woodpecker-ci.org/autoscaler/engine/types"
-	"go.woodpecker-ci.org/autoscaler/utils"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/types"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/utils"
 	shared_utils "go.woodpecker-ci.org/woodpecker/v3/shared/utils"
 	"go.woodpecker-ci.org/woodpecker/v3/woodpecker-go/woodpecker"
 )

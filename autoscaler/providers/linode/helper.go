@@ -9,7 +9,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"go.woodpecker-ci.org/autoscaler/engine"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine"
 )
 
 func generatePassword(length int) (string, error) {

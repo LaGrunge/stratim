@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"go.woodpecker-ci.org/autoscaler/providers/aws/ec2api/mocks"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/providers/aws/ec2api/mocks"
 )
 
 func TestValidateImageReference(t *testing.T) {

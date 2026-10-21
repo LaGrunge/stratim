@@ -3,7 +3,7 @@ package hcapi
 import (
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 
-	"go.woodpecker-ci.org/autoscaler/version"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/version"
 )
 
 type Client interface {

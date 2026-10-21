@@ -6,7 +6,7 @@ package mocks
 
 import (
 	mock "github.com/stretchr/testify/mock"
-	"go.woodpecker-ci.org/autoscaler/providers/hetznercloud/hcapi"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/providers/hetznercloud/hcapi"
 )
 
 // NewMockClient creates a new instance of MockClient. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

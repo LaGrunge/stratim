@@ -30,3 +30,4 @@ vendor/
 
 coverage.out
 plugin-s3
+/s3

@@ -25,7 +25,7 @@ else
 	endif
 endif
 
-LDFLAGS := -s -w -extldflags "-static" -X go.woodpecker-ci.org/autoscaler/version.Version=${VERSION}
+LDFLAGS := -s -w -extldflags "-static" -X go.woodpecker-ci.org/woodpecker/v3/autoscaler/version.Version=${VERSION}
 CGO_ENABLED := 0
 
 HAS_GO = $(shell hash go > /dev/null 2>&1 && echo "GO" || echo "NOGO" )
@@ -113,14 +113,14 @@ lint: install-tools ## Lint code
 	@echo "Running golangci-lint"
 	golangci-lint run
 	@echo "Running zerolog linter"
-	lint go.woodpecker-ci.org/autoscaler/cmd/woodpecker-autoscaler
+	lint go.woodpecker-ci.org/woodpecker/v3/autoscaler/cmd/woodpecker-autoscaler
 
 test-autoscaler: ## Test autoscaler code
 	go test -race -cover -coverpkg=./... -coverprofile autoscaler-coverage.out -timeout 30s ${GO_PACKAGES}
 
 .PHONY: test-e2e
 test-e2e: ## Run end-to-end tests and report the engine coverage they exercise
-	go test -race -coverpkg=go.woodpecker-ci.org/autoscaler/engine/... -coverprofile e2e-coverage.out -timeout 60s go.woodpecker-ci.org/autoscaler/e2e
+	go test -race -coverpkg=go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/... -coverprofile e2e-coverage.out -timeout 60s go.woodpecker-ci.org/woodpecker/v3/autoscaler/e2e
 	@echo
 	@echo "e2e coverage of engine:"
 	@go tool cover -func=e2e-coverage.out
@@ -135,6 +135,6 @@ generate:
 ##@ Build
 
 build:
-	CGO_ENABLED=${CGO_ENABLED} GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags '${LDFLAGS}' -o dist/woodpecker-autoscaler go.woodpecker-ci.org/autoscaler/cmd/woodpecker-autoscaler
+	CGO_ENABLED=${CGO_ENABLED} GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags '${LDFLAGS}' -o dist/woodpecker-autoscaler go.woodpecker-ci.org/woodpecker/v3/autoscaler/cmd/woodpecker-autoscaler
 
 endif

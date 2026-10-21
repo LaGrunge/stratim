@@ -14,10 +14,10 @@ import (
 	"github.com/urfave/cli/v3"
 	"golang.org/x/crypto/ssh"
 
-	"go.woodpecker-ci.org/autoscaler/config"
-	"go.woodpecker-ci.org/autoscaler/engine/inits/cloudinit"
-	"go.woodpecker-ci.org/autoscaler/engine/types"
-	"go.woodpecker-ci.org/autoscaler/utils"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/config"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/inits/cloudinit"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/types"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/utils"
 	"go.woodpecker-ci.org/woodpecker/v3/woodpecker-go/woodpecker"
 )
 

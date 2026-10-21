@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"go.woodpecker-ci.org/autoscaler/providers/aws/ec2api/mocks"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/providers/aws/ec2api/mocks"
 	"go.woodpecker-ci.org/woodpecker/v3/woodpecker-go/woodpecker"
 )
 

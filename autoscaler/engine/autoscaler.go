@@ -7,9 +7,9 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"go.woodpecker-ci.org/autoscaler/config"
-	"go.woodpecker-ci.org/autoscaler/engine/types"
-	"go.woodpecker-ci.org/autoscaler/server"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/config"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/types"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/server"
 	"go.woodpecker-ci.org/woodpecker/v3/woodpecker-go/woodpecker"
 )
 

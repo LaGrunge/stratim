@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"go.woodpecker-ci.org/autoscaler/config"
-	"go.woodpecker-ci.org/autoscaler/engine"
-	"go.woodpecker-ci.org/autoscaler/engine/types"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/config"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/types"
 	"go.woodpecker-ci.org/woodpecker/v3/woodpecker-go/woodpecker"
 )
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"go.woodpecker-ci.org/autoscaler/utils"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/utils"
 )
 
 func TestSliceToMap(t *testing.T) {

@@ -31,3 +31,4 @@ plugin-git
 
 .vscode
 .idea
+/clone

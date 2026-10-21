@@ -3,7 +3,7 @@ package engine
 import (
 	"maps"
 
-	"go.woodpecker-ci.org/autoscaler/engine/types"
+	"go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/types"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline"
 )
 
