@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -176,7 +175,9 @@ func (p Plugin) Exec() error {
 	}
 
 	for _, cmd := range cmds {
-		buf := new(bytes.Buffer)
+		// exec copies stdout and stderr in separate goroutines, so the buffer
+		// they share must be locked
+		buf := new(lockedBuffer)
 		cmd.Dir = p.Pipeline.Path
 		cmd.Stdout = io.MultiWriter(os.Stdout, buf)
 		cmd.Stderr = io.MultiWriter(os.Stderr, buf)
