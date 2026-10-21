@@ -3,7 +3,6 @@ package main
 import (
 	"compress/gzip"
 	"context"
-	"errors"
 	"io"
 	"log/slog"
 	"mime"
@@ -243,13 +242,16 @@ func (p *Plugin) Exec(ctx context.Context) error {
 func (p *Plugin) doUpload(ctx context.Context, client *s3.Client, putObjectInput *s3.PutObjectInput, f *os.File, file string) error {
 	// optionally compress
 	if p.Compress {
-		gr, err := gzip.NewReader(f)
+		gz, err := gzipToTemp(f)
 		if err != nil {
 			slog.Error("Problem gzipping file", slog.String("file", file), slog.String("err", err.Error()))
 			return err
 		}
-		// wrap with gzip
-		putObjectInput.Body = &gzipReadSeeker{rs: f, z: gr}
+		defer func() {
+			gz.Close()
+			os.Remove(gz.Name())
+		}()
+		putObjectInput.Body = gz
 		// set encoding
 		putObjectInput.ContentEncoding = aws.String("gzip")
 	} else {
@@ -264,6 +266,11 @@ func (p *Plugin) doUpload(ctx context.Context, client *s3.Client, putObjectInput
 	retryIndex := 0
 	var err error
 	for {
+		// a failed attempt has consumed the body, rewind it so that a retry
+		// does not upload an empty object
+		if _, err = putObjectInput.Body.(io.Seeker).Seek(0, io.SeekStart); err != nil {
+			break
+		}
 		_, err = client.PutObject(ctx, putObjectInput)
 		retryIndex++
 		if err == nil || retryIndex > p.RetryCount {
@@ -289,26 +296,31 @@ func (p *Plugin) doUpload(ctx context.Context, client *s3.Client, putObjectInput
 	return nil
 }
 
-// gzipReadSeeker implements Seek over gzip.Reader
-type gzipReadSeeker struct {
-	rs io.ReadSeeker
-	z  *gzip.Reader
-}
-
-func (grs *gzipReadSeeker) Read(p []byte) (n int, err error) {
-	return grs.z.Read(p)
-}
-
-func (grs *gzipReadSeeker) Seek(offset int64, whence int) (int64, error) {
-	// only zero (reset) seeks are supported, in this case, this should be fine
-	// since AWS will rarely seek mid-file
-	if offset == 0 && whence == 0 {
-		if err := grs.z.Reset(grs.rs); err != nil {
-			return 0, err
-		}
-		return grs.rs.Seek(0, 0)
+// gzipToTemp compresses src into a temporary file and returns it rewound, so
+// that the SDK can seek it to sign the request and to retry. The caller closes
+// and removes the file.
+func gzipToTemp(src io.Reader) (*os.File, error) {
+	tmp, err := os.CreateTemp("", "plugin-s3-*.gz")
+	if err != nil {
+		return nil, err
 	}
-	return 0, errors.New("non-zero seek not supported")
+	fail := func(err error) (*os.File, error) {
+		tmp.Close()
+		os.Remove(tmp.Name())
+		return nil, err
+	}
+
+	zw := gzip.NewWriter(tmp)
+	if _, err := io.Copy(zw, src); err != nil {
+		return fail(err)
+	}
+	if err := zw.Close(); err != nil {
+		return fail(err)
+	}
+	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+		return fail(err)
+	}
+	return tmp, nil
 }
 
 // matches is a helper function that returns a list of all files matching the
