@@ -104,6 +104,23 @@ func TestServesRepoSecrets(t *testing.T) {
 	assert.Equal(t, []string{"alpine"}, secrets[1].Images)
 }
 
+func TestPinnedToForgeRemoteID(t *testing.T) {
+	svc := setup(t, mapSource{
+		"stratim/repos/acme/engine": `{"_forge_remote_id": "42", "a": "b"}`,
+	})
+
+	secrets, err := svc.SecretListPipeline(context.Background(),
+		&model.Repo{FullName: "acme/engine", ForgeRemoteID: "42"}, &model.Pipeline{}, nil)
+	require.NoError(t, err)
+	require.Len(t, secrets, 1, "the pin itself is not a secret")
+	assert.Equal(t, "a", secrets[0].Name)
+
+	secrets, err = svc.SecretListPipeline(context.Background(),
+		&model.Repo{FullName: "acme/engine", ForgeRemoteID: "43"}, &model.Pipeline{}, nil)
+	require.NoError(t, err)
+	assert.Empty(t, secrets, "a re-created acme/engine must not get the secrets")
+}
+
 func TestNoSecretsForUnknownRepo(t *testing.T) {
 	svc := setup(t, mapSource{})
 	assert.Empty(t, list(t, svc, "acme/other"))

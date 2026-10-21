@@ -25,7 +25,13 @@
 //
 // A string value, or an object without events, is available to the events in
 // STRATIM_SECRETS_DEFAULT_EVENTS, which leaves out pull requests: a pull
-// request from a fork must not see the secrets of the repository.
+// request from a fork must not see the secrets of the repository. The
+// reserved key "_forge_remote_id" pins the document to the repository with
+// that forge id, so a renamed or re-created owner/name gets nothing.
+//
+// The server's request-signing key is read from STRATIM_SECRETS_PUBLIC_KEY_FILE
+// or, without it, fetched from the server at start over plain HTTP: run the
+// extension on the same private network as the server, never across hosts.
 package main
 
 import (

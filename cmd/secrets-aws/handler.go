@@ -37,6 +37,12 @@ import (
 // (server/services/utils/http.go).
 const signatureName = "woodpecker-ci-extensions"
 
+// forgeRemoteIDKey is the reserved key that pins a secret document to one
+// repository by its forge id. The document is looked up by owner/name, which
+// a rename or a deleted and re-created repository can hand to someone else;
+// with the pin, such a repository gets nothing.
+const forgeRemoteIDKey = "_forge_remote_id"
+
 // source returns the raw value of a secret, and false when it does not exist.
 type source interface {
 	Get(ctx context.Context, id string) (string, bool, error)
@@ -91,7 +97,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	secrets, err := h.secretsFor(r.Context(), req.Repo.FullName)
+	secrets, err := h.secretsFor(r.Context(), req.Repo)
 	if err != nil {
 		log.Error().Err(err).Str("repo", req.Repo.FullName).Msg("cannot read secrets")
 		http.Error(w, "cannot read secrets", http.StatusBadGateway)
@@ -123,7 +129,8 @@ func (h *handler) verify(r *http.Request) error {
 		[]string{httpsign.DigestSha256, httpsign.DigestSha512})
 }
 
-func (h *handler) secretsFor(ctx context.Context, repo string) ([]*model.Secret, error) {
+func (h *handler) secretsFor(ctx context.Context, r *model.Repo) ([]*model.Secret, error) {
+	repo := r.FullName
 	raw, ok, err := h.source.Get(ctx, h.prefix+repo)
 	if err != nil || !ok {
 		return nil, err
@@ -132,6 +139,15 @@ func (h *handler) secretsFor(ctx context.Context, repo string) ([]*model.Secret,
 	var doc map[string]entry
 	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
 		return nil, fmt.Errorf("secret %s%s is not a JSON object of secrets: %w", h.prefix, repo, err)
+	}
+
+	if pin, pinned := doc[forgeRemoteIDKey]; pinned {
+		if pin.Value != string(r.ForgeRemoteID) {
+			log.Warn().Str("repo", repo).Str("forge_remote_id", string(r.ForgeRemoteID)).
+				Msg("secret document is pinned to another repository, serving nothing")
+			return nil, nil
+		}
+		delete(doc, forgeRemoteIDKey)
 	}
 
 	names := make([]string, 0, len(doc))
