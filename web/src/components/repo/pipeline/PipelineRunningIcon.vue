@@ -12,21 +12,20 @@ import StratimFlapIcon from '~/assets/stratim-flap.svg?skipsvgo';
 .stratim-flap :deep(.wing-r),
 .stratim-flap :deep(.bird) {
   transform-box: view-box;
-  animation: 0.9s ease-in-out infinite;
 }
 
 .stratim-flap :deep(.wing-l) {
   transform-origin: 615px 609px;
-  animation-name: flap-left;
+  animation: flap-left 0.9s ease-in-out infinite;
 }
 
 .stratim-flap :deep(.wing-r) {
   transform-origin: 764px 672px;
-  animation-name: flap-right;
+  animation: flap-right 0.9s ease-in-out infinite;
 }
 
 .stratim-flap :deep(.bird) {
-  animation-name: lift;
+  animation: lift 0.9s ease-in-out infinite;
 }
 
 @keyframes flap-left {
