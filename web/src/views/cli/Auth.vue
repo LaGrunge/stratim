@@ -1,7 +1,7 @@
 <template>
   <div class="m-auto flex flex-col gap-4">
     <div class="text-wp-text-100 text-center">
-      <WoodpeckerLogo preserveAspectRatio="xMinYMin slice" class="m-auto mb-8 w-32" />
+      <img :src="stratimLogo" alt="Stratim CI" class="m-auto mb-8 w-32" />
       <template v-if="state === 'confirm'">
         <h1 class="text-4xl font-bold">{{ $t('login_to_cli') }}</h1>
         <p class="text-2xl">{{ $t('login_to_cli_description') }}</p>
@@ -32,7 +32,7 @@ import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 
-import WoodpeckerLogo from '~/assets/logo.svg?component';
+import stratimLogo from '~/assets/stratim-logo.webp';
 import Button from '~/components/atomic/Button.vue';
 import useApiClient from '~/compositions/useApiClient';
 

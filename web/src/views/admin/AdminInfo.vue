@@ -1,7 +1,7 @@
 <template>
   <Settings :title="$t('info')">
     <div class="flex flex-col items-center gap-4">
-      <WoodpeckerLogo class="fill-wp-text-200 h-32 w-32" />
+      <img :src="stratimLogo" alt="Stratim CI" class="h-32 w-32" />
 
       <i18n-t keypath="running_version" tag="p" class="text-center text-xl">
         <span class="font-bold">{{ version?.current }}</span>
@@ -31,7 +31,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
-import WoodpeckerLogo from '~/assets/logo.svg?component';
+import stratimLogo from '~/assets/stratim-logo.webp';
 import Error from '~/components/atomic/Error.vue';
 import Settings from '~/components/layout/Settings.vue';
 import { useVersion } from '~/compositions/useVersion';

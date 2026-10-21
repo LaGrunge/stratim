@@ -4,7 +4,7 @@
   >
     <div class="flex items-center space-x-2">
       <router-link :to="{ name: 'home' }" class="-my-2 flex flex-col px-2">
-        <WoodpeckerLogo class="h-8 w-8" />
+        <img :src="stratimMark" alt="Stratim CI" class="h-8 w-8" />
         <span class="text-xs" :title="version?.current">{{ version?.currentShort }}</span>
       </router-link>
       <router-link v-if="user" :to="{ name: 'repos' }" class="navbar-clickable navbar-link">
@@ -47,7 +47,7 @@
 <script lang="ts" setup>
 import { useRoute } from 'vue-router';
 
-import WoodpeckerLogo from '~/assets/logo.svg?component';
+import stratimMark from '~/assets/stratim-mark.webp';
 import Button from '~/components/atomic/Button.vue';
 import Icon from '~/components/atomic/Icon.vue';
 import IconButton from '~/components/atomic/IconButton.vue';

@@ -17,7 +17,7 @@
       class="min-h-sm border-wp-background-400 dark:border-wp-background-100 bg-wp-background-100 dark:bg-wp-background-200 flex w-full flex-col overflow-hidden border md:m-8 md:w-3xl md:flex-row md:rounded-md"
     >
       <div class="bg-wp-primary-200 dark:bg-wp-primary-300 flex min-h-48 items-center justify-center md:w-3/5">
-        <WoodpeckerLogo preserveAspectRatio="xMinYMin slice" class="h-32 w-32 md:h-48 md:w-48" />
+        <img :src="stratimLogo" alt="Stratim CI" class="h-32 w-32 md:h-48 md:w-48" />
       </div>
       <div class="flex min-h-48 flex-col items-center justify-center gap-4 p-4 text-center md:w-2/5">
         <h1 class="text-wp-text-100 text-xl">{{ $t('login_to_woodpecker_with') }}</h1>
@@ -52,7 +52,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 
-import WoodpeckerLogo from '~/assets/logo.svg?component';
+import stratimLogo from '~/assets/stratim-logo.webp';
 import Button from '~/components/atomic/Button.vue';
 import Error from '~/components/atomic/Error.vue';
 import Icon from '~/components/atomic/Icon.vue';
