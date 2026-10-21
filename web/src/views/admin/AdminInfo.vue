@@ -31,7 +31,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
-import stratimLogo from '~/assets/stratim-logo.webp';
+import stratimLogo from '~/assets/stratim-logo.svg?url';
 import Error from '~/components/atomic/Error.vue';
 import Settings from '~/components/layout/Settings.vue';
 import { useVersion } from '~/compositions/useVersion';

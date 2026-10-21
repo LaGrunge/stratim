@@ -52,7 +52,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 
-import stratimLogo from '~/assets/stratim-logo.webp';
+import stratimLogo from '~/assets/stratim-logo.svg?url';
 import Button from '~/components/atomic/Button.vue';
 import Error from '~/components/atomic/Error.vue';
 import Icon from '~/components/atomic/Icon.vue';

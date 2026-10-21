@@ -32,7 +32,7 @@ import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 
-import stratimLogo from '~/assets/stratim-logo.webp';
+import stratimLogo from '~/assets/stratim-logo.svg?url';
 import Button from '~/components/atomic/Button.vue';
 import useApiClient from '~/compositions/useApiClient';
 
