@@ -1,0 +1,40 @@
+package config
+
+import (
+	"time"
+
+	"go.woodpecker-ci.org/autoscaler/engine/types"
+)
+
+type Config struct {
+	MinAgents              int
+	MaxAgents              int
+	WorkflowsPerAgent      int
+	PoolID                 string
+	Image                  string
+	Environment            map[string]string
+	GRPCAddress            string
+	GRPCSecure             bool
+	AgentInactivityTimeout time.Duration
+	AgentIdleTimeout       time.Duration
+	// AgentCreationTimeout is how long a deployed agent may take to make its
+	// first contact with the server. Past this deadline it no longer counts
+	// as bucket capacity and is reaped, so a stuck boot cannot stall the
+	// queue indefinitely. Zero disables the deadline; never-connected agents
+	// then fall back to AgentInactivityTimeout for reaping.
+	AgentCreationTimeout time.Duration
+	UserData             string // cloudinit template
+	ExtraAgentLabels     map[string]string
+
+	// BillingModel is taken from the selected provider and selects the teardown
+	// policy the engine applies to idle agents.
+	BillingModel types.BillingModel
+	// ReconciliationInterval is the loop period. It is added to
+	// AgentBillingTeardownMargin so the billing-hour teardown window can never
+	// be skipped between two reconciliations.
+	ReconciliationInterval time.Duration
+	// AgentBillingTeardownMargin is, for BillingHourlyRoundUp providers, how
+	// long before each paid-hour boundary an idle agent becomes eligible for
+	// teardown.
+	AgentBillingTeardownMargin time.Duration
+}

@@ -1,0 +1,52 @@
+when:
+  - event: pull_request
+
+variables:
+  - &golang_image 'docker.io/golang:1.27'
+  - &when
+    - path: &when_path # related config files
+        - '.woodpecker/test.yml'
+        - '.golangci.yml'
+        # go source code
+        - '**/*.go'
+        - 'go.*'
+        # schema changes
+        - 'pipeline/schema/**'
+        # tools updates
+        - Makefile
+      branch:
+        exclude: ${CI_REPO_DEFAULT_BRANCH}
+      event: push
+    - path: *when_path
+      event: [pull_request, tag, deployment]
+
+steps:
+  - name: vendor
+    image: *golang_image
+    commands:
+      - go mod vendor
+
+  - name: lint
+    image: *golang_image
+    depends_on: [vendor]
+    commands:
+      - make lint
+    when: *when
+
+  - name: lint-editorconfig
+    image: docker.io/woodpeckerci/plugin-editorconfig-checker:0.3.4
+    depends_on: []
+
+  - name: test
+    image: *golang_image
+    depends_on: [vendor]
+    commands:
+      - make test-autoscaler
+    when: *when
+
+  - name: test-e2e
+    image: *golang_image
+    depends_on: [vendor]
+    commands:
+      - make test-e2e
+    when: *when
