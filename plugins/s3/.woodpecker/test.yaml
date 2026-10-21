@@ -1,0 +1,40 @@
+variables:
+  - &golang 'golang:1.27'
+
+when:
+  - event: pull_request
+  - event: push
+    branch: "renovate/*"
+
+steps:
+  markdownlint:
+    image: ghcr.io/igorshubovych/markdownlint-cli:v0.49.1
+    commands:
+      - markdownlint --ignore CHANGELOG.md --ignore vendor/ .
+
+  vendor:
+    image: *golang
+    commands:
+      - go mod vendor
+
+  lint:
+    image: golangci/golangci-lint:v2.15.0
+    depends_on: [ vendor ]
+    commands:
+      - make lint
+
+  test:
+    image: *golang
+    depends_on: [ vendor ]
+    commands:
+      - make test
+
+  build:
+    image: woodpeckerci/plugin-docker-buildx:6.0.3
+    depends_on: [ lint, test, vendor ]
+    settings:
+      dockerfile: Dockerfile.multiarch
+      dry_run: true
+      repo: woodpeckerci/plugin-s3
+      tags: latest
+      platforms: linux/arm/v7,linux/arm64/v8,linux/amd64,linux/ppc64le,linux/riscv64,windows/amd64,darwin/amd64,darwin/arm64,freebsd/arm64,freebsd/amd64,openbsd/arm64,openbsd/amd64
