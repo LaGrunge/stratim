@@ -1,0 +1,10 @@
+# Autoscaler image from a prebuilt binary (scripts/build_images.sh), same
+# layout as the upstream autoscaler/docker/Dockerfile.
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.27 AS base
+
+FROM scratch
+ARG TARGETARCH
+ENV GODEBUG=netdns=go
+COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY autoscaler/linux_${TARGETARCH}/woodpecker-autoscaler /bin/
+ENTRYPOINT ["/bin/woodpecker-autoscaler"]

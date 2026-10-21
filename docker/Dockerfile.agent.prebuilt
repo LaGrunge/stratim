@@ -1,0 +1,19 @@
+# Agent image from a prebuilt binary (scripts/build_images.sh), same layout as
+# the upstream docker/Dockerfile.agent.multiarch.
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.27 AS base
+RUN mkdir -p /etc/woodpecker && \
+  apt-get update && apt-get install -y --no-install-recommends tzdata-legacy && \
+  rm -rf /usr/share/zoneinfo/right
+
+FROM scratch
+ARG TARGETARCH
+ENV GODEBUG=netdns=go
+# Internal setting, do not change: tells the agent it runs in a container.
+ENV WOODPECKER_IN_CONTAINER=true
+EXPOSE 3000
+COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=base /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=base /etc/woodpecker /etc/woodpecker
+COPY agent/linux_${TARGETARCH}/woodpecker-agent /bin/
+HEALTHCHECK CMD ["/bin/woodpecker-agent", "ping"]
+ENTRYPOINT ["/bin/woodpecker-agent"]
