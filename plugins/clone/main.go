@@ -22,7 +22,7 @@ func main() {
 	ctx := context.Background()
 
 	if err := app.Run(ctx, os.Args); err != nil {
-		log.Fatal(err)
+		log.Fatal(err) //nolint:forbidigo
 	}
 }
 

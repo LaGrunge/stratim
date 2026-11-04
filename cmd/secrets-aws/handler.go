@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/rs/zerolog/log"
 	"github.com/yaronf/httpsign"
 
@@ -181,8 +181,7 @@ type secretsManagerSource struct {
 
 func (s *secretsManagerSource) Get(ctx context.Context, id string) (string, bool, error) {
 	out, err := s.client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: &id})
-	var notFound *smtypes.ResourceNotFoundException
-	if errors.As(err, &notFound) {
+	if _, ok := errors.AsType[*types.ResourceNotFoundException](err); ok {
 		return "", false, nil
 	}
 	if err != nil {
@@ -212,7 +211,7 @@ type cached struct {
 }
 
 func newCachedSource(next source, ttl time.Duration) *cachedSource {
-	return &cachedSource{next: next, ttl: ttl, now: time.Now, entries: map[string]cached{}}
+	return &cachedSource{next: next, ttl: ttl, now: time.Now, entries: make(map[string]cached)}
 }
 
 func (c *cachedSource) Get(ctx context.Context, id string) (string, bool, error) {

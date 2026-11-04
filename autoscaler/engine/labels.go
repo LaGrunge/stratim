@@ -50,12 +50,12 @@ type agentLabelSet struct {
 // The capability supplies the well-known "platform" and "backend" labels
 // (matching what a woodpecker agent self-reports on connect), and every agent
 // advertises "repo=*" by default — without it, real queue tasks, which always
-// carry a concrete "repo" label, would never match. extraAgentLabels are
+// carry a concrete "repo" label, would never match. ExtraAgentLabels are
 // merged on top, with the "!" prefix interpreted as a mandatory key per the
 // woodpecker label rules.
 func agentLabelsFor(capability types.Capability, extraAgentLabels map[string]string) agentLabelSet {
 	out := agentLabelSet{
-		Labels:    make(map[string]string, 3+len(extraAgentLabels)), //nolint:mnd
+		Labels:    make(map[string]string, 3+len(extraAgentLabels)),
 		Mandatory: make(map[string]string),
 	}
 

@@ -129,7 +129,7 @@ func (p *provider) setupKeyPair(ctx context.Context) error {
 		return err
 	}
 
-	index := map[string]string{}
+	index := make(map[string]string)
 	for key := range res {
 		index[res[key].Name] = res[key].ID
 	}

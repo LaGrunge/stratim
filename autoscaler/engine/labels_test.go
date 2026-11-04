@@ -90,7 +90,7 @@ func Test_taskMatchesAgent(t *testing.T) {
 
 	t.Run("empty task labels match any agent", func(t *testing.T) {
 		assert.True(t, taskMatchesAgent(nil, docker))
-		assert.True(t, taskMatchesAgent(map[string]string{}, docker))
+		assert.True(t, taskMatchesAgent(make(map[string]string), docker))
 	})
 
 	t.Run("matches when every task label is satisfied", func(t *testing.T) {

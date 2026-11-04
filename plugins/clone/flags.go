@@ -110,13 +110,13 @@ var globalFlags = []cli.Flag{
 		Name:    "backoff",
 		Usage:   "backoff duration",
 		Sources: cli.EnvVars("PLUGIN_BACKOFF"),
-		Value:   5 * time.Second,
+		Value:   5 * time.Second, //nolint:mnd
 	},
 	&cli.IntFlag{
 		Name:    "backoff-attempts",
 		Usage:   "backoff attempts",
 		Sources: cli.EnvVars("PLUGIN_ATTEMPTS"),
-		Value:   5,
+		Value:   5, //nolint:mnd
 	},
 	&cli.BoolFlag{
 		Name:    "lfs",

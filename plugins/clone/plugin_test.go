@@ -204,7 +204,6 @@ func TestClone(t *testing.T) {
 	disableAutoCRLF(t)
 
 	for _, c := range commits {
-
 		dir := setup()
 		defer teardown(dir)
 
@@ -255,7 +254,6 @@ func TestClone(t *testing.T) {
 				t.Errorf("Expected %s size to be [%d]. Got [%d].", c.file, c.dataSize, size)
 			}
 		}
-
 	}
 }
 
@@ -269,7 +267,6 @@ func TestCloneNonEmpty(t *testing.T) {
 	defer teardown(dir)
 
 	for _, c := range commits {
-
 		plugin := Plugin{
 			Repo: Repo{
 				Clone: c.clone,
@@ -657,11 +654,9 @@ func TestUpdateSubmodulesRemote(t *testing.T) {
 	}
 }
 
-// helper function that will setup a temporary workspace.
-// to which we can clone the repositroy
+// Setup creates a temporary workspace to clone the repository into.
 func setup() string {
 	dir, _ := os.MkdirTemp("", "plugin_git_test_")
-	os.Mkdir(dir, 0o777)
 	return dir
 }
 

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -124,7 +123,7 @@ func startFakeS3(t *testing.T) (*fakeS3, *Plugin) {
 	t.Setenv("AWS_PROFILE", "")
 	t.Setenv("AWS_REGION", "")
 
-	fake := &fakeS3{objects: map[string]fakeObject{}}
+	fake := &fakeS3{objects: make(map[string]fakeObject)}
 	srv := httptest.NewServer(fake)
 	t.Cleanup(srv.Close)
 
@@ -213,7 +212,7 @@ func TestExecUploadsMatchedFiles(t *testing.T) {
 	p.EncryptionKey = "kms-key"
 	p.StorageClass = "STANDARD_IA"
 
-	require.NoError(t, p.Exec(context.Background()))
+	require.NoError(t, p.Exec(t.Context()))
 
 	assert.Equal(t, []string{
 		"bucket/builds/42/app.js",
@@ -244,7 +243,7 @@ func TestExecDryRunUploadsNothing(t *testing.T) {
 	p.Source = filepath.Join(dir, "*")
 	p.DryRun = true
 
-	require.NoError(t, p.Exec(context.Background()))
+	require.NoError(t, p.Exec(t.Context()))
 	assert.Empty(t, fake.keys())
 	assert.Zero(t, fake.puts)
 }
@@ -258,12 +257,12 @@ func TestExecOverwrite(t *testing.T) {
 	p.Source = filepath.Join(dir, "a.txt")
 	p.StripPrefix = dir + string(filepath.Separator)
 
-	require.NoError(t, p.Exec(context.Background()))
+	require.NoError(t, p.Exec(t.Context()))
 	assert.Equal(t, "old", string(fake.object(t, "bucket/a.txt").body), "an existing object must be kept without overwrite")
 	assert.Zero(t, fake.puts)
 
 	p.Overwrite = true
-	require.NoError(t, p.Exec(context.Background()))
+	require.NoError(t, p.Exec(t.Context()))
 	assert.Equal(t, "new", string(fake.object(t, "bucket/a.txt").body))
 }
 
@@ -278,14 +277,14 @@ func TestExecRetriesFailedUpload(t *testing.T) {
 
 	// a 400 is not retried by the SDK, so each failure costs one plugin retry
 	fake.putFailures = 2
-	require.NoError(t, p.Exec(context.Background()))
+	require.NoError(t, p.Exec(t.Context()))
 	assert.Equal(t, 3, fake.puts)
 	assert.Equal(t, "a", string(fake.object(t, "bucket/a.txt").body))
 
-	fake.objects = map[string]fakeObject{}
+	fake.objects = make(map[string]fakeObject)
 	fake.puts = 0
 	fake.putFailures = 3
-	require.Error(t, p.Exec(context.Background()))
+	require.Error(t, p.Exec(t.Context()))
 	assert.Equal(t, 3, fake.puts)
 	assert.Empty(t, fake.keys())
 }
@@ -300,7 +299,7 @@ func TestExecCompress(t *testing.T) {
 	p.StripPrefix = dir + string(filepath.Separator)
 	p.Compress = true
 
-	require.NoError(t, p.Exec(context.Background()))
+	require.NoError(t, p.Exec(t.Context()))
 
 	obj := fake.object(t, "bucket/report.txt")
 	assert.Contains(t, obj.header.Get("Content-Encoding"), "gzip")

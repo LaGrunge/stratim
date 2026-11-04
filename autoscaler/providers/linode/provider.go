@@ -16,7 +16,7 @@ package linode
 
 import (
 	"context"
-	b64 "encoding/base64"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -52,7 +52,7 @@ var blackholeMetadataAPI = []string{
 	"ip -6 route add blackhole fe80::a9fe:a9fe/64",
 }
 
-// editorconfig-checker-enable
+// editorconfig-checker-enable.
 type provider struct {
 	region       *linodego.Region
 	name         string
@@ -130,7 +130,7 @@ func (p *provider) DeployAgent(ctx context.Context, agent *woodpecker.Agent, cap
 	if err != nil {
 		return fmt.Errorf("%s: cloudinit.RenderUserDataTemplate: %w", p.name, err)
 	}
-	userDataString := b64.StdEncoding.EncodeToString([]byte(userData))
+	userDataString := base64.StdEncoding.EncodeToString([]byte(userData))
 
 	opts := linodego.InstanceCreateOptions{
 		Type:           p.instanceType.ID,
@@ -230,7 +230,7 @@ func (p *provider) setupKeyPair(ctx context.Context) error {
 		return err
 	}
 
-	index := map[string]string{}
+	index := make(map[string]string)
 	for key := range res {
 		index[res[key].Label] = res[key].SSHKey
 	}

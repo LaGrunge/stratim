@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -21,7 +22,7 @@ func trace(cmd *exec.Cmd) {
 	fmt.Printf("%s%s\n", logGroupMarker, strings.Join(cmd.Args, " "))
 }
 
-// pathExists returns whether the given file or directory exists or not
+// pathExists returns whether the given file or directory exists or not.
 func pathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -42,7 +43,7 @@ func isDirEmpty(dir string) bool {
 	defer f.Close()
 
 	_, err = f.Readdir(1)
-	return err == io.EOF
+	return errors.Is(err, io.EOF)
 }
 
 // helper function to write a netrc file.
