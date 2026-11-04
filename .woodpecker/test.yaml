@@ -113,6 +113,8 @@ steps:
     when:
       - path: *when_path
 
+  # Stratim runs on MariaDB only; sqlite and postgres stay informational until
+  # their drivers are removed in phase 1.
   sqlite:
     depends_on:
       - vendor
@@ -120,9 +122,10 @@ steps:
     environment:
       WOODPECKER_DATABASE_DRIVER: sqlite3
     commands:
-      - make test-server-datastore-coverage
+      - make test-server-datastore
     when:
       - path: *when_path
+    failure: ignore
 
   postgres:
     depends_on:
@@ -134,22 +137,28 @@ steps:
     commands:
       - make test-server-datastore
     when: *when
+    failure: ignore
 
-  mysql:
+  mariadb:
     depends_on:
       - vendor
     image: *golang_image
     environment:
       WOODPECKER_DATABASE_DRIVER: mysql
-      WOODPECKER_DATABASE_DATASOURCE: root@tcp(mysql:3306)/test?parseTime=true
+      WOODPECKER_DATABASE_DATASOURCE: root@tcp(mariadb:3306)/test?parseTime=true
     commands:
-      - make test-server-datastore
+      # the image restarts its server once after initializing the data
+      # directory, with networking off until then
+      - timeout 120 bash -c 'until (exec 3<>/dev/tcp/mariadb/3306) 2>/dev/null; do sleep 1; done'
+      - make test-server-datastore-coverage
+      # the fixture generator runs only by hand; keep it compiling
+      - go vet -tags 'test fixturegen' ./server/store/datastore/migration/
     when: *when
 
   codecov:
     depends_on:
       - test
-      - sqlite
+      - mariadb
     pull: true
     image: docker.io/woodpeckerci/plugin-codecov:2.3.3
     settings:
@@ -175,10 +184,10 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
     when: *when
 
-  mysql:
-    image: docker.io/mysql:26.10.0
+  mariadb:
+    image: docker.io/mariadb:13.0
     ports: ['3306']
     environment:
-      MYSQL_DATABASE: test
-      MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+      MARIADB_DATABASE: test
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
     when: *when
