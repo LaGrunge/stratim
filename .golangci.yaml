@@ -108,6 +108,8 @@ linters:
             - '**/server/**/*.go'
             - '**/web/*.go'
             - '**/web/**/*.go'
+            # autoscaler/server is a client of the server API, not the server
+            - '!**/autoscaler/**'
           deny:
             - pkg: go.woodpecker-ci.org/woodpecker/v3/agent
             - pkg: go.woodpecker-ci.org/woodpecker/v3/cli
@@ -276,6 +278,16 @@ linters:
           alias: gitlab
         - pkg: go.yaml.in/yaml/v4
           alias: go_yaml
+
+        # autoscaler: these clash with its own config, types and mocks packages
+        - pkg: github.com/aws/aws-sdk-go-v2/config
+          alias: awsconfig
+        - pkg: github.com/aws/aws-sdk-go-v2/service/ec2/types
+          alias: ec2_types
+        - pkg: go.woodpecker-ci.org/woodpecker/v3/autoscaler/server/mocks
+          alias: mocks_server
+        - pkg: go.woodpecker-ci.org/woodpecker/v3/autoscaler/engine/types/mocks
+          alias: mocks_provider
     misspell:
       locale: US
     mnd:

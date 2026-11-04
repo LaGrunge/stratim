@@ -53,7 +53,7 @@ func (p *provider) resolveDeployCandidates(ctx context.Context, instanceTypes []
 		region       string
 		architecture ec2_types.ArchitectureValues
 	}
-	configs := map[regionConfigKey]regionConfig{}
+	configs := make(map[regionConfigKey]regionConfig)
 	imageValidated := false
 	for _, raw := range instanceTypes {
 		instanceType, region, err := p.valueRegion("aws-instance-type", raw)

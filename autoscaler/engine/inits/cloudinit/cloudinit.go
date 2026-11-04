@@ -88,7 +88,7 @@ func genExtraAgentLabels(conf map[string]string) string {
 	return strings.Join(out, ",")
 }
 
-// editorconfig-checker-disable
+// editorconfig-checker-disable.
 var CloudInitUserDataUbuntuDefault = `#cloud-config
 
 package_reboot_if_required: false

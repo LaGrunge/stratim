@@ -246,7 +246,7 @@ func (p *provider) BillingModel() types.BillingModel {
 }
 
 func (p *provider) Capabilities(_ context.Context) ([]types.Capability, error) {
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	var caps []types.Capability
 
 	for _, c := range p.deployCandidates {

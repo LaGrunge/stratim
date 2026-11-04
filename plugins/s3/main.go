@@ -149,7 +149,7 @@ func main() {
 				Name:    "retry-delay",
 				Usage:   "amount of time to wait before each retry",
 				Sources: cli.EnvVars("PLUGIN_RETRY_DELAY"),
-				Value:   time.Duration(5) * time.Second, //nolint:mnd
+				Value:   time.Duration(5) * time.Second,
 			},
 		},
 	}
@@ -187,9 +187,9 @@ func run(ctx context.Context, c *cli.Command) error {
 		Overwrite:             c.Bool("overwrite"),
 		RetryCount:            c.Int("retry-count"),
 		RetryDelay:            c.Duration("retry-delay"),
-		ContentType:           map[string]string{},
-		ContentEncoding:       map[string]string{},
-		CacheControl:          map[string]string{},
+		ContentType:           make(map[string]string),
+		ContentEncoding:       make(map[string]string),
+		CacheControl:          make(map[string]string),
 	}
 
 	if err := json.Unmarshal([]byte(c.String("content-type")), &plugin.ContentType); err != nil {

@@ -16,7 +16,7 @@ package aws
 
 import (
 	"context"
-	b64 "encoding/base64"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"slices"
@@ -279,7 +279,7 @@ func (p *provider) DeployAgent(ctx context.Context, agent *woodpecker.Agent, cap
 		runInstancesInput.KeyName = aws.String(p.sshKeyName)
 	}
 
-	runInstancesInput.UserData = aws.String(b64.StdEncoding.EncodeToString([]byte(userData)))
+	runInstancesInput.UserData = aws.String(base64.StdEncoding.EncodeToString([]byte(userData)))
 
 	var result *ec2.RunInstancesOutput
 	for i, c := range candidates {
@@ -386,7 +386,7 @@ func (p *provider) ListDeployedAgentNames(ctx context.Context) ([]string, error)
 }
 
 func (p *provider) Capabilities(_ context.Context) ([]types.Capability, error) {
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	var caps []types.Capability
 	var errs error
 

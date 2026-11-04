@@ -79,13 +79,13 @@ func TestMergeMaps(t *testing.T) {
 			name: "nil maps",
 			m1:   nil,
 			m2:   nil,
-			want: map[string]string{},
+			want: make(map[string]string),
 		},
 		{
 			name: "empty maps",
-			m1:   map[string]string{},
-			m2:   map[string]string{},
-			want: map[string]string{},
+			m1:   make(map[string]string),
+			m2:   make(map[string]string),
+			want: make(map[string]string),
 		},
 		{
 			name: "overwrite",

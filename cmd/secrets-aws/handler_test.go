@@ -78,7 +78,7 @@ func setup(t *testing.T, src source) lister {
 
 func list(t *testing.T, svc lister, repo string) []*model.Secret {
 	t.Helper()
-	secrets, err := svc.SecretListPipeline(context.Background(),
+	secrets, err := svc.SecretListPipeline(t.Context(),
 		&model.Repo{FullName: repo}, &model.Pipeline{Event: model.EventManual}, nil)
 	require.NoError(t, err)
 	return secrets
@@ -109,20 +109,20 @@ func TestPinnedToForgeRemoteID(t *testing.T) {
 		"stratim/repos/acme/engine": `{"_forge_remote_id": "42", "a": "b"}`,
 	})
 
-	secrets, err := svc.SecretListPipeline(context.Background(),
+	secrets, err := svc.SecretListPipeline(t.Context(),
 		&model.Repo{FullName: "acme/engine", ForgeRemoteID: "42"}, &model.Pipeline{}, nil)
 	require.NoError(t, err)
 	require.Len(t, secrets, 1, "the pin itself is not a secret")
 	assert.Equal(t, "a", secrets[0].Name)
 
-	secrets, err = svc.SecretListPipeline(context.Background(),
+	secrets, err = svc.SecretListPipeline(t.Context(),
 		&model.Repo{FullName: "acme/engine", ForgeRemoteID: "43"}, &model.Pipeline{}, nil)
 	require.NoError(t, err)
 	assert.Empty(t, secrets, "a re-created acme/engine must not get the secrets")
 }
 
 func TestNoSecretsForUnknownRepo(t *testing.T) {
-	svc := setup(t, mapSource{})
+	svc := setup(t, make(mapSource))
 	assert.Empty(t, list(t, svc, "acme/other"))
 }
 
@@ -153,14 +153,14 @@ func TestRejectsAnotherServersKey(t *testing.T) {
 
 	client, err := utils.NewHTTPClient(otherPriv, "loopback")
 	require.NoError(t, err)
-	_, err = secret.NewHTTP(srv.URL, client, false).SecretListPipeline(context.Background(),
+	_, err = secret.NewHTTP(srv.URL, client, false).SecretListPipeline(t.Context(),
 		&model.Repo{FullName: "acme/engine"}, &model.Pipeline{}, nil)
 	assert.Error(t, err)
 }
 
 func TestRejectsInvalidEvent(t *testing.T) {
 	svc := setup(t, mapSource{"stratim/repos/acme/engine": `{"a": {"value": "b", "events": ["nonsense"]}}`})
-	_, err := svc.SecretListPipeline(context.Background(),
+	_, err := svc.SecretListPipeline(t.Context(),
 		&model.Repo{FullName: "acme/engine"}, &model.Pipeline{}, nil)
 	assert.Error(t, err)
 }
@@ -172,7 +172,7 @@ func TestCachedSource(t *testing.T) {
 	c.now = func() time.Time { return now }
 
 	for range 3 {
-		v, ok, err := c.Get(context.Background(), "x")
+		v, ok, err := c.Get(t.Context(), "x")
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "1", v)
@@ -180,7 +180,7 @@ func TestCachedSource(t *testing.T) {
 	assert.Equal(t, 1, inner.calls)
 
 	now = now.Add(2 * time.Minute)
-	_, _, err := c.Get(context.Background(), "x")
+	_, _, err := c.Get(t.Context(), "x")
 	require.NoError(t, err)
 	assert.Equal(t, 2, inner.calls)
 }

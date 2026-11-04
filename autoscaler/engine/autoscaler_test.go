@@ -95,7 +95,7 @@ func Test_planScaling(t *testing.T) {
 			taskWithLabels(map[string]string{"platform": "linux/arm64"}),
 		}, nil)
 		assert.Len(t, decisions, 2)
-		seen := map[string]int{}
+		seen := make(map[string]int)
 		for _, d := range decisions {
 			seen[d.Bucket.Capability.Platform] = d.Delta
 		}
@@ -325,7 +325,7 @@ func Test_planScaling(t *testing.T) {
 		decisions := a.planScaling([]woodpecker.Task{
 			taskWithLabels(map[string]string{"platform": "linux/amd64"}),
 		}, nil)
-		seen := map[string]int{}
+		seen := make(map[string]int)
 		for _, d := range decisions {
 			seen[d.Bucket.Capability.Platform] = d.Delta
 		}
@@ -348,7 +348,7 @@ func Test_createAgents(t *testing.T) {
 		autoscaler := Autoscaler{
 			client:   client,
 			provider: provider,
-			agents:   map[string]*woodpecker.Agent{},
+			agents:   make(map[string]*woodpecker.Agent),
 			config:   &config.Config{PoolID: "1"},
 		}
 

@@ -45,7 +45,7 @@ var _ types.Provider = (*fakeProvider)(nil)
 func newFakeProvider(capabilities ...types.Capability) *fakeProvider {
 	return &fakeProvider{
 		capabilities: capabilities,
-		deployed:     map[string]types.Capability{},
+		deployed:     make(map[string]types.Capability),
 	}
 }
 
@@ -116,7 +116,7 @@ type fakeWoodpecker struct {
 var _ server.Client = (*fakeWoodpecker)(nil)
 
 func newFakeWoodpecker() *fakeWoodpecker {
-	return &fakeWoodpecker{nextID: 1, agents: map[int64]*woodpecker.Agent{}}
+	return &fakeWoodpecker{nextID: 1, agents: make(map[int64]*woodpecker.Agent)}
 }
 
 func (s *fakeWoodpecker) put(agent *woodpecker.Agent) {

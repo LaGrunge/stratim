@@ -13,6 +13,14 @@ import (
 	"time"
 )
 
+const (
+	// Permissions that keep the pipeline workspace writable for every step's user.
+	workspacePerm os.FileMode = 0o777
+	// Lengths of full SHA1 and SHA256 commit ids in hex.
+	sha1HexLen   = 40
+	sha256HexLen = 64
+)
+
 type Plugin struct {
 	Repo     Repo
 	Pipeline Pipeline
@@ -34,14 +42,16 @@ func (p Plugin) Exec() error {
 	umask(p.Config.Umask)
 
 	if p.Pipeline.Path != "" {
-		err := os.MkdirAll(p.Pipeline.Path, 0o777)
+		err := os.MkdirAll(p.Pipeline.Path, workspacePerm)
 		if err != nil {
 			return err
 		}
 	}
 
 	// make sure pipeline workspace is always writable for anyone
-	os.Chmod(p.Pipeline.Path, 0o777)
+	if err := os.Chmod(p.Pipeline.Path, workspacePerm); err != nil {
+		fmt.Printf("Failed to make %s writable for anyone: %s\n", p.Pipeline.Path, err)
+	}
 
 	err := writeNetrc(p.Config.Home, p.Netrc.Machine, p.Netrc.Login, p.Netrc.Password)
 	if err != nil {
@@ -70,7 +80,7 @@ func (p Plugin) Exec() error {
 	// autodetect object-format if not set
 	if p.Repo.ObjectFormat == "" {
 		p.Repo.ObjectFormat = "sha1"
-		if len(p.Pipeline.Commit) == 64 {
+		if len(p.Pipeline.Commit) == sha256HexLen {
 			p.Repo.ObjectFormat = "sha256"
 		}
 	}
@@ -91,15 +101,15 @@ func (p Plugin) Exec() error {
 					p.Config.SSHKey = filepath.Join(p.Config.Home, "/sshkey")
 				}
 				if err := os.WriteFile(p.Config.SSHKey, []byte(p.Config.SSHKeyPrivate), 0o600); err != nil {
-					return fmt.Errorf("could not write private SSH key: %v", err)
+					return fmt.Errorf("could not write private SSH key: %w", err)
 				}
 			}
 			if p.Config.SSHHostKey != "" {
 				if err := os.Mkdir(filepath.Join(p.Config.Home, ".ssh"), 0o700); err != nil {
-					return fmt.Errorf("could not create SSH directory: %v", err)
+					return fmt.Errorf("could not create SSH directory: %w", err)
 				}
 				if err := os.WriteFile(filepath.Join(p.Config.Home, ".ssh/known_hosts"), []byte(p.Config.SSHHostKey), 0o600); err != nil {
-					return fmt.Errorf("could not write SSH host key: %v", err)
+					return fmt.Errorf("could not write SSH host key: %w", err)
 				}
 			}
 			if p.Config.SSHKey != "" {
@@ -116,12 +126,13 @@ func (p Plugin) Exec() error {
 		}
 	}
 
-	if p.Pipeline.Ref != "" {
+	switch {
+	case p.Pipeline.Ref != "":
 		// fetch and checkout by ref
 		fmt.Println("using head checkout")
 		cmds = append(cmds, fetch(p.Pipeline.Ref, p.Config.Tags, p.Config.Depth, p.Config.filter))
 		cmds = append(cmds, checkoutHead())
-	} else if len(p.Pipeline.Commit) != 40 && len(p.Pipeline.Commit) != 64 {
+	case len(p.Pipeline.Commit) != sha1HexLen && len(p.Pipeline.Commit) != sha256HexLen:
 		// fetch requires full SHA1 (40 chars) or SHA256 (64 chars) commits (unambiguous reference)
 		// for short SHA1 or SHA256, fetch and switch the branch before commit reset
 		if p.Config.Branch == "" {
@@ -130,7 +141,7 @@ func (p Plugin) Exec() error {
 		cmds = append(cmds, fetch(p.Config.Branch, p.Config.Tags, p.Config.Depth, p.Config.filter))
 		cmds = append(cmds, switchBranch(p.Config.Branch))
 		cmds = append(cmds, checkoutSha(p.Pipeline.Commit))
-	} else {
+	default:
 		// fetch and checkout by commit sha
 		cmds = append(cmds, fetch(p.Pipeline.Commit, p.Config.Tags, p.Config.Depth, p.Config.filter))
 		cmds = append(cmds, checkoutSha(p.Pipeline.Commit))
@@ -140,10 +151,10 @@ func (p Plugin) Exec() error {
 		var submoduleOverrides map[string]string
 		err = json.Unmarshal([]byte(p.Config.Submodules), &submoduleOverrides)
 		if err != nil {
-			return fmt.Errorf("could not parse submodule_override map: %v", err)
+			return fmt.Errorf("could not parse submodule_override map: %w", err)
 		}
-		for name, submoduleUrl := range submoduleOverrides {
-			cmds = append(cmds, remapSubmodule(name, submoduleUrl))
+		for name, submoduleURL := range submoduleOverrides {
+			cmds = append(cmds, remapSubmodule(name, submoduleURL))
 		}
 	}
 
@@ -198,7 +209,7 @@ func (p Plugin) Exec() error {
 }
 
 func customCertHandler(certPath string) *exec.Cmd {
-	if IsUrl(certPath) {
+	if IsURL(certPath) {
 		if downloadCert(certPath) {
 			return setCustomCert(customCertTmpPath)
 		} else {
@@ -209,7 +220,7 @@ func customCertHandler(certPath string) *exec.Cmd {
 	return setCustomCert(certPath)
 }
 
-func IsUrl(str string) bool {
+func IsURL(str string) bool {
 	u, err := url.Parse(str)
 	return err == nil && u.Scheme != "" && u.Host != ""
 }
@@ -220,12 +231,11 @@ func downloadCert(url string) (retStatus bool) {
 		fmt.Printf("Failed to download %s\n", err)
 		return false
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
 			retStatus = false
 		}
-	}(resp.Body)
+	}()
 
 	out, err := os.Create(customCertTmpPath)
 	if err != nil {
@@ -271,10 +281,10 @@ func retryExec(cmd *exec.Cmd, backoff time.Duration, retries int) (err error) {
 		trace(retry)
 		err = retry.Run()
 		if err == nil {
-			return
+			return err
 		}
 	}
-	return
+	return err
 }
 
 func appendEnv(cmd *exec.Cmd, env ...string) *exec.Cmd {
@@ -302,8 +312,8 @@ func setUserEmail(userEmail string) *exec.Cmd {
 	return appendEnv(exec.Command("git", "config", "--global", "user.email", userEmail), defaultEnvVars...)
 }
 
-// Use custom SSH Key thanks to core.sshCommand
-func sshKeyHandler(sshKey string, knownHosts string) *exec.Cmd {
+// Use custom SSH Key thanks to core.sshCommand.
+func sshKeyHandler(sshKey, knownHosts string) *exec.Cmd {
 	hostKeyArg := " -o \"StrictHostKeyChecking no\""
 	if knownHosts != "" {
 		hostKeyArg = " -o UserKnownHostsFile=" + knownHosts
@@ -343,7 +353,7 @@ func checkoutSha(commit string) *exec.Cmd {
 	), defaultEnvVars...)
 }
 
-// Fetch a branch
+// Fetch a branch.
 func fetchBranch(branch string) *exec.Cmd {
 	return appendEnv(exec.Command(
 		"git",
@@ -354,7 +364,7 @@ func fetchBranch(branch string) *exec.Cmd {
 	), defaultEnvVars...)
 }
 
-// Merge a branch
+// Merge a branch.
 func mergeBranch(branch string) *exec.Cmd {
 	return appendEnv(exec.Command(
 		"git",
@@ -390,14 +400,14 @@ func checkoutLFS() *exec.Cmd {
 // fetch returns git command that fetches from origin. If tags is true
 // then tags will be fetched.
 func fetch(ref string, tags bool, depth int, filter string) *exec.Cmd {
-	tags_option := "--no-tags"
+	tagsOption := "--no-tags"
 	if tags {
-		tags_option = "--tags"
+		tagsOption = "--tags"
 	}
 	cmd := exec.Command(
 		"git",
 		"fetch",
-		tags_option,
+		tagsOption,
 	)
 	if depth != 0 {
 		cmd.Args = append(cmd.Args, fmt.Sprintf("--depth=%d", depth))

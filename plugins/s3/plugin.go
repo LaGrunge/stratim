@@ -3,6 +3,7 @@ package main
 import (
 	"compress/gzip"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"mime"
@@ -108,7 +109,7 @@ type Plugin struct {
 	RetryDelay time.Duration
 }
 
-// Exec runs the plugin
+// Exec runs the plugin.
 func (p *Plugin) Exec(ctx context.Context) error {
 	// normalize the target URL
 	p.Target = strings.TrimPrefix(p.Target, "/")
@@ -268,7 +269,12 @@ func (p *Plugin) doUpload(ctx context.Context, client *s3.Client, putObjectInput
 	for {
 		// a failed attempt has consumed the body, rewind it so that a retry
 		// does not upload an empty object
-		if _, err = putObjectInput.Body.(io.Seeker).Seek(0, io.SeekStart); err != nil {
+		seeker, ok := putObjectInput.Body.(io.Seeker)
+		if !ok {
+			err = errors.New("upload body cannot be rewound for a retry")
+			break
+		}
+		if _, err = seeker.Seek(0, io.SeekStart); err != nil {
 			break
 		}
 		_, err = client.PutObject(ctx, putObjectInput)
@@ -337,7 +343,7 @@ func matches(include string, exclude []string) ([]string, error) {
 
 	// find all files that are excluded and load into a map. we can verify
 	// each file in the list is not a member of the exclusion list.
-	excluded := map[string]bool{}
+	excluded := make(map[string]bool)
 	for _, pattern := range exclude {
 		excludes, err := zglob.Glob(pattern)
 		if err != nil {

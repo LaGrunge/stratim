@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// secrets-aws is a secret extension for the server that serves pipeline
+// Secrets-aws is a secret extension for the server that serves pipeline
 // secrets from AWS Secrets Manager, so that they never have to be stored in
 // the server's database.
 //
@@ -54,7 +54,7 @@ import (
 
 func main() {
 	if err := run(context.Background()); err != nil {
-		log.Fatal().Err(err).Msg("secrets-aws failed")
+		log.Fatal().Err(err).Msg("secrets-aws failed") //nolint:forbidigo
 	}
 }
 
@@ -81,7 +81,7 @@ func run(ctx context.Context) error {
 	}
 
 	log.Info().Str("addr", addr).Str("prefix", prefix).Msg("serving secrets from AWS Secrets Manager")
-	srv := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 10 * time.Second} //nolint:mnd
 	return srv.ListenAndServe()
 }
 

@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/gophercloud/gophercloud/v2/openstack/image/v2/images"
-	th "github.com/gophercloud/gophercloud/v2/testhelper"
-	fakeclient "github.com/gophercloud/gophercloud/v2/testhelper/client"
+	"github.com/gophercloud/gophercloud/v2/testhelper"
+	"github.com/gophercloud/gophercloud/v2/testhelper/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
@@ -72,14 +72,14 @@ func newTestCommand(t *testing.T, flags map[string]string) *cli.Command {
 func newTestProvider(t *testing.T) (*provider, *http.ServeMux) {
 	t.Helper()
 
-	fakeServer := th.SetupHTTP()
+	fakeServer := testhelper.SetupHTTP()
 	t.Cleanup(fakeServer.Teardown)
 
 	p := &provider{
 		name:          "openstack",
 		config:        &config.Config{PoolID: "pool-7"},
-		computeClient: fakeclient.ServiceClient(fakeServer),
-		imageClient:   fakeclient.ServiceClient(fakeServer),
+		computeClient: client.ServiceClient(fakeServer),
+		imageClient:   client.ServiceClient(fakeServer),
 		capability:    &dockerAMD64Capability,
 	}
 
@@ -125,7 +125,7 @@ func TestImageCapability(t *testing.T) {
 		},
 		{
 			name:       "missing architecture leaves the platform open",
-			properties: map[string]any{},
+			properties: make(map[string]any),
 			want:       types.Capability{Backend: types.BackendDocker},
 		},
 		{
