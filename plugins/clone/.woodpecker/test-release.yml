@@ -2,8 +2,7 @@ variables:
   - &golang 'golang:1.27-alpine'
   - &platforms 'linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/riscv64,linux/s390x'
   # vars used on push / tag events only
-  - publish_logins: &publish_logins
-      # Default DockerHub login
+  - publish_logins: &publish_logins # Default DockerHub login
       - registry: https://index.docker.io/v1/
         username: woodpeckerbot
         password:
