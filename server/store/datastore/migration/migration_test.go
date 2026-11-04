@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	// Blank imports to register the sql drivers.
-	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
@@ -34,6 +34,7 @@ import (
 const (
 	sqliteDB     = "./test-files/sqlite.db"
 	postgresDump = "./test-files/postgres.sql"
+	mariadbDump  = "./test-files/mariadb.sql"
 )
 
 func testDriver() string {
@@ -72,9 +73,14 @@ func testDB(t *testing.T, initNewDB bool) (engine *xorm.Engine, closeDB func()) 
 		return engine, closeDB
 	case "mysql":
 		config := os.Getenv("WOODPECKER_DATABASE_DATASOURCE")
+		cleanMySQLDB(t, config)
+		closeDB = func() {
+			// close the pool first, its connections would hold the database
+			_ = engine.Close()
+			cleanMySQLDB(t, config)
+		}
 		if !initNewDB {
-			t.Logf("do not have dump to test against")
-			t.SkipNow()
+			restoreMySQLDump(t, config)
 		}
 		engine, err = xorm.NewEngine(driver, config)
 		require.NoError(t, err)
@@ -133,6 +139,76 @@ func restorePostgresDump(t *testing.T, config string) {
 	}
 }
 
+// restoreMySQLDump loads a mariadb-dump file in one round trip; the dump's
+// conditional comments and statements need a multi-statement connection.
+func restoreMySQLDump(t *testing.T, config string) {
+	dump, err := os.ReadFile(mariadbDump)
+	require.NoError(t, err)
+
+	cfg, err := mysql.ParseDSN(config)
+	require.NoError(t, err)
+	cfg.MultiStatements = true
+
+	db, err := sql.Open("mysql", cfg.FormatDSN())
+	require.NoError(t, err)
+	defer db.Close()
+
+	_, err = db.Exec(string(dump))
+	require.NoError(t, err, "could not load mariadb dump")
+}
+
+// cleanMySQLDB recreates the test database, so that a dump loads into an
+// empty one and nothing of it leaks into the next test. It drops the
+// database, so it refuses any name but "test" or "*_test": a datasource
+// exported for a real server must not be wiped by running the tests.
+func cleanMySQLDB(t *testing.T, config string) {
+	cfg, err := mysql.ParseDSN(config)
+	require.NoError(t, err)
+	name := cfg.DBName
+	require.Truef(t, name == "test" || strings.HasSuffix(name, "_test"),
+		"refusing to drop database %q: name it test or *_test", name)
+
+	// connect without the database, it may not exist yet
+	cfg.DBName = ""
+	db, err := sql.Open("mysql", cfg.FormatDSN())
+	require.NoError(t, err)
+	defer db.Close()
+
+	quoted := "`" + strings.ReplaceAll(name, "`", "``") + "`"
+	_, err = db.Exec("DROP DATABASE IF EXISTS " + quoted)
+	require.NoError(t, err)
+	_, err = db.Exec("CREATE DATABASE " + quoted + " CHARACTER SET utf8mb4")
+	require.NoError(t, err)
+}
+
+// rowCounts counts the rows of every table but xormigrate's own.
+func rowCounts(t *testing.T, engine *xorm.Engine) map[string]int64 {
+	tables, err := engine.DBMetas()
+	require.NoError(t, err)
+	counts := make(map[string]int64, len(tables))
+	for _, table := range tables {
+		if table.Name == "migration" {
+			continue
+		}
+		counts[table.Name], err = engine.Table(table.Name).Count()
+		require.NoError(t, err)
+	}
+	return counts
+}
+
+// appliedMigrations is how many migrations xormigrate has recorded; an old
+// database from before xormigrate has none.
+func appliedMigrations(t *testing.T, engine *xorm.Engine) int64 {
+	exists, err := engine.IsTableExist("migration")
+	require.NoError(t, err)
+	if !exists {
+		return 0
+	}
+	n, err := engine.Table("migration").Count()
+	require.NoError(t, err)
+	return n
+}
+
 func cleanPostgresDB(t *testing.T, config string) {
 	db, err := sql.Open("postgres", config)
 	require.NoError(t, err)
@@ -163,6 +239,27 @@ func TestMigrate(t *testing.T) {
 
 	// migrate old db
 	engine, closeDB = testDB(t, false)
+	appliedBefore := appliedMigrations(t, engine)
+	var rowsBefore map[string]int64
+	if testDriver() == "mysql" {
+		rowsBefore = rowCounts(t, engine)
+	}
 	assert.NoError(t, Migrate(t.Context(), engine, true))
+
+	// Every fixture predates the newest migration; if none ran, the fixture
+	// went stale and this case tests nothing.
+	assert.Greater(t, appliedMigrations(t, engine), appliedBefore, "the upgrade ran no migration")
+	// every fixture holds repositories; an empty table would mean the
+	// fixture never loaded and the case above proved nothing
+	repos, err := engine.Table("repos").Count()
+	assert.NoError(t, err)
+	assert.Positive(t, repos, "the existing database lost its repositories")
+	// The MariaDB fixture has no duplicates for a migration to clean up, so
+	// the upgrade must keep every row of every table it had.
+	for table, before := range rowsBefore {
+		after, err := engine.Table(table).Count()
+		assert.NoError(t, err)
+		assert.Equalf(t, before, after, "rows of %s after the upgrade", table)
+	}
 	closeDB()
 }
