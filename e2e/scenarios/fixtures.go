@@ -30,6 +30,7 @@ import (
 )
 
 //go:embed fixtures/*.yaml fixtures/*.json fixtures/*/*.yaml fixtures/*/*.json
+//go:embed fixtures/*/*.jsonnet fixtures/_lib/*.libsonnet
 var fixtureFS embed.FS
 
 // Scenario is the single source of truth for one integration test case.
@@ -44,6 +45,11 @@ var fixtureFS embed.FS
 //	fixtures/NN_name/workflow-a.yaml
 //	fixtures/NN_name/workflow-b.yaml
 //	fixtures/NN_name/scenario.json   — assertions; Workflows field is populated from the YAMLs
+//
+// A workflow in a subdirectory may also be workflow-a.jsonnet: the loader
+// evaluates it, with fixtures/_lib/ on the import path, and serves the result
+// as workflow-a.yaml (JSON is YAML). Once the server evaluates jsonnet itself
+// (S0-4), these fixtures are served as they are.
 type Scenario struct {
 	// Name is a human-readable label shown in test output.
 	Name string `json:"name"`
@@ -110,6 +116,9 @@ func LoadScenarios(t *testing.T) []Scenario {
 	for _, e := range entries {
 		name := e.Name()
 
+		if e.IsDir() && e.Name() == libDir {
+			continue
+		}
 		if e.IsDir() {
 			// Multi-workflow scenario: load scenario.json + all *.yaml files.
 			s := loadMultiWorkflowScenario(t, name)
@@ -163,6 +172,12 @@ func loadMultiWorkflowScenario(t *testing.T, dirName string) Scenario {
 
 	var s Scenario
 	var files []*forge_types.FileMeta
+	add := func(source, served string, data []byte) {
+		for _, f := range files {
+			require.NotEqualf(t, served, f.Name, "%s/%s is served as %s, like another workflow file", dirName, source, served)
+		}
+		files = append(files, &forge_types.FileMeta{Name: served, Data: data})
+	}
 
 	for _, e := range entries {
 		if e.IsDir() {
@@ -177,10 +192,10 @@ func loadMultiWorkflowScenario(t *testing.T, dirName string) Scenario {
 			require.NoError(t, json.Unmarshal(data, &s), "parse %s/scenario.json", dirName)
 		case strings.HasSuffix(name, ".yaml"):
 			// Serve under .woodpecker/<filename> so Dir() returns them.
-			files = append(files, &forge_types.FileMeta{
-				Name: ".woodpecker/" + name,
-				Data: data,
-			})
+			add(name, ".woodpecker/"+name, data)
+		case strings.HasSuffix(name, ".jsonnet"):
+			add(name, ".woodpecker/"+strings.TrimSuffix(name, ".jsonnet")+".yaml",
+				evaluateJsonnet(t, dirName+"/"+name, data))
 		}
 	}
 	require.NotEmpty(t, files, "no YAML files in multi-workflow dir %s", dirName)

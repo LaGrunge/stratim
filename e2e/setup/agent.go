@@ -68,6 +68,10 @@ type agentConfig struct {
 	// store is used to create the org agent record. See WithOrgID.
 	store store.Store
 
+	// timeoutUnit is how long one unit of a workflow timeout lasts on this
+	// agent; zero keeps the server's meaning, a minute.
+	timeoutUnit time.Duration
+
 	// capacity is the number of workflows the agent runs in parallel
 	// (advertised to the server and number of runner goroutines).
 	capacity int
@@ -103,6 +107,13 @@ func WithOrgID(s store.Store, id int64) AgentOption {
 		c.store = s
 		c.orgID = id
 	}
+}
+
+// WithTimeoutUnit makes the agent count workflow timeouts in unit instead of
+// minutes: with time.Second, a repository timeout of 2 stops its workflows
+// after two seconds.
+func WithTimeoutUnit(unit time.Duration) AgentOption {
+	return func(c *agentConfig) { c.timeoutUnit = unit }
 }
 
 // WithCapacity sets how many workflows the agent runs in parallel. This is the
@@ -219,7 +230,8 @@ func StartAgent(t *testing.T, grpcAddr string, opts ...AgentOption) *AgentEnv {
 
 	for i := range cfg.capacity {
 		go func(slot int) {
-			runner := agent.NewRunner(client, filter, cfg.hostname, env.AgentID, counter, backend)
+			runner := agent.NewRunner(client, filter, cfg.hostname, env.AgentID, counter, backend).
+				WithTimeoutUnit(cfg.timeoutUnit)
 			log.Debug().Int("slot", slot).Str("hostname", cfg.hostname).Msg("test agent: runner started")
 			for {
 				if agentCtx.Err() != nil {

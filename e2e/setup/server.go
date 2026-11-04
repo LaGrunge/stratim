@@ -33,6 +33,7 @@ import (
 	forge_types "go.woodpecker-ci.org/woodpecker/v3/server/forge/types"
 	"go.woodpecker-ci.org/woodpecker/v3/server/logging"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/pubsub"
 	"go.woodpecker-ci.org/woodpecker/v3/server/pubsub/memory"
 	"go.woodpecker-ci.org/woodpecker/v3/server/queue"
 	server_rpc "go.woodpecker-ci.org/woodpecker/v3/server/rpc"
@@ -65,6 +66,9 @@ type ServerEnv struct {
 	Fixtures *Fixtures
 	Forge    *forge_mocks.MockForge
 	Manager  services.Manager
+	// PubSub carries the pipeline events the server publishes; see
+	// RecordEvents.
+	PubSub pubsub.PubSub
 }
 
 func (env *ServerEnv) DummyPipeline(event model.WebhookEvent) *model.Pipeline {
@@ -116,7 +120,8 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	})
 
 	server.Config.Services.Logs = logging.New()
-	server.Config.Services.Scheduler = scheduler.NewScheduler(t.Context(), memStore, memQueue, memory.New()) //nolint:contextcheck
+	ps := memory.New()
+	server.Config.Services.Scheduler = scheduler.NewScheduler(t.Context(), memStore, memQueue, ps) //nolint:contextcheck
 	server.Config.Services.Membership = cache.NewMembershipService(memStore)
 	server.Config.Services.Manager = mgr
 	server.Config.Services.LogStore = memStore
@@ -145,6 +150,7 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 		Fixtures: fixtures,
 		Forge:    mockForge,
 		Manager:  mgr,
+		PubSub:   ps,
 	}
 }
 

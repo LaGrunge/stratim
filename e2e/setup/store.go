@@ -18,6 +18,7 @@ package setup
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,23 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store/datastore"
+	"go.woodpecker-ci.org/woodpecker/v3/server/store/datastore/testdb"
+)
+
+// DatasourceEnv names the variable that switches the harness from in-memory
+// sqlite to MariaDB. It holds a go-sql-driver datasource whose database is
+// disposable (named test or *_test): every scenario recreates it. All
+// scenarios share that one database, so none may call t.Parallel, and nothing
+// else may use the database while the e2e tests run.
+//
+//	STRATIM_E2E_DATASOURCE='root@tcp(127.0.0.1:3306)/e2e_test?parseTime=true'
+const DatasourceEnv = "STRATIM_E2E_DATASOURCE"
+
+// The MariaDB pool: the scheduler, gRPC handlers and agents' updates query
+// the store concurrently.
+const (
+	mariadbMaxOpenConns = 10
+	mariadbMaxIdleConns = 2
 )
 
 // Fixtures holds the pre-seeded database records shared across all tests.
@@ -35,11 +53,12 @@ type Fixtures struct {
 	Repo  *model.Repo
 }
 
-// newStore creates a fully-migrated in-memory sqlite store.
+// newStore creates a fully-migrated store: in-memory sqlite by default, or a
+// freshly recreated MariaDB database when DatasourceEnv is set.
 func newStore(ctx context.Context, t *testing.T) store.Store {
 	t.Helper()
 
-	s, err := datastore.NewEngine(&store.Opts{
+	opts := &store.Opts{
 		Driver: "sqlite3",
 		Config: ":memory:",
 		// MaxOpenConns=1 and MaxIdleConns=1 are required for in-memory sqlite:
@@ -49,8 +68,21 @@ func newStore(ctx context.Context, t *testing.T) store.Store {
 			MaxOpenConns: 1,
 			MaxIdleConns: 1,
 		},
-	})
-	require.NoError(t, err, "create in-memory store")
+	}
+	if datasource := os.Getenv(DatasourceEnv); datasource != "" {
+		testdb.RecreateMySQL(t, datasource)
+		opts = &store.Opts{
+			Driver: "mysql",
+			Config: datasource,
+			XORM: store.XORM{
+				MaxOpenConns: mariadbMaxOpenConns,
+				MaxIdleConns: mariadbMaxIdleConns,
+			},
+		}
+	}
+
+	s, err := datastore.NewEngine(opts)
+	require.NoError(t, err, "create %s store", opts.Driver)
 
 	require.NoError(t, s.Ping(), "ping store")
 	require.NoError(t, s.Migrate(ctx, true), "migrate store")

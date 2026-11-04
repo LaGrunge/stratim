@@ -29,6 +29,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"xorm.io/xorm"
 	"xorm.io/xorm/schemas"
+
+	"go.woodpecker-ci.org/woodpecker/v3/server/store/datastore/testdb"
 )
 
 const (
@@ -158,27 +160,9 @@ func restoreMySQLDump(t *testing.T, config string) {
 }
 
 // cleanMySQLDB recreates the test database, so that a dump loads into an
-// empty one and nothing of it leaks into the next test. It drops the
-// database, so it refuses any name but "test" or "*_test": a datasource
-// exported for a real server must not be wiped by running the tests.
+// empty one and nothing of it leaks into the next test.
 func cleanMySQLDB(t *testing.T, config string) {
-	cfg, err := mysql.ParseDSN(config)
-	require.NoError(t, err)
-	name := cfg.DBName
-	require.Truef(t, name == "test" || strings.HasSuffix(name, "_test"),
-		"refusing to drop database %q: name it test or *_test", name)
-
-	// connect without the database, it may not exist yet
-	cfg.DBName = ""
-	db, err := sql.Open("mysql", cfg.FormatDSN())
-	require.NoError(t, err)
-	defer db.Close()
-
-	quoted := "`" + strings.ReplaceAll(name, "`", "``") + "`"
-	_, err = db.Exec("DROP DATABASE IF EXISTS " + quoted)
-	require.NoError(t, err)
-	_, err = db.Exec("CREATE DATABASE " + quoted + " CHARACTER SET utf8mb4")
-	require.NoError(t, err)
+	testdb.RecreateMySQL(t, config)
 }
 
 // rowCounts counts the rows of every table but xormigrate's own.
