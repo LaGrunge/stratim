@@ -75,7 +75,10 @@ steps:
     image: *golang_image
     commands:
       - make install-addlicense # cspell:words addlicense
-      - bash -c 'shopt -s globstar; addlicense -check -ignore "vendor/**" -ignore cmd/server/openapi/docs.go **/*.go'
+      # plugins/clone and plugins/s3 started as Drone plugins and carry their
+      # own Apache-2.0 LICENSE; a "Woodpecker Authors" header would misstate
+      # who holds the copyright.
+      - bash -c 'shopt -s globstar; addlicense -check -ignore "vendor/**" -ignore cmd/server/openapi/docs.go -ignore "plugins/clone/**" -ignore "plugins/s3/**" **/*.go'
     when: *when
 
   test:
