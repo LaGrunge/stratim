@@ -1,0 +1,134 @@
+{
+  "id": 44,
+  "number": 100,
+  "author": "synthetic",
+  "parent": 0,
+  "event": "cron",
+  "event_reason": [""],
+  "status": "running",
+  "errors": null,
+  "created": 1793900000,
+  "updated": 1793828522,
+  "started": 1793900040,
+  "finished": 0,
+  "deploy_to": "",
+  "deploy_task": "",
+  "commit": "",
+  "branch": "main",
+  "rerun_count": 0,
+  "ref": "",
+  "refspec": "",
+  "author_avatar": "",
+  "forge_url": "",
+  "reviewed_by": "",
+  "reviewed": 0,
+  "workflows": [
+    {
+      "id": 1001,
+      "pipeline_id": 44,
+      "pid": 1,
+      "name": "synthetic-logs",
+      "state": "running",
+      "started": 1793900700,
+      "finished": 0,
+      "agent_id": 2,
+      "children": [
+        {
+          "id": 2001,
+          "uuid": "00000000-0000-0000-0000-000000000001",
+          "pipeline_id": 44,
+          "pid": 101,
+          "ppid": 1,
+          "name": "big-log",
+          "state": "running",
+          "exit_code": 1,
+          "started": 1793900700,
+          "finished": 0,
+          "type": "clone"
+        }
+      ]
+    },
+    {
+      "id": 1002,
+      "pipeline_id": 44,
+      "pid": 2,
+      "name": "synthetic-tests",
+      "state": "pending",
+      "started": 0,
+      "finished": 0,
+      "agent_id": 1,
+      "children": [
+        {
+          "id": 2002,
+          "uuid": "00000000-0000-0000-0000-000000000002",
+          "pipeline_id": 44,
+          "pid": 102,
+          "ppid": 2,
+          "name": "service-messages",
+          "state": "pending",
+          "exit_code": 1,
+          "started": 0,
+          "finished": 0,
+          "type": "clone"
+        }
+      ]
+    },
+    {
+      "id": 1003,
+      "pipeline_id": 44,
+      "pid": 3,
+      "name": "synthetic-parallel-a",
+      "state": "success",
+      "started": 1793900700,
+      "finished": 1793900761,
+      "agent_id": 2,
+      "children": [
+        {
+          "id": 2003,
+          "uuid": "00000000-0000-0000-0000-000000000003",
+          "pipeline_id": 44,
+          "pid": 103,
+          "ppid": 3,
+          "name": "hold",
+          "state": "success",
+          "exit_code": 0,
+          "started": 1793900700,
+          "finished": 1793900761,
+          "type": "clone"
+        }
+      ]
+    },
+    {
+      "id": 1005,
+      "pipeline_id": 44,
+      "pid": 5,
+      "name": "synthetic-check",
+      "state": "running",
+      "started": 1793900400,
+      "finished": 0,
+      "agent_id": 2,
+      "children": [
+        {
+          "id": 2005,
+          "uuid": "00000000-0000-0000-0000-000000000005",
+          "pipeline_id": 44,
+          "pid": 105,
+          "ppid": 5,
+          "name": "check",
+          "state": "running",
+          "exit_code": 1,
+          "started": 1793900400,
+          "finished": 0,
+          "type": "clone"
+        }
+      ]
+    }
+  ],
+  "changed_files": [],
+  "version": "stratim-base-v3.20.1",
+  "title": "",
+  "message": "",
+  "timestamp": 0,
+  "sender": "synthetic",
+  "author_email": ""
+}
