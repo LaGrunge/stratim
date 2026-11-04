@@ -98,19 +98,3 @@ steps:
       - ls -la dist/*.*
       - cat dist/checksums.txt
 
-  release:
-    depends_on:
-      - checksums
-    image: woodpeckerci/plugin-release:0.3.3
-    settings:
-      api_key:
-        from_secret: github_token
-      files:
-        - dist/*.tar.gz
-        - dist/*.zip
-        - dist/*.deb
-        - dist/*.rpm
-        - dist/checksums.txt
-      title: ${CI_COMMIT_TAG##v}
-    when:
-      event: tag
