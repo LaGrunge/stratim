@@ -1,0 +1,16 @@
+# Synthetic load (S0-3): synthetic-parallel-a and -b have no dependency on each
+# other, so they must run at the same time; the checker verifies that their
+# run times overlap. See synthetic-logs.yaml for when it runs.
+when:
+  - event: cron
+    cron: synthetic
+  - event: manual
+    evaluate: 'TASK == "synthetic"'
+
+skip_clone: true
+
+steps:
+  - name: hold
+    image: docker.io/alpine:3.24
+    commands:
+      - sleep 60

@@ -1,0 +1,12 @@
+{
+  "max_queue_wait_seconds": 600,
+  "max_pipeline_seconds": 1800,
+  "workflows": {
+    "synthetic-logs": { "state": "success", "max_seconds": 600 },
+    "synthetic-tests": { "state": "success", "max_seconds": 300 },
+    "synthetic-parallel-a": { "state": "success", "max_seconds": 300 },
+    "synthetic-parallel-b": { "state": "success", "max_seconds": 300 }
+  },
+  "overlapping": [["synthetic-parallel-a", "synthetic-parallel-b"]],
+  "logs": [{ "workflow": "synthetic-logs", "step": "big-log", "lines": 3000000 }]
+}
