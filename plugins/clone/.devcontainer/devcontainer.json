@@ -1,4 +1,4 @@
 {
-	"name": "plugin-git",
-	"dockerFile": "containerfile"
+  "name": "plugin-git",
+  "dockerFile": "containerfile"
 }

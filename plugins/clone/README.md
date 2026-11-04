@@ -46,7 +46,7 @@ docker buildx build \
   --file docker/Dockerfile.multiarch --tag woodpeckerci/plugin-git .
 ```
 
-*The platform linux/amd64 should be replaced by the correct platform.*
+_The platform linux/amd64 should be replaced by the correct platform._
 
 This will build the image and load it into docker so the image can be used locally.
 [More information on the output formats can be found in docker buildx doc](https://docs.docker.com/engine/reference/commandline/buildx_build/#output).

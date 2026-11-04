@@ -121,8 +121,8 @@ steps:
     settings:
       # ...
       cache_control:
-        "\\\\.html$": "public,max_age=600"
-        "\\\\.(woff2|js|css|png|svg)$": "public,max_age=12000"
+        "\\\\.html$": 'public,max_age=600'
+        "\\\\.(woff2|js|css|png|svg)$": 'public,max_age=12000'
 ```
 
 > Note that \\\\. means a literal '.' - you need to escape backslashes twice, once for the regex (\. becomes \\.), then againg for the yaml string (\\ becomes \\\\), resulting in 4.
