@@ -44,6 +44,9 @@ type Runner struct {
 	agentID  int64
 	counter  *State
 	backend  backend_types.Backend
+	// timeoutUnit is what one unit of a workflow timeout lasts; zero means a
+	// minute, as the server means it.
+	timeoutUnit time.Duration
 }
 
 func NewRunner(workEngine rpc.Peer, f rpc.Filter, h string, agentID int64, state *State, backend backend_types.Backend) Runner {
@@ -55,6 +58,19 @@ func NewRunner(workEngine rpc.Peer, f rpc.Filter, h string, agentID int64, state
 		counter:  state,
 		backend:  backend,
 	}
+}
+
+// workflowTimeout is how long a workflow may run: the server sends the
+// timeout in minutes, zero meaning none set, which gets an hour. A non-zero
+// unit replaces the minute; only tests set one (see WithTimeoutUnit).
+func workflowTimeout(timeout int64, unit time.Duration) time.Duration {
+	if timeout == 0 {
+		return time.Hour
+	}
+	if unit == 0 {
+		unit = time.Minute
+	}
+	return time.Duration(timeout) * unit
 }
 
 // formatAgentLabels renders the agent's labels as a JSON object so they can be
@@ -96,10 +112,7 @@ func (r *Runner) Run(runnerCtx context.Context) error {
 	}
 
 	// Compute workflow timeout
-	timeout := time.Hour
-	if minutes := workflow.Timeout; minutes != 0 {
-		timeout = time.Duration(minutes) * time.Minute
-	}
+	timeout := workflowTimeout(workflow.Timeout, r.timeoutUnit)
 
 	repoName := extractRepositoryName(workflow.Config)       // hack
 	pipelineNumber := extractPipelineNumber(workflow.Config) // hack

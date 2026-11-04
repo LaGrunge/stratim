@@ -218,8 +218,14 @@ test-ui: ui-dependencies ## Test UI code
 test-lib: ## Test lib code
 	go test -race -cover -coverpkg=./... -coverprofile coverage.out -timeout 60s -tags 'test $(TAGS)' $(shell go list ./... | grep -v '/cmd\|/agent\|/cli\|/server\|/autoscaler\|/plugins')
 
+# With STRATIM_E2E_DATASOURCE set the e2e tests run on MariaDB, which needs a
+# longer timeout; run in parallel with the sqlite job, they need their own
+# coverage file.
+E2E_TIMEOUT ?= 60s
+E2E_COVERAGE_FILE ?= e2e-coverage.out
+
 test-e2e: ## Test by running yaml config and compare expected result
-	go test -race -cover -coverpkg=./... -coverprofile e2e-coverage.out -timeout 60s -tags 'test $(TAGS)' ./e2e/...
+	go test -race -cover -coverpkg=./... -coverprofile $(E2E_COVERAGE_FILE) -timeout $(E2E_TIMEOUT) -tags 'test $(TAGS)' ./e2e/...
 
 test-extensions: ## Test the server extensions
 	go test -race -cover -coverprofile extensions-coverage.out -timeout 60s -tags 'test $(TAGS)' ./cmd/secrets-aws/...

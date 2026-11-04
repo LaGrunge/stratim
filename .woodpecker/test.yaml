@@ -102,6 +102,21 @@ steps:
     when:
       - path: *when_path
 
+  # The same scenarios on MariaDB. Every scenario recreates its database, so it
+  # must stay distinct from the mariadb job's (e2e_test here, test there): the
+  # two jobs share the service and run at the same time.
+  test-e2e-mariadb:
+    depends_on:
+      - vendor
+    image: *golang_image
+    environment:
+      STRATIM_E2E_DATASOURCE: root@tcp(mariadb:3306)/e2e_test?parseTime=true
+    commands:
+      - timeout 120 bash -c 'until (exec 3<>/dev/tcp/mariadb/3306) 2>/dev/null; do sleep 1; done'
+      - make test-e2e E2E_TIMEOUT=600s E2E_COVERAGE_FILE=e2e-mariadb-coverage.out
+    # like the mariadb service it needs: pull requests only
+    when: *when
+
   test-fuzz:
     depends_on:
       - vendor
@@ -145,6 +160,7 @@ steps:
     image: *golang_image
     environment:
       WOODPECKER_DATABASE_DRIVER: mysql
+      # database name distinct from test-e2e-mariadb's, see there
       WOODPECKER_DATABASE_DATASOURCE: root@tcp(mariadb:3306)/test?parseTime=true
     commands:
       # the image restarts its server once after initializing the data
@@ -159,6 +175,8 @@ steps:
     depends_on:
       - test
       - mariadb
+      - test-e2e
+      - test-e2e-mariadb
     pull: true
     image: docker.io/woodpeckerci/plugin-codecov:2.3.3
     settings:
@@ -169,6 +187,7 @@ steps:
         - server-coverage.out
         - datastore-coverage.out
         - e2e-coverage.out
+        - e2e-mariadb-coverage.out
       token:
         from_secret: codecov_token
     when:

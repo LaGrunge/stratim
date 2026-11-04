@@ -1,0 +1,15 @@
+{
+  "name": "jsonnet workflows sharing a library",
+  "event": "push",
+  "expected_status": "success",
+  "expected_workflows": [
+    { "name": "build", "status": "success" },
+    { "name": "deploy", "status": "success" }
+  ],
+  "expected_steps": [
+    { "name": "compile", "status": "success", "exit_code": 0 },
+    { "name": "unit-test", "status": "success", "exit_code": 0 },
+    { "name": "deploy-staging", "status": "success", "exit_code": 0 },
+    { "name": "deploy-production", "status": "success", "exit_code": 0 }
+  ]
+}
