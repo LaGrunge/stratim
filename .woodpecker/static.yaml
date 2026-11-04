@@ -44,4 +44,3 @@ steps:
     when:
       - event: pull_request
         evaluate: 'CI_COMMIT_PULL_REQUEST_LABELS contains "breaking"'
-

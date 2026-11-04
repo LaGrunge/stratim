@@ -97,4 +97,3 @@ steps:
     commands:
       - ls -la dist/*.*
       - cat dist/checksums.txt
-
