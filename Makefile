@@ -37,6 +37,9 @@ else
 endif
 
 TAGS ?=
+# Matches go-mockery in the nixpkgs pinned by flake.lock; 3.6.x cannot parse Go 1.27.
+MOCKERY_VERSION ?= v3.8.0
+MOCKERY ?= go run github.com/vektra/mockery/v3@$(MOCKERY_VERSION)
 LDFLAGS := -X go.woodpecker-ci.org/woodpecker/v3/version.Version=${VERSION}
 STATIC_BUILD ?= true
 ifeq ($(STATIC_BUILD),true)
@@ -129,11 +132,8 @@ clean-all: clean ## Clean all artifacts
 
 .PHONY: generate
 generate: generate-openapi ## Run all code generations
-	@if command -v mockery > /dev/null 2>&1; then \
-		mockery; \
-	else \
-		go run github.com/vektra/mockery/v3@latest; \
-	fi
+	$(MOCKERY)
+	cd autoscaler && $(MOCKERY)
 	CGO_ENABLED=0 go generate ./...
 
 generate-openapi: ## Run openapi code generation
@@ -161,7 +161,7 @@ install-addlicense:
 	go install github.com/google/addlicense@latest
 
 install-mockery:
-	go install github.com/vektra/mockery/v3@latest
+	go install github.com/vektra/mockery/v3@$(MOCKERY_VERSION)
 
 install-protoc-gen-go:
 	@hash protoc-gen-go > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
