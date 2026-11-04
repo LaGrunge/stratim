@@ -324,8 +324,8 @@ func gzipToTemp(src io.Reader) (*os.File, error) {
 }
 
 // matches is a helper function that returns a list of all files matching the
-// included Glob pattern, while excluding all files that matche the exclusion
-// Glob pattners.
+// included Glob pattern, while excluding all files that match the exclusion
+// Glob patterns.
 func matches(include string, exclude []string) ([]string, error) {
 	matches, err := zglob.Glob(include)
 	if err != nil {
@@ -337,20 +337,20 @@ func matches(include string, exclude []string) ([]string, error) {
 
 	// find all files that are excluded and load into a map. we can verify
 	// each file in the list is not a member of the exclusion list.
-	excludem := map[string]bool{}
+	excluded := map[string]bool{}
 	for _, pattern := range exclude {
 		excludes, err := zglob.Glob(pattern)
 		if err != nil {
 			return nil, err
 		}
 		for _, match := range excludes {
-			excludem[match] = true
+			excluded[match] = true
 		}
 	}
 
 	var included []string
 	for _, include := range matches {
-		_, ok := excludem[include]
+		_, ok := excluded[include]
 		if ok {
 			continue
 		}

@@ -147,7 +147,7 @@ func main() {
 			},
 			&cli.DurationFlag{
 				Name:    "retry-delay",
-				Usage:   "tamount of time to wait before each retry",
+				Usage:   "amount of time to wait before each retry",
 				Sources: cli.EnvVars("PLUGIN_RETRY_DELAY"),
 				Value:   time.Duration(5) * time.Second, //nolint:mnd
 			},

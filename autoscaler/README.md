@@ -58,7 +58,7 @@ Useful optional settings:
 
 Set `WOODPECKER_PROVIDER=openstack`. The prefix for all the following environment variables is `WOODPECKER_OPENSTACK_`.
 
-You have to supply the `AUTH_URL` pointing to your Keystone. If necessary, you can also specifiy the `DOMAIN_NAME`, `REGION` and `PROJECT_NAME`.
+You have to supply the `AUTH_URL` pointing to your Keystone. If necessary, you can also specify the `DOMAIN_NAME`, `REGION` and `PROJECT_NAME`.
 
 Both `USERNAME`/`PASSWORD` authentication and application credentials via `APPLICATION_CREDENTIAL_ID` and `APPLICATION_CREDENTIAL_SECRET` are supported.
 Credentials can also be read from files, to do so append `_FILE` to the appropriate variable name and set it to the file path.

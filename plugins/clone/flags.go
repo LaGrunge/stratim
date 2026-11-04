@@ -172,7 +172,7 @@ var globalFlags = []cli.Flag{
 	},
 	&cli.BoolFlag{
 		Name:    "merge-pull-request",
-		Usage:   "Merge pull reguest with target branch",
+		Usage:   "Merge pull request with target branch",
 		Sources: cli.EnvVars("PLUGIN_MERGE_PULL_REQUEST"),
 	},
 	&cli.StringFlag{
