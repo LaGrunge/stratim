@@ -107,7 +107,7 @@ docker run --rm \
   -e PLUGIN_MERGE_PULL_REQUEST=true \
   -e PLUGIN_GIT_USERNAME=ci \
   -e PLUGIN_GIT_USEREMAIL=ci@mydomain.ci \
-   release/plugin-git
+  release/plugin-git
 ```
 
 Clone a tag:

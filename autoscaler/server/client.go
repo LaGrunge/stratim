@@ -39,7 +39,7 @@ func NewClient(ctx context.Context, c *cli.Command) (Client, error) {
 	var (
 		skip        = c.Bool("skip-verify")
 		socks       = c.String("socks-proxy")
-		socksoff    = c.Bool("socks-proxy-off")
+		socksOff    = c.Bool("socks-proxy-off")
 		serverToken = c.String("server-token")
 		serverURL   = c.String("server-url")
 	)
@@ -72,7 +72,7 @@ func NewClient(ctx context.Context, c *cli.Command) (Client, error) {
 
 	trans, _ := client.Transport.(*oauth2.Transport)
 
-	if len(socks) != 0 && !socksoff {
+	if len(socks) != 0 && !socksOff {
 		dialer, err := proxy.SOCKS5("tcp", socks, nil, proxy.Direct)
 		if err != nil {
 			return nil, err
