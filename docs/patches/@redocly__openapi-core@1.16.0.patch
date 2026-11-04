@@ -1,0 +1,13 @@
+diff --git a/lib/utils.js b/lib/utils.js
+index 028a307..74ae36b 100644
+--- a/lib/utils.js
++++ b/lib/utils.js
+@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.getProxyAgent = exports.pause = exports.nextTick = exports.pickDefined = exports.keysOf = exports.identity = exports.isTruthy = exports.showErrorForDeprecatedField = exports.showWarningForDeprecatedField = exports.doesYamlFileExist = exports.isCustomRuleId = exports.getMatchingStatusCodeRange = exports.assignExisting = exports.isNotString = exports.isString = exports.isNotEmptyObject = exports.slash = exports.isPathParameter = exports.yamlAndJsonSyncReader = exports.readFileAsStringSync = exports.isSingular = exports.validateMimeTypeOAS3 = exports.validateMimeType = exports.splitCamelCaseIntoWords = exports.omitObjectProps = exports.pickObjectProps = exports.readFileFromUrl = exports.isEmptyArray = exports.isEmptyObject = exports.isPlainObject = exports.isDefined = exports.loadYaml = exports.popStack = exports.pushStack = exports.stringifyYaml = exports.parseYaml = void 0;
+ const fs = require("fs");
+ const path_1 = require("path");
+-const minimatch = require("minimatch");
++const { minimatch } = require("minimatch");
+ const node_fetch_1 = require("node-fetch");
+ const pluralize = require("pluralize");
+ const js_yaml_1 = require("./js-yaml");

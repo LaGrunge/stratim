@@ -15,8 +15,17 @@ overrides:
   tinypool: '^2.1.2'
   # CVE-2026-104844
   postcss-selector-parser: '^7.1.6'
+  # CVE-2026-118764 is fixed only in minimatch 11. Both parents call the module
+  # itself as a function, which minimatch 11 no longer exports; the patches in
+  # patches/ switch them to its named export.
+  'serve-handler>minimatch': '^11.0.4'
+  '@redocly/openapi-core>minimatch': '^11.0.4'
 
   # image-size is archived upstream and its last release (2.0.2) is affected by
   # CVE-2025-71329 and CVE-2025-71330 with no fixed version available.
   # image-size-next is a drop-in community fork of 2.0.2 carrying those fixes.
   image-size: 'npm:image-size-next@^2.1.1'
+
+patchedDependencies:
+  serve-handler@6.1.7: patches/serve-handler@6.1.7.patch
+  '@redocly/openapi-core@1.16.0': patches/@redocly__openapi-core@1.16.0.patch
