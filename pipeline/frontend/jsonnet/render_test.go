@@ -156,8 +156,19 @@ func TestRendererHandsOutCopies(t *testing.T) {
 func TestRendererKeyFollowsOrder(t *testing.T) {
 	a := &File{Name: ".woodpecker/a.yaml", Data: []byte("steps: []\n")}
 	b := &File{Name: ".woodpecker/b.yaml", Data: []byte("steps: []\n")}
-	assert.NotEqual(t, contentKey([]*File{a, b}), contentKey([]*File{b, a}))
-	assert.Equal(t, contentKey([]*File{a, b}), contentKey([]*File{a, b}))
+	assert.NotEqual(t, contentKey([]*File{a, b}, nil), contentKey([]*File{b, a}, nil))
+	assert.Equal(t, contentKey([]*File{a, b}, nil), contentKey([]*File{a, b}, nil))
+}
+
+// TestRendererKeyFollowsParams: the same configs with other params are
+// evaluated again.
+func TestRendererKeyFollowsParams(t *testing.T) {
+	a := &File{Name: ".woodpecker/a.jsonnet", Data: []byte("{}")}
+	none, empty := contentKey([]*File{a}, nil), contentKey([]*File{a}, make(map[string]string))
+	assert.Equal(t, none, empty)
+	assert.NotEqual(t, none, contentKey([]*File{a}, map[string]string{"X": "1"}))
+	assert.NotEqual(t, contentKey([]*File{a}, map[string]string{"X": "1"}), contentKey([]*File{a}, map[string]string{"X": "2"}))
+	assert.Equal(t, contentKey([]*File{a}, map[string]string{"X": "1", "Y": "2"}), contentKey([]*File{a}, map[string]string{"Y": "2", "X": "1"}))
 }
 
 func TestRendererForgetsPastItsSize(t *testing.T) {

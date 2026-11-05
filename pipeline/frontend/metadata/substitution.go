@@ -16,6 +16,7 @@ package metadata
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/drone/envsubst"
@@ -33,4 +34,40 @@ func EnvVarSubst(yaml string, environ map[string]string) (string, error) {
 		}
 		return env
 	})
+}
+
+// Substitute substitutes environ into s, a value: ${NAME} and the string
+// operations envsubst knows, the escapes $$, \\ and \/ outside of ${...}. A
+// name not in environ is empty. Unlike EnvVarSubst, a value goes in as it
+// is: s is not YAML text.
+func Substitute(s string, environ map[string]string) (string, error) {
+	if !strings.ContainsAny(s, `$\`) {
+		return s, nil
+	}
+	return envsubst.Eval(s, func(name string) string { return environ[name] })
+}
+
+// Reference is a ${NAME...} expression in a string.
+type Reference struct {
+	Name string
+	// HasDefault: the expression gives a default when NAME is empty or
+	// unset (${NAME:-x}, ${NAME-x}, ${NAME:=x}, ${NAME=x}).
+	HasDefault bool
+}
+
+// references finds ${NAME...} expressions, with the $ right before them:
+// an odd number of those escapes the expression.
+var references = regexp.MustCompile(`(\$*)\$\{#?([A-Za-z_][A-Za-z0-9_]*)(:?[-=])?`)
+
+// References returns the ${NAME...} expressions s substitutes, leaving out
+// those escaped as $${NAME}.
+func References(s string) []Reference {
+	var out []Reference
+	for _, m := range references.FindAllStringSubmatch(s, -1) {
+		if len(m[1])%2 == 1 { // an odd number of $ before: escaped
+			continue
+		}
+		out = append(out, Reference{Name: m[2], HasDefault: m[3] != ""})
+	}
+	return out
 }

@@ -51,6 +51,8 @@ const (
 	LibExt = ".libsonnet"
 	// LibraryName is the name configs import the Stratim library by.
 	LibraryName = "stratim.libsonnet"
+	// VarsName is what the library imports the variables of the run as.
+	VarsName = "stratim.vars"
 
 	// The deepest jsonnet calls may nest.
 	maxStack = 500
@@ -103,6 +105,13 @@ func Expand(files []*File) ([]*File, error) {
 	return Default.Expand(files)
 }
 
+// ExpandWith is Expand for a run given vars: the variables of a manual
+// run, a cron job, the API, a restart or deployment, which configs read as
+// (import 'stratim.libsonnet').vars.
+func ExpandWith(files []*File, vars map[string]string) ([]*File, error) {
+	return Default.ExpandWith(files, vars)
+}
+
 // Error is a config that could not be turned into workflows.
 type Error struct {
 	File string
@@ -115,8 +124,8 @@ func (e *Error) Unwrap() error { return e.Err }
 // expand does Expand with evaluate. It gives up on the set at the first
 // config that fails for reasons of the moment (time, memory), so that a set
 // of hanging configs takes one timeout, not one each.
-func expand(files []*File, evaluate evaluator) ([]*File, error) {
-	sources := make(map[string]string)
+func expand(files []*File, vars map[string]string, evaluate evaluator) ([]*File, error) {
+	sources := map[string]string{VarsName: varsJSON(vars)}
 	configs := 0
 	for _, f := range files {
 		if IsConfig(f.Name) || IsLibrary(f.Name) {
@@ -293,6 +302,9 @@ func (i *importer) Import(importedFrom, importedPath string) (jsonnet.Contents, 
 	if importedPath == LibraryName {
 		return i.library, LibraryName, nil
 	}
+	if importedPath == VarsName {
+		return i.files[VarsName], VarsName, nil
+	}
 	resolved := clean(importedPath) // the config itself
 	if importedFrom != "" {
 		resolved = clean(path.Join(path.Dir(importedFrom), importedPath))
@@ -301,6 +313,15 @@ func (i *importer) Import(importedFrom, importedPath string) (jsonnet.Contents, 
 		return contents, resolved, nil
 	}
 	return jsonnet.Contents{}, "", fmt.Errorf("%s not found: a config can import %s and the .jsonnet and .libsonnet files next to it", importedPath, LibraryName)
+}
+
+// varsJSON is vars as a jsonnet object; none is {}.
+func varsJSON(vars map[string]string) string {
+	if vars == nil {
+		vars = make(map[string]string)
+	}
+	data, _ := json.Marshal(vars) //nolint:errchkjson // a map of strings always marshals
+	return string(data)
 }
 
 // clean is a file name as configs and imports refer to it.

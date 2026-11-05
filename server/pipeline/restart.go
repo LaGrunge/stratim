@@ -18,6 +18,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/rs/zerolog/log"
 
@@ -66,6 +68,7 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 	newPipeline.Parent = lastPipeline.Number
 	newPipeline.RerunCount++
 	newPipeline.Version = version.String()
+	newPipeline.AdditionalVariables = withRestartVariables(lastPipeline.AdditionalVariables, envs)
 
 	err = store.CreatePipeline(newPipeline)
 	if err != nil {
@@ -157,3 +160,26 @@ func createNewOutOfOld(old *model.Pipeline) *model.Pipeline {
 	newPipeline.Reviewed = 0
 	return &newPipeline
 }
+
+// withRestartVariables returns the variables of a pipeline restarted, or
+// deployed, with envs: the old ones, and those envs gives a value, which
+// parameters and jsonnet read as the run's. They are stored, so that a
+// later restart builds the same workflows. The keys of the request itself
+// are not variables: the deployment task is the pipeline's own field, and
+// a token authenticates the request.
+func withRestartVariables(old, envs map[string]string) map[string]string {
+	vars := maps.Clone(old)
+	for name, value := range envs {
+		if value == "" || slices.Contains(requestKeys, name) {
+			continue
+		}
+		if vars == nil {
+			vars = make(map[string]string, len(envs))
+		}
+		vars[name] = value
+	}
+	return vars
+}
+
+// requestKeys are query keys of a restart request that are not variables.
+var requestKeys = []string{"deploy_task", "access_token", "fork", "event", "deploy_to"}

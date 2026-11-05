@@ -20,6 +20,39 @@
     "skip_clone": {
       "type": "boolean"
     },
+    "params": {
+      "description": "Parameters of the workflow: variables with a default, which a manual run, a cron job or the API can set. Read more: https://woodpecker-ci.org/docs/usage/environment#parameters",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": ["string", "number", "boolean", "null"]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "default": {
+                "type": ["string", "number", "boolean", "null"]
+              },
+              "description": {
+                "type": "string"
+              },
+              "options": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": ["string", "number", "boolean", "null"]
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
     "when": {
       "$ref": "#/definitions/workflow_when"
     },

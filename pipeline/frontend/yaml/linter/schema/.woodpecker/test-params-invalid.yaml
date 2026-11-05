@@ -1,0 +1,10 @@
+params:
+  TIER:
+    default: light
+    choices: [light, full]
+
+steps:
+  - name: test
+    image: alpine
+    commands:
+      - echo $TIER

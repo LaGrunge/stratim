@@ -1,0 +1,19 @@
+params:
+  TIER: light
+  RETRIES: 3
+  PUBLISH: false
+  PIN:
+    default: main
+    description: branch of the dependency
+    options: [main, stable]
+  EMPTY:
+  NULLABLE:
+    options: [~, x]
+  N:
+    options: [1, 2]
+
+steps:
+  - name: test
+    image: alpine
+    commands:
+      - echo $TIER $PIN
