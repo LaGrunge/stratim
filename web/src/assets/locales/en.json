@@ -189,7 +189,9 @@
         "your_timezone": "In your browser's timezone.",
         "edit": "Edit cron",
         "delete": "Delete cron",
-        "enabled": "Enabled"
+        "enabled": "Enabled",
+        "from_config": "from the config",
+        "managed": "This cron comes from the config of workflow {workflow} on the default branch: change or remove it there. Here it can only be enabled or disabled."
       },
       "badge": {
         "badge": "Badge",

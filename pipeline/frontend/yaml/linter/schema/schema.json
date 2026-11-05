@@ -24,6 +24,35 @@
       "description": "End the workflow when it runs longer, in place of the repository's timeout, which is also its ceiling: a duration such as 90s or 1h30m, or minutes.",
       "$ref": "#/definitions/duration"
     },
+    "crons": {
+      "description": "Schedules that run this workflow, and the workflows it depends on, on the default branch, by name. The server applies them on a push to the default branch. Read more: https://woodpecker-ci.org/docs/usage/cron",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schedule"],
+        "properties": {
+          "schedule": {
+            "description": "A cron expression: 0 3 * * *, @daily.",
+            "type": "string"
+          },
+          "timezone": {
+            "description": "The timezone the schedule is read in; UTC if left out.",
+            "type": "string"
+          },
+          "variables": {
+            "description": "Variables the run is given, as a manual run's.",
+            "type": "object",
+            "additionalProperties": {
+              "type": ["string", "number", "boolean"]
+            }
+          }
+        }
+      }
+    },
     "params": {
       "description": "Parameters of the workflow: variables with a default, which a manual run, a cron job or the API can set. Read more: https://woodpecker-ci.org/docs/usage/environment#parameters",
       "type": "object",

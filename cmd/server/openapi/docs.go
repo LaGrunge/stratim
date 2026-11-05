@@ -4870,6 +4870,10 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "managed": {
+                    "description": "Managed: the cron comes from the config of the default branch, which\nthe server keeps it in line with; only its being enabled is changed\notherwise.",
+                    "type": "boolean"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -4891,6 +4895,10 @@ const docTemplate = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "workflow": {
+                    "description": "Workflow, if set, is the workflow the cron runs, with its\ndependencies, whatever their when says.",
+                    "type": "string"
                 }
             }
         },

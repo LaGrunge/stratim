@@ -164,9 +164,20 @@ type Store interface {
 	CronFind(*model.Repo, int64) (*model.Cron, error)
 	CronList(*model.Repo, *model.ListOptionsWithAll) ([]*model.Cron, error)
 	CronUpdate(*model.Repo, *model.Cron) error
+	// CronSetEnabled saves whether a managed cron is enabled, who changed
+	// it and, enabled, its next run, nothing the config owns. It returns
+	// types.ErrRecordNotExist if the cron is gone or, enabled, its schedule
+	// or timezone are not those its next run was worked out from.
+	CronSetEnabled(*model.Repo, *model.Cron) error
 	CronDelete(*model.Repo, int64) error
 	CronListNextExecute(int64, int64) ([]*model.Cron, error)
 	CronGetLock(*model.Cron, int64) (bool, error)
+	// CronApplyConfig makes the repository's managed crons those plan works
+	// out from its crons, in one transaction, unless the config of the
+	// pipeline pipelineID, or of a later one, was applied already: it
+	// reports whether it applied. Applies for one repository run one at a
+	// time.
+	CronApplyConfig(repo *model.Repo, pipelineID int64, plan func(existing []*model.Cron) (*model.CronPlan, error)) (bool, error)
 
 	// Forge
 	ForgeCreate(*model.Forge) error

@@ -1,0 +1,15 @@
+crons:
+  nightly:
+    schedule: 0 3 * * *
+    timezone: Europe/Berlin
+    variables:
+      TIER: full
+      N: 1
+  hourly:
+    schedule: '@hourly'
+
+steps:
+  - name: test
+    image: alpine
+    commands:
+      - echo test

@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/cenkalti/backoff/v7"
+	"github.com/go-sql-driver/mysql"
 	"xorm.io/xorm"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
@@ -41,13 +42,24 @@ func retryWrite(fn func() error) error {
 func retryWriteCtx(ctx context.Context, fn func() error) error {
 	_, err := backoff.Retry(ctx, func() (struct{}, error) {
 		err := fn()
-		if errors.Is(err, types.ErrDatabaseLocked) || errors.Is(err, types.ErrInsertDuplicateDetected) {
+		if errors.Is(err, types.ErrDatabaseLocked) || errors.Is(err, types.ErrInsertDuplicateDetected) || isErrLockConflict(err) {
 			return struct{}{}, err
 		}
 		return struct{}{}, backoff.Permanent(err)
 	}, backoff.WithBackOff(backoff.NewExponentialBackOff()), backoff.WithMaxTries(maxRetries))
 	return err
 }
+
+// isErrLockConflict reports whether err is MariaDB/MySQL choosing the write
+// as a deadlock's victim (1213): it was rolled back, and is tried again from
+// the start. A lock wait timeout (1205) is not: the lock is held long, and
+// waiting again only adds to the queue.
+func isErrLockConflict(err error) bool {
+	var myErr *mysql.MySQLError
+	return errors.As(err, &myErr) && myErr.Number == mysqlErrDeadlock
+}
+
+const mysqlErrDeadlock = 1213
 
 // isErrDatabaseLocked reports whether err is a transient SQLite lock error
 // (SQLITE_BUSY "database is locked" or SQLITE_LOCKED "database table is locked").
@@ -79,6 +91,10 @@ func wrapGet(exist bool, err error) error {
 func wrapDelete(c int64, err error) error {
 	if isErrDatabaseLocked(err) {
 		return types.ErrDatabaseLocked
+	}
+	if err != nil && isErrLockConflict(err) {
+		// a failed delete counts no rows: not a missing entry
+		return err
 	}
 	if c == 0 {
 		return types.ErrRecordNotExist

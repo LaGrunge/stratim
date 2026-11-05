@@ -47,18 +47,22 @@ type Repo struct {
 	UserID  int64 `json:"-"                  xorm:"INDEX 'user_id'"`
 	ForgeID int64 `json:"forge_id,omitempty" xorm:"UNIQUE(forge) UNIQUE(name) UNIQUE(full_name) forge_id"`
 	// ForgeRemoteID is the unique identifier for the repository on the forge.
-	ForgeRemoteID                ForgeRemoteID        `json:"forge_remote_id"                 xorm:"UNIQUE(forge) forge_remote_id"`
-	OrgID                        int64                `json:"org_id"                          xorm:"INDEX 'org_id'"`
-	Owner                        string               `json:"owner"                           xorm:"UNIQUE(name) 'owner'"`
-	Name                         string               `json:"name"                            xorm:"UNIQUE(name) 'name'"`
-	FullName                     string               `json:"full_name"                       xorm:"UNIQUE(full_name) 'full_name'"`
-	Avatar                       string               `json:"avatar_url,omitempty"            xorm:"varchar(500) 'avatar'"`
-	ForgeURL                     string               `json:"forge_url,omitempty"             xorm:"varchar(1000) 'forge_url'"`
-	Clone                        string               `json:"clone_url,omitempty"             xorm:"varchar(1000) 'clone'"`
-	CloneSSH                     string               `json:"clone_url_ssh"                   xorm:"varchar(1000) 'clone_ssh'"`
-	Branch                       string               `json:"default_branch,omitempty"        xorm:"varchar(500) 'branch'"`
-	PREnabled                    bool                 `json:"pr_enabled"                      xorm:"DEFAULT TRUE 'pr_enabled'"`
-	Timeout                      int64                `json:"timeout,omitempty"               xorm:"timeout"`
+	ForgeRemoteID ForgeRemoteID `json:"forge_remote_id"          xorm:"UNIQUE(forge) forge_remote_id"`
+	OrgID         int64         `json:"org_id"                   xorm:"INDEX 'org_id'"`
+	Owner         string        `json:"owner"                    xorm:"UNIQUE(name) 'owner'"`
+	Name          string        `json:"name"                     xorm:"UNIQUE(name) 'name'"`
+	FullName      string        `json:"full_name"                xorm:"UNIQUE(full_name) 'full_name'"`
+	Avatar        string        `json:"avatar_url,omitempty"     xorm:"varchar(500) 'avatar'"`
+	ForgeURL      string        `json:"forge_url,omitempty"      xorm:"varchar(1000) 'forge_url'"`
+	Clone         string        `json:"clone_url,omitempty"      xorm:"varchar(1000) 'clone'"`
+	CloneSSH      string        `json:"clone_url_ssh"            xorm:"varchar(1000) 'clone_ssh'"`
+	Branch        string        `json:"default_branch,omitempty" xorm:"varchar(500) 'branch'"`
+	PREnabled     bool          `json:"pr_enabled"               xorm:"DEFAULT TRUE 'pr_enabled'"`
+	Timeout       int64         `json:"timeout,omitempty"        xorm:"timeout"`
+	// CronsFrom is the ID of the pipeline whose config the managed crons were
+	// last made from: an older one's config is not applied over it. An ID,
+	// not the number: numbers come back after a pipeline is dropped.
+	CronsFrom                    int64                `json:"-"                               xorm:"crons_from"`
 	Visibility                   RepoVisibility       `json:"visibility"                      xorm:"varchar(10) 'visibility'"`
 	IsSCMPrivate                 bool                 `json:"private"                         xorm:"private"`
 	Trusted                      TrustedConfiguration `json:"trusted"                         xorm:"json 'trusted'"`

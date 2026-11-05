@@ -51,6 +51,9 @@ type PipelineBuilder struct {
 	GetWorkflowMetadata func(workflow *Workflow) metadata.Metadata
 	// SelectedWorkflow, if set, limits to this workflow and its hard dependencies.
 	SelectedWorkflow string
+	// RunSelected: the selected workflow and its dependencies run whatever
+	// the when of each says; a cron the workflow declares runs it so.
+	RunSelected bool
 	// ListOnly reports the workflows that could run instead of building them.
 	ListOnly bool
 }
@@ -162,6 +165,14 @@ func (b *PipelineBuilder) genItemForWorkflow(workflow *Workflow, axis matrix.Axi
 	whenMatch := parsed.When.Match
 	if b.ListOnly {
 		whenMatch = parsed.When.MatchIgnoringEvaluate
+	}
+	if b.RunSelected && b.SelectedWorkflow != "" {
+		// only the selected workflow and its dependencies are read: they run
+		// whatever started the pipeline, here and for the compiler; their
+		// status, matrix and platform conditions, and the when of their
+		// steps, hold
+		parsed.When = parsed.When.WithoutTrigger()
+		whenMatch = parsed.When.Match
 	}
 	if match, err := whenMatch(workflowMetadata, true, environ); !match && err == nil {
 		log.Debug().Str("pipeline", workflow.Name).Msg(

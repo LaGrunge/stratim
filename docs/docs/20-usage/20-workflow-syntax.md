@@ -786,6 +786,16 @@ A workflow that runs longer than its `timeout` is stopped. It takes the place of
 timeout: 3h
 ```
 
+## `crons`
+
+The crons that run this workflow, and the workflows it depends on, on the default branch: see [Crons in the config](./45-cron.md#crons-in-the-config). They add to [`when`](#when---global-workflow-conditions), which still decides what else runs the workflow.
+
+```yaml
+crons:
+  nightly:
+    schedule: 0 3 * * *
+```
+
 ## `when` - Global workflow conditions
 
 Woodpecker gives the ability to skip whole workflows ([not just steps](#when---conditional-execution)) based on certain conditions by a `when` block.

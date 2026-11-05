@@ -34,6 +34,8 @@ type (
 		// Timeout ends the workflow when it runs longer, in place of the
 		// repository's timeout, which is also its ceiling.
 		Timeout base.Timeout `yaml:"timeout,omitempty"`
+		// Crons are the schedules that run this workflow, by name.
+		Crons map[string]Cron `yaml:"crons,omitempty"`
 		// Deprecated: use when.status. TODO remove in next major.
 		RunsOn []string `yaml:"runs_on,omitempty"`
 	}

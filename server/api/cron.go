@@ -139,6 +139,10 @@ func PostCron(c *gin.Context) {
 	if cron.Timezone == "" {
 		cron.Timezone = "UTC"
 	}
+	if err := model.CheckSettingsName(cron.Name); err != nil {
+		c.String(http.StatusUnprocessableEntity, "Error inserting cron. %s", err)
+		return
+	}
 	if err := cron.Validate(); err != nil {
 		c.String(http.StatusUnprocessableEntity, "Error inserting cron. validate failed: %s", err)
 		return
@@ -211,6 +215,10 @@ func PatchCron(c *gin.Context) {
 		handleDBError(c, err)
 		return
 	}
+	if err := cron.CheckPatch(in); err != nil {
+		c.String(http.StatusConflict, "Cron %s: %s", cron.Name, err)
+		return
+	}
 	if in.Branch != nil {
 		if branch := strings.TrimSpace(*in.Branch); branch != "" {
 			// check if branch exists on forge
@@ -245,7 +253,11 @@ func PatchCron(c *gin.Context) {
 		}
 	}
 	if in.Name != nil {
-		if name := strings.TrimSpace(*in.Name); name != "" {
+		if name := strings.TrimSpace(*in.Name); name != "" && name != cron.Name {
+			if err := model.CheckSettingsName(name); err != nil {
+				c.String(http.StatusUnprocessableEntity, "Error updating cron. %s", err)
+				return
+			}
 			cron.Name = name
 		}
 	}
@@ -270,7 +282,22 @@ func PatchCron(c *gin.Context) {
 		c.String(http.StatusUnprocessableEntity, "Error inserting cron. validate failed: %s", err)
 		return
 	}
-	if err := _store.CronUpdate(repo, cron); err != nil {
+	if cron.Managed && in.Enabled == nil {
+		// nothing of its own to save
+		c.JSON(http.StatusOK, cron)
+		return
+	}
+	save := _store.CronUpdate
+	if cron.Managed {
+		// the config owns the rest, and may have changed it since CronFind:
+		// CronSetEnabled refuses a next run of a schedule no longer there
+		save = _store.CronSetEnabled
+	}
+	if err := save(repo, cron); err != nil {
+		if errors.Is(err, types.ErrRecordNotExist) {
+			c.String(http.StatusConflict, "Cron %s was changed or removed in the config meanwhile: try again", cron.Name)
+			return
+		}
 		c.String(http.StatusInternalServerError, "Error updating cron %q. %s", in.Name, err)
 		return
 	}
@@ -315,7 +342,17 @@ func DeleteCron(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Error parsing cron id. %s", err)
 		return
 	}
-	if err := store.FromContext(c).CronDelete(repo, id); err != nil {
+	_store := store.FromContext(c)
+	cron, err := _store.CronFind(repo, id)
+	if err != nil {
+		handleDBError(c, err)
+		return
+	}
+	if cron.Managed {
+		c.String(http.StatusConflict, "Cron %s: %s", cron.Name, model.ErrManagedCron)
+		return
+	}
+	if err := _store.CronDelete(repo, id); err != nil {
 		handleDBError(c, err)
 		return
 	}

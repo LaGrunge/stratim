@@ -26,7 +26,12 @@
         class="bg-wp-background-200! dark:bg-wp-background-200! items-center"
       >
         <span class="grid w-full grid-cols-3">
-          <span>{{ cron.name }}</span>
+          <span class="flex items-center gap-2">
+            <span>{{ cron.name }}</span>
+            <span v-if="cron.managed" class="text-wp-text-alt-100 text-sm">
+              {{ $t('repo.settings.crons.from_config') }}
+            </span>
+          </span>
           <span
             v-if="cron.enabled && cron.next_exec && cron.next_exec > 0"
             :title="$t('repo.settings.crons.your_timezone')"
@@ -55,6 +60,7 @@
             @click="selectedCron = cron"
           />
           <IconButton
+            v-if="!cron.managed"
             icon="trash"
             class="hover:text-wp-error-100 h-8 w-8"
             :is-loading="isDeleting"
@@ -72,11 +78,15 @@
 
     <div v-else class="space-y-4">
       <form @submit.prevent="createCron">
+        <p v-if="selectedCron.managed" class="text-wp-text-alt-100 mb-4">
+          {{ $t('repo.settings.crons.managed', { workflow: selectedCron.workflow }) }}
+        </p>
         <InputField v-slot="{ id }" :label="$t('repo.settings.crons.name.name')">
           <TextField
             :id="id"
             v-model="selectedCron.name"
             :placeholder="$t('repo.settings.crons.name.placeholder')"
+            :disabled="selectedCron.managed"
             required
           />
         </InputField>
@@ -88,11 +98,13 @@
             :id="id"
             v-model="selectedCron.branch"
             :placeholder="$t('repo.settings.crons.branch.placeholder')"
+            :disabled="selectedCron.managed"
           />
         </InputField>
 
         <InputField v-slot="{ id }" :label="$t('repo.settings.crons.timezone')">
-          <SelectField :id="id" v-model="selectedCronTimezone" :options="timezones" />
+          <span v-if="selectedCron.managed" :id="id" class="text-wp-text-100">{{ selectedCron.timezone }}</span>
+          <SelectField v-else :id="id" v-model="selectedCronTimezone" :options="timezones" />
         </InputField>
 
         <InputField
@@ -104,6 +116,7 @@
             :id="id"
             v-model="selectedCron!.schedule"
             :placeholder="$t('repo.settings.crons.schedule.placeholder')"
+            :disabled="selectedCron!.managed"
             required
           />
         </InputField>
@@ -123,7 +136,11 @@
 
         <InputField v-slot="{ id }" :label="$t('repo.manual_pipeline.variables.title')">
           <span class="text-wp-text-alt-100 mb-2 text-sm">{{ $t('repo.manual_pipeline.variables.desc') }}</span>
+          <ul v-if="selectedCron!.managed" :id="id" class="text-wp-text-100">
+            <li v-for="(value, name) in selectedCron!.variables" :key="name">{{ `${name}=${value}` }}</li>
+          </ul>
           <KeyValueEditor
+            v-else
             :id="id"
             v-model="selectedCronVariables"
             :key-placeholder="$t('repo.manual_pipeline.variables.name')"
@@ -229,7 +246,10 @@ const { doSubmit: createCron, isLoading: isSaving } = useAsyncAction(async () =>
     throw new Error("Unexpected: Can't get cron");
   }
 
-  if (isEditingCron.value) {
+  if (isEditingCron.value && selectedCron.value.managed) {
+    // a cron of the config: only whether it is enabled changes here
+    await apiClient.updateCron(repo.value.id, { id: selectedCron.value.id, enabled: selectedCron.value.enabled });
+  } else if (isEditingCron.value) {
     await apiClient.updateCron(repo.value.id, selectedCron.value);
   } else {
     await apiClient.createCron(repo.value.id, selectedCron.value);

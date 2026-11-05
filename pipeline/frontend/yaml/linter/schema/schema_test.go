@@ -15,6 +15,7 @@
 package schema_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -26,6 +27,7 @@ import (
 
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/linter/schema"
+	yaml_types "go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/types"
 )
 
 func TestSchema(t *testing.T) {
@@ -145,6 +147,15 @@ func TestSchema(t *testing.T) {
 		{
 			name:     "Params with an invalid name",
 			testFile: ".woodpecker/test-params-invalid-name.yaml",
+			fail:     true,
+		},
+		{
+			name:     "Crons",
+			testFile: ".woodpecker/test-crons.yaml",
+		},
+		{
+			name:     "Crons with an unknown key",
+			testFile: ".woodpecker/test-crons-invalid.yaml",
 			fail:     true,
 		},
 		{
@@ -268,4 +279,21 @@ func TestMatrixSchemaWorkflowLimit(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSchemaCronName: the schema names crons as the server reads them.
+func TestSchemaCronName(t *testing.T) {
+	data, err := os.ReadFile("schema.json")
+	require.NoError(t, err)
+	var s struct {
+		Properties struct {
+			Crons struct {
+				PropertyNames struct {
+					Pattern string `json:"pattern"`
+				} `json:"propertyNames"`
+			} `json:"crons"`
+		} `json:"properties"`
+	}
+	require.NoError(t, json.Unmarshal(data, &s))
+	assert.Equal(t, yaml_types.CronNamePattern, s.Properties.Crons.PropertyNames.Pattern)
 }
