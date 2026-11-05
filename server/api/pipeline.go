@@ -669,7 +669,7 @@ func PostPipeline(c *gin.Context) {
 	for key, val := range c.Request.URL.Query() {
 		switch key {
 		// Skip some options of the endpoint
-		case "fork", "event", "deploy_to":
+		case "fork", "event", "deploy_to", "access_token":
 			continue
 		default:
 			// We only accept string literals, because pipeline parameters will be

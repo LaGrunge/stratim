@@ -273,7 +273,7 @@ func TestExpandLimits(t *testing.T) {
 
 func TestExpandStopsAtTheFirstTimeout(t *testing.T) {
 	var calls int
-	_, err := expand(files(map[string]string{"a.jsonnet": "x", "b.jsonnet": "x", "c.jsonnet": "x"}), func(string, map[string]string) (string, error) {
+	_, err := expand(files(map[string]string{"a.jsonnet": "x", "b.jsonnet": "x", "c.jsonnet": "x"}), nil, func(string, map[string]string) (string, error) {
 		calls++
 		return "", &transient{errors.New("evaluation took longer than 30s")}
 	})
@@ -304,4 +304,32 @@ func TestExpandStepsByName(t *testing.T) {
 	empty, err := Expand(files(map[string]string{"a.jsonnet": "{ steps: {} }"}))
 	require.NoError(t, err, "no steps at all is the linter's to report, as in YAML")
 	assert.Len(t, empty, 1)
+}
+
+// TestLibraryVars: a config reads the run's variables, with a default
+// for one the run was not given.
+func TestLibraryVars(t *testing.T) {
+	config := files(map[string]string{"build.jsonnet": `
+local s = import 'stratim.libsonnet';
+{ steps: [s.step('b', 'x', ['echo ' + s.var('TIER', 'light') + ' ' + s.var('EMPTY', 'dflt') + ' ' + std.length(s.vars)])] }
+`})
+	out, err := ExpandWith(config, map[string]string{"TIER": "full", "OTHER": "1", "EMPTY": ""})
+	require.NoError(t, err)
+	require.Len(t, out, 1)
+	assert.Contains(t, string(out[0].Data), "echo full dflt 3")
+
+	out, err = Expand(config)
+	require.NoError(t, err)
+	assert.Contains(t, string(out[0].Data), "echo light dflt 0")
+}
+
+// TestVarsAreNotAFile: a config cannot reach the variables as a file of
+// the repository, nor shadow them with one.
+func TestVarsAreNotAFile(t *testing.T) {
+	out, err := ExpandWith(files(map[string]string{
+		"stratim.vars":  `{"TIER": "fake"}`,
+		"build.jsonnet": `{ steps: [{ name: 'b', image: 'x', commands: ['echo ' + (import 'stratim.vars').TIER] }] }`,
+	}), map[string]string{"TIER": "real"})
+	require.NoError(t, err)
+	assert.Contains(t, string(out[0].Data), "echo real")
 }

@@ -44,6 +44,8 @@ Please note that the environment section is not able to expand environment varia
        - go test
 ```
 
+The linter warns of a `${variable}` in commands the server does not know: it would come out empty. That includes the step's own `environment`, secrets and the variables the agent sets (`CI_WORKSPACE`, `CI_STEP_NAME`, ...), which only the shell has. The server knows the built-in variables it sets when it reads the configuration, [parameters](#parameters), matrix axes, the variables of the run and its global environment; `woodpecker-cli lint` does not know the last two, and warns of them too. An expression with a default, `${TASK:-all}`, does not warn.
+
 ## Built-in environment variables
 
 This is the reference list of all environment variables available to your pipeline containers. These are injected into your pipeline step and plugins containers, at runtime.
@@ -183,6 +185,41 @@ WOODPECKER_ENVIRONMENT=GOLANG_VERSION:1.18
      commands:
        - [...]
 ```
+
+## Parameters
+
+A workflow can declare parameters: variables with a default, which a manual run, a cron job, the API, a restart or a deployment can set. A run that sets a parameter gets its value; any other run gets the default. A restart or deployment that sets one keeps the value for later restarts.
+
+```yaml
+params:
+  TIER: light # the default alone
+  PIN:
+    default: main
+    description: branch of the dependency to build against
+    options: [main, stable] # the values allowed; another one fails the pipeline
+
+steps:
+  - name: test
+    image: golang
+    commands:
+      - ./test.sh --tier ${TIER} --pin ${PIN}
+  - name: full-suite
+    image: golang
+    commands:
+      - ./test.sh --all
+    when:
+      evaluate: 'TIER == "full"'
+```
+
+A parameter is available, like the variables of a manual run:
+
+- in [string substitution](#string-substitution);
+- in `when` filters of the workflow and of its steps;
+- in the environment of every step but plugins, so that a run cannot change the settings of a plugin. Hand a parameter to a plugin through its settings: `tags: ${TAG}`.
+
+A run that gives a parameter an empty value gets the default. A parameter with `options` and no default must be given one of them, unless the empty value is an option (`options: [~, x]`). Options are checked for the workflows that run: a workflow its `when` leaves out does not fail the pipeline.
+
+A default and the options can use built-in variables, the variables of the run and the parameters declared before them: `TAG: v-${CI_COMMIT_BRANCH}`, `IMAGE: app:${TAG}`. A parameter set by the server's global environment takes the parameter's value, and plugins get neither. A name is letters, digits and `_`, does not start with a digit, and is not `CI`, `CI_*`, `PATH`, `HOME`, `SHELL`, `PWD`, in any case, nor an axis of the workflow's matrix, nor set by a step's own `environment`.
 
 ## String Substitution
 

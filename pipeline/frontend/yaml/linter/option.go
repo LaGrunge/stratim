@@ -37,3 +37,11 @@ func WithTrustedClonePlugins(plugins []string) Option {
 		linter.trustedClonePlugins = &plugins
 	}
 }
+
+// WithVariables gives the linter the variables of the run the server
+// substitutes, so that it knows which names in commands it does not.
+func WithVariables(environ map[string]string) Option {
+	return func(linter *Linter) {
+		linter.variables = environ
+	}
+}

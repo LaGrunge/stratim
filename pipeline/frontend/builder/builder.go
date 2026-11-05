@@ -16,6 +16,7 @@
 package builder
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"strconv"
@@ -30,7 +31,6 @@ import (
 	pipeline_errors "go.woodpecker-ci.org/woodpecker/v3/pipeline/errors"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/metadata"
-	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/compiler"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/linter"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/matrix"
@@ -55,7 +55,7 @@ type PipelineBuilder struct {
 }
 
 func (b *PipelineBuilder) Build() (items []*Item, errorsAndWarnings error) {
-	expanded, err := expandJsonnet(b.Yamls)
+	expanded, err := jsonnet.ExpandWith(b.Yamls, b.AdditionalEnvs)
 	if err != nil {
 		return nil, &pipeline_errors.PipelineError{Type: pipeline_errors.PipelineErrorTypeCompiler, Message: err.Error()}
 	}
@@ -130,19 +130,11 @@ func (b *PipelineBuilder) Build() (items []*Item, errorsAndWarnings error) {
 
 func (b *PipelineBuilder) genItemForWorkflow(workflow *Workflow, axis matrix.Axis, data string) (item *Item, errorsAndWarnings error) {
 	workflowMetadata := b.GetWorkflowMetadata(workflow)
-	environ := b.environmentVariables(workflowMetadata, axis)
-
-	// substitute vars
-	substituted, err := metadata.EnvVarSubst(data, environ)
+	config, err := b.parseWorkflow([]byte(data), axis, workflowMetadata)
 	if err != nil {
 		return nil, multierr.Append(errorsAndWarnings, err)
 	}
-
-	// parse yaml pipeline
-	parsed, err := yaml.ParseString(substituted)
-	if err != nil {
-		return nil, &pipeline_errors.PipelineError{Message: err.Error(), Type: pipeline_errors.PipelineErrorTypeCompiler}
-	}
+	parsed, environ, params, invalidParams := config.parsed, config.environ, config.params, config.invalidParams
 
 	// lint pipeline
 	if !b.ListOnly {
@@ -154,6 +146,7 @@ func (b *PipelineBuilder) genItemForWorkflow(workflow *Workflow, axis matrix.Axi
 			}),
 			linter.PrivilegedPlugins(b.PrivilegedPlugins),
 			linter.WithTrustedClonePlugins(b.TrustedClonePlugins),
+			linter.WithVariables(environ),
 		).Lint([]*linter.WorkflowConfig{{
 			Workflow:  parsed,
 			File:      workflow.Name,
@@ -181,9 +174,21 @@ func (b *PipelineBuilder) genItemForWorkflow(workflow *Workflow, axis matrix.Axi
 		return nil, multierr.Append(errorsAndWarnings, err)
 	}
 
+	// a parameter's options matter to a workflow that runs; listing the
+	// workflows of a manual run, none is given yet
+	if invalidParams != nil {
+		if !b.ListOnly {
+			return nil, multierr.Append(errorsAndWarnings, invalidParams)
+		}
+		if warning, ok := errors.AsType[*pipeline_errors.PipelineError](invalidParams); ok {
+			warning.IsWarning = true
+		}
+		errorsAndWarnings = multierr.Append(errorsAndWarnings, invalidParams)
+	}
+
 	var ir *backend_types.Config
 	if !b.ListOnly {
-		ir, err = b.toInternalRepresentation(parsed, axis, workflowMetadata, workflow.ID)
+		ir, err = b.toInternalRepresentation(parsed, axis, params, workflowMetadata, workflow.ID)
 		if err != nil {
 			return nil, multierr.Append(errorsAndWarnings, err)
 		}
@@ -267,13 +272,21 @@ func (b *PipelineBuilder) environmentVariables(metadata metadata.Metadata, axis 
 	return environ
 }
 
-func (b *PipelineBuilder) toInternalRepresentation(parsed *yaml_types.Workflow, axis map[string]string, metadata metadata.Metadata, workflowID int64) (*backend_types.Config, error) {
+func (b *PipelineBuilder) toInternalRepresentation(parsed *yaml_types.Workflow, axis, params map[string]string, metadata metadata.Metadata, workflowID int64) (*backend_types.Config, error) {
+	// a parameter has one value: plugins, which get no parameters, do not
+	// get a global variable of its name either
+	envs := maps.Clone(b.Envs)
+	for name := range params {
+		delete(envs, name)
+	}
+
 	options := []compiler.Option{}
 	options = append(
 		options,
 		compiler.WithNonPluginEnviron(axis),
 		compiler.WithNonPluginEnviron(b.AdditionalEnvs),
-		compiler.WithEnviron(b.Envs),
+		compiler.WithNonPluginEnviron(params),
+		compiler.WithEnviron(envs),
 		compiler.WithEscalated(b.PrivilegedPlugins...),
 		compiler.WithTrustedClonePlugins(b.TrustedClonePlugins),
 		compiler.WithPrefix(
@@ -292,10 +305,4 @@ func (b *PipelineBuilder) toInternalRepresentation(parsed *yaml_types.Workflow, 
 	options = append(options, b.CompilerOptions...)
 
 	return compiler.New(options...).Compile(parsed)
-}
-
-// expandJsonnet replaces the jsonnet configs among yamls with the workflows
-// they evaluate to, and drops jsonnet libraries; see package jsonnet.
-func expandJsonnet(yamls []*YamlFile) ([]*YamlFile, error) {
-	return jsonnet.Expand(yamls)
 }

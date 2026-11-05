@@ -15,10 +15,7 @@
 package builder
 
 import (
-	pipeline_errors "go.woodpecker-ci.org/woodpecker/v3/pipeline/errors"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
-	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/metadata"
-	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/constraint"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/matrix"
 )
@@ -121,15 +118,11 @@ func (b *PipelineBuilder) workflowDependencies(file *YamlFile) (constraint.Depen
 	var dependencies constraint.DependsOn
 	for _, axis := range axes {
 		workflow := &Workflow{Name: SanitizePath(file.Name), Environ: axis}
-		environ := b.environmentVariables(b.GetWorkflowMetadata(workflow), axis)
-		substituted, err := metadata.EnvVarSubst(string(file.Data), environ)
+		config, err := b.parseWorkflow(file.Data, axis, b.GetWorkflowMetadata(workflow))
 		if err != nil {
 			return nil, err
 		}
-		parsed, err := yaml.ParseString(substituted)
-		if err != nil {
-			return nil, &pipeline_errors.PipelineError{Message: err.Error(), Type: pipeline_errors.PipelineErrorTypeCompiler}
-		}
+		parsed := config.parsed
 		dependencies = append(dependencies, parsed.DependsOn...)
 	}
 	return dependencies, nil

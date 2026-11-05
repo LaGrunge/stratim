@@ -18,6 +18,16 @@
 {
   version:: 0,
 
+  // vars are the variables the run was given (a manual run, a cron job, the
+  // API, a restart or deployment), as strings by name.
+  vars:: import 'stratim.vars',
+
+  // var is the run's value of the variable name, or default when the run
+  // gave none or an empty one, as a workflow's `params` read it. To have
+  // the value in the steps' environment and in `when` too, with options,
+  // declare it in the workflow's `params`.
+  var(name, default=''):: local v = std.get(self.vars, name, ''); if v == '' then default else v,
+
   // workflow is a workflow of steps; extra adds any other workflow keys
   // (when, depends_on, services, ...).
   workflow(steps, extra={}):: { steps: steps } + extra,

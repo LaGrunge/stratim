@@ -38,6 +38,8 @@ type Linter struct {
 	trusted             TrustedConfiguration
 	privilegedPlugins   *[]string
 	trustedClonePlugins *[]string
+	// variables the run has, if known: see lintCommandVariables
+	variables map[string]string
 }
 
 type TrustedConfiguration struct {
@@ -110,6 +112,12 @@ func (l *Linter) lintFile(config *WorkflowConfig) error {
 		linterErr = multierr.Append(linterErr, err)
 	}
 	if err := l.lintBadHabits(config); err != nil {
+		linterErr = multierr.Append(linterErr, err)
+	}
+	if err := l.lintParams(config); err != nil {
+		linterErr = multierr.Append(linterErr, err)
+	}
+	if err := l.lintCommandVariables(config); err != nil {
 		linterErr = multierr.Append(linterErr, err)
 	}
 

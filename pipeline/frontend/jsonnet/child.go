@@ -126,7 +126,7 @@ func Recovering(evaluate evaluator, cause error, interval time.Duration) evaluat
 // SelfCheck evaluates a trivial config with evaluate, to find out at start
 // whether evaluating works at all.
 func SelfCheck(evaluate evaluator) error {
-	_, err := expand([]*File{{Name: "check" + Ext, Data: []byte("{ steps: [] }")}}, evaluate)
+	_, err := expand([]*File{{Name: "check" + Ext, Data: []byte("{ steps: [] }")}}, nil, evaluate)
 	return err
 }
 

@@ -1,0 +1,8 @@
+params:
+  MY-TIER: light
+
+steps:
+  - name: test
+    image: alpine
+    commands:
+      - echo hi

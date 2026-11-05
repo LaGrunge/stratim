@@ -134,6 +134,20 @@ func TestSchema(t *testing.T) {
 			fail:     false,
 		},
 		{
+			name:     "Params",
+			testFile: ".woodpecker/test-params.yaml",
+		},
+		{
+			name:     "Params with an unknown key",
+			testFile: ".woodpecker/test-params-invalid.yaml",
+			fail:     true,
+		},
+		{
+			name:     "Params with an invalid name",
+			testFile: ".woodpecker/test-params-invalid-name.yaml",
+			fail:     true,
+		},
+		{
 			name:     "Concurrency invalid",
 			testFile: ".woodpecker/test-concurrency-invalid.yaml",
 			fail:     true,

@@ -48,6 +48,21 @@ local s = import 'stratim.libsonnet';
 | `s.matrix(axes)`                                       | every combination of the axes as objects: `s.matrix({A: [1, 2]})` is `[{A: 1}, {A: 2}]` |
 | `s.when.event`, `branch`, `push`, `pull_request`       | conditions for a `when` list; add them up to require all of them                        |
 | `s.when.tag`, `cron`, `manual(task)`, `path`, `status` | `manual('docs')` matches a manual run with `TASK=docs`                                  |
+| `s.vars`                                               | the variables the run was given (manual run, cron job, API, restart), by name           |
+| `s.var(name, default='')`                              | the run's value of `name`, or `default` when it gave none or an empty one               |
+
+A config can shape its workflows by the run's variables, for example the platforms to build for:
+
+```jsonnet
+local s = import 'stratim.libsonnet';
+
+{
+  ['build-' + p]: s.workflow([s.step('build', 'golang', ['make'])])
+  for p in std.split(s.var('PLATFORMS', 'amd64'), ',')
+}
+```
+
+To have a variable in the steps' environment and in `when` too, with a default and allowed values, declare it in the workflow's [`params`](./50-environment.md#parameters).
 
 `stratim.libsonnet` only grows: a function keeps returning the same for the same arguments, so restarting an old pipeline on a newer server builds the same workflows. A change that would break this comes as a new library, `stratim.v1.libsonnet`.
 

@@ -87,7 +87,12 @@ func NewRenderer(evaluate evaluator, concurrency int) *Renderer {
 
 // Expand is the package's Expand, with this renderer.
 func (r *Renderer) Expand(files []*File) ([]*File, error) {
-	key := contentKey(files)
+	return r.ExpandWith(files, nil)
+}
+
+// ExpandWith is the package's ExpandWith, with this renderer.
+func (r *Renderer) ExpandWith(files []*File, vars map[string]string) ([]*File, error) {
+	key := contentKey(files, vars)
 	if cached, ok := r.lookup(key); ok {
 		return copyFiles(cached.files), cached.err
 	}
@@ -95,7 +100,7 @@ func (r *Renderer) Expand(files []*File) ([]*File, error) {
 		if cached, ok := r.lookup(key); ok {
 			return cached, nil
 		}
-		out, err := expand(files, r.limited)
+		out, err := expand(files, vars, r.limited)
 		res := result{files: copyFiles(out), err: err}
 		r.keep(key, res)
 		return res, nil
@@ -186,10 +191,12 @@ func isTransient(err error) bool {
 }
 
 // contentKey identifies a list of config files, in order, and the library
-// they see.
-func contentKey(files []*File) [sha256.Size]byte {
+// and vars they see.
+func contentKey(files []*File, vars map[string]string) [sha256.Size]byte {
 	h := sha256.New()
 	h.Write([]byte(Library))
+	p := varsJSON(vars) // encoding/json sorts the keys
+	fmt.Fprintf(h, "\x00%d:%s", len(p), p)
 	for _, f := range files {
 		fmt.Fprintf(h, "\x00%d:%s\x00%d:", len(f.Name), f.Name, len(f.Data))
 		h.Write(f.Data)
