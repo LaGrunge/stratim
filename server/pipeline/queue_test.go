@@ -26,6 +26,28 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 )
 
+// TestWorkflowTimeout: a workflow's own timeout, rounded up to minutes, in
+// place of the repository's, which is also its ceiling.
+func TestWorkflowTimeout(t *testing.T) {
+	for _, tt := range []struct {
+		own  time.Duration
+		repo int64
+		want int64
+	}{
+		{0, 60, 60},
+		{10 * time.Minute, 60, 10},
+		{60 * time.Second, 60, 1},
+		{61 * time.Second, 60, 2},
+		{time.Nanosecond, 60, 1},
+		{60 * time.Minute, 60, 60},
+		{90 * time.Minute, 60, 60},
+		{time.Duration(1<<63 - 1), 60, 60},
+		{90 * time.Minute, 0, 90},
+	} {
+		assert.Equal(t, tt.want, workflowTimeout(tt.own, tt.repo), "own %s, repository %d", tt.own, tt.repo)
+	}
+}
+
 func TestQueuePipelineConcurrency(t *testing.T) {
 	repo := &model.Repo{ID: 7}
 	activePipeline := &model.Pipeline{ID: 42}

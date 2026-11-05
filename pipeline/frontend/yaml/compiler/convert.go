@@ -20,6 +20,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/oklog/ulid/v2"
 
@@ -175,6 +176,7 @@ func (c *Compiler) createProcess(container *yaml_types.Container, workflow *yaml
 		Image:          container.Image,
 		Pull:           container.Pull,
 		Detached:       detached,
+		Timeout:        time.Duration(container.Timeout),
 		Privileged:     privileged,
 		WorkingDir:     workingDir,
 		WorkspaceBase:  workspaceBase,

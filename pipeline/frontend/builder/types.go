@@ -16,6 +16,7 @@ package builder
 
 import (
 	"sort"
+	"time"
 
 	backend_types "go.woodpecker-ci.org/woodpecker/v3/pipeline/backend/types"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
@@ -29,7 +30,9 @@ type Item struct {
 	RunsOn           []string
 	ConcurrencyLimit int
 	ConcurrencyGroup string
-	Config           *backend_types.Config
+	// Timeout is the workflow's own timeout, 0 if it sets none.
+	Timeout time.Duration
+	Config  *backend_types.Config
 }
 
 type Workflow struct {

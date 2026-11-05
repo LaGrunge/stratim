@@ -75,7 +75,7 @@ You can change the visibility of your project by this setting. If a user has acc
 
 ## Timeout
 
-After this timeout a pipeline has to finish or will be treated as timed out.
+After this timeout a pipeline has to finish or will be treated as timed out. A workflow can set a shorter [`timeout`](./20-workflow-syntax.md#timeout-1) of its own in its config; this one stays the ceiling.
 
 ## Cancel previous pipelines
 

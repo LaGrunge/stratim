@@ -14,15 +14,19 @@
 
 package types
 
+import "time"
+
 // Step defines a container process.
 type Step struct {
-	Name           string            `json:"name"`
-	OrgID          int64             `json:"org_id,omitempty"`
-	UUID           string            `json:"uuid"`
-	Type           StepType          `json:"type,omitempty"`
-	Image          string            `json:"image,omitempty"`
-	Pull           bool              `json:"pull,omitempty"`
-	Detached       bool              `json:"detach,omitempty"`
+	Name     string   `json:"name"`
+	OrgID    int64    `json:"org_id,omitempty"`
+	UUID     string   `json:"uuid"`
+	Type     StepType `json:"type,omitempty"`
+	Image    string   `json:"image,omitempty"`
+	Pull     bool     `json:"pull,omitempty"`
+	Detached bool     `json:"detach,omitempty"`
+	// Timeout ends a step that is not detached when it runs longer, if set.
+	Timeout        time.Duration     `json:"timeout,omitempty"`
 	Privileged     bool              `json:"privileged,omitempty"`
 	WorkingDir     string            `json:"working_dir,omitempty"`
 	WorkspaceBase  string            `json:"workspace_base,omitempty"`

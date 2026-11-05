@@ -69,7 +69,7 @@ func TestCompleteStepCancelFallout(t *testing.T) {
 			engine.On("DestroyStep", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			r := canceledRuntime(t, engine)
 
-			ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, time.Now().Unix())
+			ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, time.Now().Unix())
 
 			assert.NoError(t, err)
 			require.NotNil(t, ws)
@@ -85,7 +85,7 @@ func TestCompleteStepCancelFallout(t *testing.T) {
 			Return(nil, errors.New("engine exploded"))
 		r := New(&backend_types.Config{}, engine, WithTracer(newTestTracer(t)), WithLogger(newTestLogger(t)))
 
-		ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, time.Now().Unix())
+		ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, time.Now().Unix())
 
 		assert.EqualError(t, err, "engine exploded")
 		assert.Nil(t, ws)

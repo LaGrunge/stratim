@@ -119,15 +119,31 @@ func (r *Runtime) setStepEnv(step *backend_types.Step) error {
 //
 // If StartStep or TailStep fail, startStep returns a non-nil error and the caller
 // must not call waitForLogs.
-func (r *Runtime) startStep(step *backend_types.Step) (func(), int64, error) {
+//
+// It also returns the step's context, which its timeout ends, counted from
+// now: the time it took to start (pulling the image, scheduling a pod) is
+// not the step's. Its deadline closes the log stream, which a backend that
+// ignores the context of TailStep would keep open; release frees it.
+func (r *Runtime) startStep(step *backend_types.Step) (stepCtx context.Context, release, waitForLogs func(), startTime int64, err error) {
 	if err := r.engine.StartStep(r.ctx, step, r.taskUUID); err != nil {
-		return nil, 0, err
+		return nil, nil, nil, 0, err
 	}
-	startTime := time.Now().Unix()
+	startTime = time.Now().Unix()
 
 	rc, err := r.engine.TailStep(r.ctx, step, r.taskUUID)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, nil, 0, err
+	}
+
+	stepCtx, cancel := r.stepContext(step)
+	stop := context.AfterFunc(stepCtx, func() {
+		if r.timedOut(stepCtx) {
+			_ = rc.Close()
+		}
+	})
+	release = func() {
+		stop()
+		cancel()
 	}
 
 	var wg sync.WaitGroup
@@ -139,7 +155,7 @@ func (r *Runtime) startStep(step *backend_types.Step) (func(), int64, error) {
 		_ = rc.Close()
 	})
 
-	return wg.Wait, startTime, nil
+	return stepCtx, release, wg.Wait, startTime, nil
 }
 
 // cancelFallout reports whether err is a consequence of the workflow being
@@ -170,11 +186,17 @@ func (r *Runtime) cancelErr(err error, step *backend_types.Step) error {
 //
 // The runnerCtx is intentionally used for DestroyStep so that container cleanup can
 // still reach the backend even after the workflow context (r.ctx) is canceled.
-func (r *Runtime) completeStep(runnerCtx context.Context, step *backend_types.Step, waitForLogs func(), startTime int64) (*backend_types.State, error) {
+func (r *Runtime) completeStep(runnerCtx, stepCtx context.Context, step *backend_types.Step, waitForLogs func(), startTime int64) (*backend_types.State, error) {
 	// Drain the log stream before waiting on the process exit.
 	waitForLogs()
 
-	waitState, err := r.engine.WaitStep(r.ctx, step, r.taskUUID) //nolint:contextcheck
+	waitState, err := r.engine.WaitStep(stepCtx, step, r.taskUUID)
+	// the step ran past its timeout, unless the wait found it ended by
+	// itself: it is stopped below, as a canceled step is, and fails
+	timedOut := !exited(waitState, err) && r.timedOut(stepCtx)
+	if timedOut {
+		err = nil
+	}
 	if err != nil {
 		if !r.cancelFallout(err) {
 			return nil, err
@@ -191,6 +213,15 @@ func (r *Runtime) completeStep(runnerCtx context.Context, step *backend_types.St
 		return nil, err
 	}
 
+	if timedOut {
+		timeoutErr := &pipeline_errors.TimeoutError{UUID: step.UUID, Timeout: step.Timeout}
+		return &backend_types.State{
+			Started:  startTime,
+			Exited:   true,
+			ExitCode: pipeline_errors.TimeoutExitCode,
+			Error:    timeoutErr,
+		}, timeoutErr
+	}
 	waitState.Started = startTime
 
 	// Re-check context cancellation: the wait may have raced with cancellation.
@@ -221,13 +252,35 @@ func (r *Runtime) completeStep(runnerCtx context.Context, step *backend_types.St
 	return waitState, waitState.Error
 }
 
+// stepContext is the context a step runs in: the workflow's, ended by the
+// step's timeout if it has one. A detached step runs as long as the
+// workflow: it has no timeout of its own.
+func (r *Runtime) stepContext(step *backend_types.Step) (context.Context, context.CancelFunc) {
+	if step.Timeout <= 0 || step.Detached {
+		return r.ctx, func() {}
+	}
+	return context.WithTimeout(r.ctx, step.Timeout)
+}
+
+// exited reports whether a wait found the step ended by itself, whatever
+// its exit code.
+func exited(state *backend_types.State, err error) bool {
+	return err == nil && state != nil && state.Exited && state.Error == nil
+}
+
+// timedOut reports whether stepCtx ended by the step's own timeout, not by
+// the workflow's end.
+func (r *Runtime) timedOut(stepCtx context.Context) bool {
+	return !r.canceled() && r.ctx.Err() == nil && errors.Is(stepCtx.Err(), context.DeadlineExceeded)
+}
+
 // runBlockingStep starts the step and blocks until it fully completes.
 // The error is traced and returned to runStage, which feeds it into the
 // stage error group.
 func (r *Runtime) runBlockingStep(runnerCtx context.Context, step *backend_types.Step) error {
 	logger := r.makeLogger()
 
-	waitForLogs, startTime, err := r.startStep(step)
+	stepCtx, release, waitForLogs, startTime, err := r.startStep(step)
 	if err != nil {
 		// The step never ran — trace the start failure and surface it.
 		if r.cancelFallout(err) {
@@ -236,7 +289,8 @@ func (r *Runtime) runBlockingStep(runnerCtx context.Context, step *backend_types
 		return r.traceStep(nil, err, step)
 	}
 
-	processState, err := r.completeStep(runnerCtx, step, waitForLogs, startTime)
+	processState, err := r.completeStep(runnerCtx, stepCtx, step, waitForLogs, startTime)
+	release()
 	logger.Debug().Str("step", step.Name).Msg("complete")
 
 	if r.cancelFallout(err) {
@@ -256,7 +310,7 @@ func (r *Runtime) runBlockingStep(runnerCtx context.Context, step *backend_types
 // Any error that occurs after setup is logged but not propagated — it cannot
 // influence the pipeline outcome at that point.
 func (r *Runtime) runDetachedStep(runnerCtx context.Context, step *backend_types.Step) error {
-	waitForLogs, startTime, err := r.startStep(step)
+	stepCtx, release, waitForLogs, startTime, err := r.startStep(step)
 	if err != nil {
 		// Setup failed before the container was running — treat it like a
 		// blocking failure so the pipeline is aware.
@@ -270,7 +324,8 @@ func (r *Runtime) runDetachedStep(runnerCtx context.Context, step *backend_types
 	r.uploadWait.Go(func() {
 		logger := r.makeLogger()
 
-		processState, err := r.completeStep(runnerCtx, step, waitForLogs, startTime)
+		processState, err := r.completeStep(runnerCtx, stepCtx, step, waitForLogs, startTime)
+		release()
 		logger.Debug().Str("step", step.Name).Msg("complete")
 
 		if r.cancelFallout(err) {

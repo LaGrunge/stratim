@@ -202,7 +202,7 @@ func TestStartStep(t *testing.T) {
 		r := newDummyRuntime(t, newTestTracer(t))
 		step := dummyStep("s1")
 
-		waitForLogs, startTime, err := r.startStep(step)
+		_, _, waitForLogs, startTime, err := r.startStep(step)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, waitForLogs)
@@ -216,7 +216,7 @@ func TestStartStep(t *testing.T) {
 		step := dummyStep("fail")
 		step.Environment[dummy.EnvKeyStepStartFail] = "true"
 
-		_, _, err := r.startStep(step)
+		_, _, _, _, err := r.startStep(step)
 
 		assert.Error(t, err)
 	})
@@ -228,7 +228,7 @@ func TestStartStep(t *testing.T) {
 		step.Environment[dummy.EnvKeyStepTailFail] = "true"
 		r.logger = logging.Logger(func(_ *backend_types.Step, _ io.ReadCloser) error { return nil })
 
-		_, _, err := r.startStep(step)
+		_, _, _, _, err := r.startStep(step)
 
 		assert.Error(t, err)
 	})
@@ -249,7 +249,7 @@ func TestStartStep(t *testing.T) {
 			})))
 		step := dummyStep("s1")
 
-		waitForLogs, _, err := r.startStep(step)
+		_, _, waitForLogs, _, err := r.startStep(step)
 		require.NoError(t, err)
 
 		waitForLogs()
@@ -274,7 +274,7 @@ func TestStartStep(t *testing.T) {
 			})),
 		)
 
-		waitForLogs, _, err := r.startStep(dummyStep("s1"))
+		_, _, waitForLogs, _, err := r.startStep(dummyStep("s1"))
 		require.NoError(t, err) // startStep itself succeeds
 
 		// waitForLogs blocks until the goroutine finishes; the branch is hit inside.
@@ -295,7 +295,7 @@ func TestCompleteStep(t *testing.T) {
 		engine.On("DestroyStep", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		r := New(&backend_types.Config{}, engine, WithTracer(newTestTracer(t)), WithLogger(newTestLogger(t)))
 
-		ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, time.Now().Unix())
+		ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, time.Now().Unix())
 
 		assert.NoError(t, err)
 		assert.True(t, ws.Exited)
@@ -310,7 +310,7 @@ func TestCompleteStep(t *testing.T) {
 		engine.On("DestroyStep", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		r := New(&backend_types.Config{}, engine, WithTracer(newTestTracer(t)), WithLogger(newTestLogger(t)))
 
-		ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, time.Now().Unix())
+		ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, time.Now().Unix())
 
 		var exitErr *pipeline_errors.ExitError
 		assert.True(t, errors.As(err, &exitErr))
@@ -326,7 +326,7 @@ func TestCompleteStep(t *testing.T) {
 		engine.On("DestroyStep", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		r := New(&backend_types.Config{}, engine, WithTracer(newTestTracer(t)), WithLogger(newTestLogger(t)))
 
-		ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, time.Now().Unix())
+		ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, time.Now().Unix())
 
 		var oomErr *pipeline_errors.OomError
 		assert.True(t, errors.As(err, &oomErr))
@@ -342,7 +342,7 @@ func TestCompleteStep(t *testing.T) {
 		engine.On("DestroyStep", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		r := New(&backend_types.Config{}, engine, WithTracer(newTestTracer(t)), WithLogger(newTestLogger(t)))
 
-		ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, time.Now().Unix())
+		ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, time.Now().Unix())
 
 		var oomErr *pipeline_errors.OomError
 		assert.True(t, errors.As(err, &oomErr))
@@ -359,7 +359,7 @@ func TestCompleteStep(t *testing.T) {
 		engine.On("DestroyStep", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		r := New(&backend_types.Config{}, engine, WithTracer(newTestTracer(t)), WithLogger(newTestLogger(t)))
 
-		ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, time.Now().Unix())
+		ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, time.Now().Unix())
 
 		assert.ErrorIs(t, err, stateErr, "state error must fail the step for the runtime too")
 		assert.Equal(t, stateErr.Error(), ws.Error.Error())
@@ -373,7 +373,7 @@ func TestCompleteStep(t *testing.T) {
 		engine.On("DestroyStep", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		r := New(&backend_types.Config{}, engine, WithTracer(newTestTracer(t)), WithLogger(newTestLogger(t)))
 
-		ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, time.Now().Unix())
+		ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, time.Now().Unix())
 
 		assert.NoError(t, err)
 		require.NotNil(t, ws, "nil guard must allocate a new State")
@@ -388,7 +388,7 @@ func TestCompleteStep(t *testing.T) {
 		engine.On("DestroyStep", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		r := New(&backend_types.Config{}, engine, WithTracer(newTestTracer(t)), WithLogger(newTestLogger(t)))
 
-		ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, time.Now().Unix())
+		ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, time.Now().Unix())
 
 		assert.NoError(t, err)
 		assert.Equal(t, pipeline_errors.ErrCancel, ws.Error)
@@ -402,7 +402,7 @@ func TestCompleteStep(t *testing.T) {
 		// DestroyStep should NOT be called — early return.
 		r := New(&backend_types.Config{}, engine, WithTracer(newTestTracer(t)), WithLogger(newTestLogger(t)))
 
-		ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, time.Now().Unix())
+		ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, time.Now().Unix())
 
 		assert.EqualError(t, err, "engine exploded")
 		assert.Nil(t, ws)
@@ -417,7 +417,7 @@ func TestCompleteStep(t *testing.T) {
 			Return(errors.New("cleanup failed"))
 		r := New(&backend_types.Config{}, engine, WithTracer(newTestTracer(t)), WithLogger(newTestLogger(t)))
 
-		ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, time.Now().Unix())
+		ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, time.Now().Unix())
 
 		assert.EqualError(t, err, "cleanup failed")
 		assert.Nil(t, ws)
@@ -431,7 +431,7 @@ func TestCompleteStep(t *testing.T) {
 		engine.On("DestroyStep", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		r := New(&backend_types.Config{}, engine, WithTracer(newTestTracer(t)), WithLogger(newTestLogger(t)))
 
-		ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, 9999)
+		ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, 9999)
 
 		assert.NoError(t, err)
 		assert.Equal(t, int64(9999), ws.Started)
@@ -457,7 +457,7 @@ func TestCompleteStep(t *testing.T) {
 			WithContext(canceledCtx), // r.ctx is canceled
 		)
 
-		ws, err := r.completeStep(t.Context(), dummyStep("s1"), func() {}, time.Now().Unix())
+		ws, err := r.completeStep(t.Context(), r.ctx, dummyStep("s1"), func() {}, time.Now().Unix())
 
 		assert.NoError(t, err)
 		require.NotNil(t, ws)

@@ -70,7 +70,7 @@ func pipelineTasks(repo *model.Repo, org *model.Org, activePipeline *model.Pipel
 		task.Data, err = json.Marshal(rpc.Workflow{
 			ID:      fmt.Sprint(item.Workflow.ID),
 			Config:  item.Config,
-			Timeout: repo.Timeout,
+			Timeout: workflowTimeout(item.Timeout, repo.Timeout),
 		})
 		if err != nil {
 			return nil, err
@@ -90,4 +90,22 @@ func getTaskDependencies(dependsOn []string, items []*builder.Item) (taskIDs []s
 		}
 	}
 	return taskIDs
+}
+
+// workflowTimeout is the timeout of a workflow, in minutes: its own,
+// rounded up, or the repository's, which is also the most its own can be. A
+// config shortens the time an agent is held, never lengthens it: raising the
+// limit is for whoever sets the repository's timeout.
+func workflowTimeout(own time.Duration, repoTimeout int64) int64 {
+	if own <= 0 {
+		return repoTimeout
+	}
+	minutes := int64(own / time.Minute)
+	if own%time.Minute != 0 {
+		minutes++
+	}
+	if repoTimeout > 0 && minutes > repoTimeout {
+		return repoTimeout
+	}
+	return minutes
 }
