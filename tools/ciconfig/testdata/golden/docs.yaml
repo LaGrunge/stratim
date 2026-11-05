@@ -1,0 +1,98 @@
+steps:
+- commands:
+  - npx get-pnpm
+  - export PNPM_HOME='/root/.local/share/pnpm'
+  - export PATH="$PNPM_HOME/bin:$PATH"
+  - pnpm install --frozen-lockfile
+  directory: docs/
+  image: docker.io/node:26-alpine
+  name: install-dependencies
+  when:
+  - event:
+    - tag
+    - pull_request
+    - push
+    path:
+    - .woodpecker/docs.jsonnet
+    - .woodpecker/ci.libsonnet
+    - docs/**
+    - cli/**
+    - cmd/cli/**
+    - server/api/**
+  - event: manual
+- commands:
+  - npx get-pnpm
+  - export PNPM_HOME='/root/.local/share/pnpm'
+  - export PATH="$PNPM_HOME/bin:$PATH"
+  - pnpm format:check
+  directory: docs/
+  image: docker.io/node:26-alpine
+  name: format-check
+  when:
+  - event: pull_request
+    path:
+    - .woodpecker/docs.jsonnet
+    - .woodpecker/ci.libsonnet
+    - docs/**
+    - cli/**
+    - cmd/cli/**
+    - server/api/**
+- commands:
+  - make generate-docs
+  image: docker.io/golang:1.27
+  name: build-cli
+  when:
+  - event:
+    - tag
+    - pull_request
+    - push
+    path:
+    - .woodpecker/docs.jsonnet
+    - .woodpecker/ci.libsonnet
+    - docs/**
+    - cli/**
+    - cmd/cli/**
+    - server/api/**
+  - event: manual
+- commands:
+  - npx get-pnpm
+  - export PNPM_HOME='/root/.local/share/pnpm'
+  - export PATH="$PNPM_HOME/bin:$PATH"
+  - pnpm build
+  directory: docs/
+  image: docker.io/node:26-alpine
+  name: build
+  when:
+  - event:
+    - tag
+    - pull_request
+    - push
+    path:
+    - .woodpecker/docs.jsonnet
+    - .woodpecker/ci.libsonnet
+    - docs/**
+    - cli/**
+    - cmd/cli/**
+    - server/api/**
+  - event: manual
+when:
+- event: tag
+- event: pull_request
+- branch:
+  - ${CI_REPO_DEFAULT_BRANCH}
+  event: push
+  path:
+  - .woodpecker/docs.jsonnet
+  - .woodpecker/ci.libsonnet
+  - docs/**
+  - cli/**
+  - cmd/cli/**
+  - server/api/**
+  - web/**
+  - server/api/**
+  - '**/*.go'
+  - go.*
+  - pipeline/schema/**
+  - docker/**
+- evaluate: TASK == "docs"
+  event: manual

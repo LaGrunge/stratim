@@ -1,0 +1,41 @@
+steps:
+- depends_on: []
+  image: docker.io/woodpeckerci/plugin-editorconfig-checker:0.3.4
+  name: lint-editorconfig
+  when:
+  - event: pull_request
+- commands:
+  - npx get-pnpm
+  - export PNPM_HOME='/root/.local/share/pnpm'
+  - export PATH="$PNPM_HOME/bin:$PATH"
+  - pnpx cspell lint --no-progress --gitignore '{**,.*}/{*,.*}'
+  - apk add --no-cache -U tree
+  - tree --gitignore -I 012_columns_rename_procs_to_steps.go -I versioned_docs -I
+    '*opensource.svg'| pnpx cspell lint --no-progress stdin
+  depends_on: []
+  image: docker.io/node:26-alpine
+  name: spellcheck
+- depends_on: []
+  image: docker.io/woodpeckerci/plugin-prettier:next
+  name: prettier
+  pull: true
+  settings:
+    version: 3.6.2
+- commands:
+  - apk add --no-cache -q jq && ./.woodpecker/check-feature-docs.sh
+  depends_on: []
+  image: docker.io/alpine:3.24
+  name: check-feature-docs
+  when:
+  - evaluate: CI_COMMIT_PULL_REQUEST_LABELS contains "feature"
+    event: pull_request
+- commands:
+  - apk add --no-cache -q jq && ./.woodpecker/check-breaking-migrations.sh
+  depends_on: []
+  image: docker.io/alpine:3.24
+  name: check-breaking-migrations
+  when:
+  - evaluate: CI_COMMIT_PULL_REQUEST_LABELS contains "breaking"
+    event: pull_request
+when:
+- event: pull_request

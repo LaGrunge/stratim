@@ -1,0 +1,11 @@
+skip_clone: true
+steps:
+- commands:
+  - sleep 60
+  image: docker.io/alpine:3.24
+  name: hold
+when:
+- cron: synthetic
+  event: cron
+- evaluate: TASK == "synthetic"
+  event: manual

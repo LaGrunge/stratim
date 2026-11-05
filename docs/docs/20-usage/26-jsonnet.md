@@ -17,9 +17,13 @@ Every `.jsonnet` file in the config folder is a config: keep generator sources o
 
 A config can import `stratim.libsonnet` (below) and the `.jsonnet` and `.libsonnet` files next to it, by a path relative to it. It cannot read anything else. Two configs, or a config and a YAML file, may not produce workflows of the same name.
 
+Jsonnet writes the fields of an object in alphabetical order. Steps or services given as an object by name therefore come out sorted; give them as a list, each with a `name`, when their order matters.
+
 Variables such as `${CI_COMMIT_BRANCH}` are substituted after evaluation, as in YAML: write them into strings as they are.
 
 The server evaluates each config in a separate process with no environment, which is stopped after 30 seconds and may use at most 1 GiB of memory, and a config may produce at most 16 MiB of JSON. The same config files are evaluated once and the result is reused; a config that ran out of time or memory is not evaluated again for five minutes. A config folder may hold at most 100 jsonnet configs, yielding at most 500 workflows.
+
+A config that does not evaluate fails the whole pipeline with an error that names the file, before any workflow exists: the forge then shows no status for its workflows rather than failed ones. `woodpecker-cli lint` catches such errors before pushing.
 
 ## stratim.libsonnet
 

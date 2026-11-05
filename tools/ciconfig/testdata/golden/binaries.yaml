@@ -1,0 +1,84 @@
+steps:
+- commands:
+  - npx get-pnpm
+  - export PNPM_HOME='/root/.local/share/pnpm'
+  - export PATH="$PNPM_HOME/bin:$PATH"
+  - pnpm install --frozen-lockfile
+  - pnpm build
+  directory: web/
+  image: docker.io/node:26-alpine
+  name: build-web
+- commands:
+  - go mod vendor
+  image: docker.io/golang:1.27
+  name: vendor
+- commands:
+  - apt update
+  - apt install -y tree
+  - make cross-compile-server
+  depends_on:
+  - vendor
+  - build-web
+  environment:
+    ARCHIVE_IT: "1"
+    PLATFORMS: linux|arm64/v8;linux|amd64;linux|riscv64;windows|amd64;freebsd|amd64
+    TAGS: bindata sqlite sqlite_unlock_notify netgo
+  image: docker.io/techknowlogick/xgo:go-1.27.x
+  name: cross-compile-server
+  pull: true
+- commands:
+  - make build-tarball
+  depends_on:
+  - vendor
+  - build-web
+  image: docker.io/golang:1.27
+  name: build-tarball
+- commands:
+  - apt update
+  - apt install -y zip
+  - make release-agent
+  depends_on:
+  - vendor
+  image: docker.io/golang:1.27
+  name: build-agent
+- commands:
+  - apt update
+  - apt install -y zip
+  - make release-cli
+  depends_on:
+  - vendor
+  image: docker.io/golang:1.27
+  name: build-cli
+- commands:
+  - make bundle
+  depends_on:
+  - cross-compile-server
+  - build-agent
+  - build-cli
+  image: docker.io/golang:1.27
+  name: build-deb-rpm
+- commands:
+  - make release-checksums
+  depends_on:
+  - cross-compile-server
+  - build-agent
+  - build-cli
+  - build-deb-rpm
+  - build-tarball
+  image: docker.io/golang:1.27
+  name: checksums
+- commands:
+  - ls -la dist/*.*
+  - cat dist/checksums.txt
+  depends_on:
+  - checksums
+  image: docker.io/golang:1.27
+  name: release-dryrun
+when:
+- event: tag
+- branch: ${CI_REPO_DEFAULT_BRANCH}
+  event: pull_request
+  path:
+  - Makefile
+  - .woodpecker/binaries.jsonnet
+  - .woodpecker/ci.libsonnet

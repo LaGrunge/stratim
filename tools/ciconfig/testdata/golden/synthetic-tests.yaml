@@ -1,0 +1,24 @@
+skip_clone: true
+steps:
+- commands:
+  - |
+    awk -v n="$TESTS" 'BEGIN {
+      print "##teamcity[testSuiteStarted name=\x27synthetic\x27]"
+      for (i = 1; i <= n; i++) {
+        t = sprintf("synthetic.case_%05d", i)
+        print "##teamcity[testStarted name=\x27" t "\x27]"
+        if (i % 1000 == 0) print "##teamcity[testFailed name=\x27" t "\x27 message=\x27synthetic failure\x27]"
+        else if (i % 997 == 0) print "##teamcity[testIgnored name=\x27" t "\x27 message=\x27synthetic skip\x27]"
+        print "##teamcity[testFinished name=\x27" t "\x27 duration=\x27" (i % 50) "\x27]"
+      }
+      print "##teamcity[testSuiteFinished name=\x27synthetic\x27]"
+    }'
+  environment:
+    TESTS: "10000"
+  image: docker.io/alpine:3.24
+  name: service-messages
+when:
+- cron: synthetic
+  event: cron
+- evaluate: TASK == "synthetic"
+  event: manual
