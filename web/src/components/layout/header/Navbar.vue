@@ -3,9 +3,8 @@
     class="text-neutral-content bg-wp-primary-200 text-wp-primary-text-100 dark:bg-wp-primary-300 flex border-b border-black/20 p-4 font-bold"
   >
     <div class="flex items-center space-x-2">
-      <router-link :to="{ name: 'home' }" class="-my-2 flex flex-col px-2">
-        <img :src="stratimLogo" alt="Stratim CI" class="h-8 w-8" />
-        <span class="text-xs" :title="version?.current">{{ version?.currentShort }}</span>
+      <router-link :to="{ name: 'home' }" class="-my-2 flex shrink-0 px-2">
+        <img :src="stratimLogo" alt="Stratim CI" class="h-12 w-12" />
       </router-link>
       <router-link v-if="user" :to="{ name: 'repos' }" class="navbar-clickable navbar-link">
         <span class="flex md:hidden">{{ $t('repos') }}</span>
