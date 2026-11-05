@@ -1,0 +1,5 @@
+steps:
+- commands:
+  - echo linting
+  image: docker.io/library/alpine:3.24
+  name: lint

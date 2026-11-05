@@ -22,7 +22,12 @@ var DefaultConfigOrder = []string{
 	".woodpecker/",
 	".woodpecker.yaml",
 	".woodpecker.yml",
+	".woodpecker.jsonnet",
 }
+
+// DefaultConfigExtensions are the files of a config folder that are read:
+// YAML workflows, jsonnet configs and the jsonnet libraries they import.
+var DefaultConfigExtensions = []string{".yaml", ".yml", ".jsonnet", ".libsonnet"}
 
 const (
 	// DefaultClonePlugin can be changed by 'WOODPECKER_DEFAULT_CLONE_PLUGIN' at runtime.

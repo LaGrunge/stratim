@@ -1,0 +1,10 @@
+steps:
+- commands:
+  - "true"
+  image: docker.io/library/alpine:3.24
+  name: probe
+when:
+- branch:
+  - main
+  - release/*
+  event: push

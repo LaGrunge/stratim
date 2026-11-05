@@ -19,6 +19,7 @@ package scenarios
 import (
 	"embed"
 	"encoding/json"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -33,6 +34,10 @@ import (
 //go:embed fixtures/*/*.jsonnet fixtures/_lib/*.libsonnet
 var fixtureFS embed.FS
 
+// libDir holds the .libsonnet files the jsonnet fixtures import by bare name,
+// e.g. import 'steps.libsonnet'. It is not a scenario.
+const libDir = "_lib"
+
 // Scenario is the single source of truth for one integration test case.
 //
 // Single-workflow scenarios use a flat fixture pair:
@@ -46,10 +51,9 @@ var fixtureFS embed.FS
 //	fixtures/NN_name/workflow-b.yaml
 //	fixtures/NN_name/scenario.json   — assertions; Workflows field is populated from the YAMLs
 //
-// A workflow in a subdirectory may also be workflow-a.jsonnet: the loader
-// evaluates it, with fixtures/_lib/ on the import path, and serves the result
-// as workflow-a.yaml (JSON is YAML). Once the server evaluates jsonnet itself
-// (S0-4), these fixtures are served as they are.
+// A workflow in a subdirectory may also be workflow-a.jsonnet: it is served
+// as it is, and the server evaluates it. The libraries in fixtures/_lib/ are
+// then served next to it, as a project keeps its own.
 type Scenario struct {
 	// Name is a human-readable label shown in test output.
 	Name string `json:"name"`
@@ -172,6 +176,7 @@ func loadMultiWorkflowScenario(t *testing.T, dirName string) Scenario {
 
 	var s Scenario
 	var files []*forge_types.FileMeta
+	usesJsonnet := false
 	add := func(source, served string, data []byte) {
 		for _, f := range files {
 			require.NotEqualf(t, served, f.Name, "%s/%s is served as %s, like another workflow file", dirName, source, served)
@@ -194,8 +199,17 @@ func loadMultiWorkflowScenario(t *testing.T, dirName string) Scenario {
 			// Serve under .woodpecker/<filename> so Dir() returns them.
 			add(name, ".woodpecker/"+name, data)
 		case strings.HasSuffix(name, ".jsonnet"):
-			add(name, ".woodpecker/"+strings.TrimSuffix(name, ".jsonnet")+".yaml",
-				evaluateJsonnet(t, dirName+"/"+name, data))
+			add(name, ".woodpecker/"+name, data)
+			usesJsonnet = true
+		}
+	}
+	if usesJsonnet {
+		libs, err := fixtureFS.ReadDir(path.Join("fixtures", libDir))
+		require.NoError(t, err, "read jsonnet library dir")
+		for _, lib := range libs {
+			data, err := fixtureFS.ReadFile(path.Join("fixtures", libDir, lib.Name()))
+			require.NoError(t, err, "read %s/%s", libDir, lib.Name())
+			add(libDir+"/"+lib.Name(), ".woodpecker/"+lib.Name(), data)
 		}
 	}
 	require.NotEmpty(t, files, "no YAML files in multi-workflow dir %s", dirName)

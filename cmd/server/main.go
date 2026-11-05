@@ -23,11 +23,17 @@ import (
 	"github.com/rs/zerolog/log"
 
 	_ "go.woodpecker-ci.org/woodpecker/v3/cmd/server/openapi"
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/dot_env"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/utils"
 )
 
 func main() {
+	// evaluating a jsonnet config in a child process: nothing else to set up
+	if len(os.Args) > 1 && os.Args[1] == jsonnet.ChildCommand {
+		jsonnet.RunChild()
+	}
+
 	dot_env.Load()
 
 	ctx := utils.WithContextSigtermCallback(context.Background(), func() {

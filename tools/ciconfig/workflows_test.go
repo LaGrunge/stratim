@@ -127,8 +127,12 @@ func TestWorkflowsBuild(t *testing.T) {
 // rather than pass unnoticed.
 func readConfig(t *testing.T) ([]*builder.YamlFile, []compiler.Secret) {
 	t.Helper()
-	files, err := filepath.Glob(filepath.Join(configDir, "*.yaml"))
-	require.NoError(t, err)
+	var files []string
+	for _, pattern := range []string{"*.yaml", "*.jsonnet", "*.libsonnet"} {
+		matches, err := filepath.Glob(filepath.Join(configDir, pattern))
+		require.NoError(t, err)
+		files = append(files, matches...)
+	}
 	require.NotEmpty(t, files, "no workflows in %s", configDir)
 
 	var yamls []*builder.YamlFile

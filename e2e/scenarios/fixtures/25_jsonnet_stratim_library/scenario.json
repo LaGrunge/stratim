@@ -1,0 +1,15 @@
+{
+  "name": "jsonnet workflows by name, with the server's stratim.libsonnet",
+  "event": "push",
+  "expected_status": "success",
+  "expected_workflows": [
+    { "name": "build-amd64", "status": "success" },
+    { "name": "build-arm64", "status": "success" },
+    { "name": "report", "status": "success" }
+  ],
+  "expected_steps": [
+    { "name": "build-amd64", "status": "success", "exit_code": 0 },
+    { "name": "build-arm64", "status": "success", "exit_code": 0 },
+    { "name": "report", "status": "success", "exit_code": 0 }
+  ]
+}

@@ -1,0 +1,6 @@
+# Plain YAML still works next to jsonnet.
+steps:
+  - name: lint
+    image: docker.io/library/alpine:3.24
+    commands:
+      - echo linting

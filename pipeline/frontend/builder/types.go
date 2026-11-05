@@ -18,6 +18,7 @@ import (
 	"sort"
 
 	backend_types "go.woodpecker-ci.org/woodpecker/v3/pipeline/backend/types"
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/constraint"
 )
 
@@ -39,10 +40,8 @@ type Workflow struct {
 	AxisID  int               `json:"-"`
 }
 
-type YamlFile struct {
-	Name string
-	Data []byte
-}
+// YamlFile is a config file; jsonnet configs among them are expanded first.
+type YamlFile = jsonnet.File
 
 type yamlFileList []*YamlFile
 

@@ -1,0 +1,8 @@
+steps:
+- commands:
+  - "true"
+  image: docker.io/library/alpine:3.24
+  name: probe
+when:
+- cron: nightly
+  event: cron

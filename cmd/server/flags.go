@@ -326,10 +326,28 @@ var flags = append([]cli.Flag{
 		Sources: cli.EnvVars("WOODPECKER_DEFAULT_PIPELINE_CONFIG_EXTENSIONS"),
 		Name:    "default-pipeline-config-extensions",
 		Usage:   "default pipeline config extensions when scanning a pipeline config directory",
-		Value:   []string{".yaml", ".yml"},
+		Value:   constant.DefaultConfigExtensions,
 		Config: cli.StringConfig{
 			TrimSpace: true,
 		},
+	},
+	&cli.IntFlag{
+		Sources: cli.EnvVars("STRATIM_JSONNET_CONCURRENCY"),
+		Name:    "jsonnet-concurrency",
+		Usage:   "how many jsonnet configs are evaluated at once; each may take jsonnet-memory-mib",
+		Value:   2,
+	},
+	&cli.IntFlag{
+		Sources: cli.EnvVars("STRATIM_JSONNET_MEMORY_MIB"),
+		Name:    "jsonnet-memory-mib",
+		Usage:   "the most memory evaluating one jsonnet config may use, in MiB",
+		Value:   1024,
+	},
+	&cli.DurationFlag{
+		Sources: cli.EnvVars("STRATIM_JSONNET_TIMEOUT"),
+		Name:    "jsonnet-timeout",
+		Usage:   "the longest evaluating one jsonnet config may take",
+		Value:   30 * time.Second,
 	},
 	&cli.StringFlag{
 		Sources: cli.EnvVars("WOODPECKER_REGISTRY_EXTENSION_ENDPOINT"),

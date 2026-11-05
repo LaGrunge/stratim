@@ -80,22 +80,9 @@ func execDir(ctx context.Context, c *cli.Command, dir string) error {
 		repoPath = convertPathForWindows(repoPath)
 	}
 
-	var yamls []*builder.YamlFile
-	walkErr := filepath.Walk(dir, func(path string, info os.FileInfo, e error) error {
-		if e != nil {
-			return e
-		}
-		if info.Mode().IsRegular() && (strings.HasSuffix(info.Name(), ".yaml") || strings.HasSuffix(info.Name(), ".yml")) {
-			dat, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			yamls = append(yamls, &builder.YamlFile{Name: path, Data: dat})
-		}
-		return nil
-	})
-	if walkErr != nil {
-		return walkErr
+	yamls, err := common.ReadConfigDir(dir)
+	if err != nil {
+		return err
 	}
 
 	return runExec(ctx, c, yamls, repoPath)
@@ -128,11 +115,11 @@ func execFile(ctx context.Context, c *cli.Command, file string) error {
 		repoPath = convertPathForWindows(repoPath)
 	}
 
-	dat, err := os.ReadFile(file)
+	yamls, err := common.ReadConfigFile(file)
 	if err != nil {
 		return err
 	}
-	return runExec(ctx, c, []*builder.YamlFile{{Name: file, Data: dat}}, repoPath)
+	return runExec(ctx, c, yamls, repoPath)
 }
 
 func runExec(ctx context.Context, c *cli.Command, yamls []*builder.YamlFile, repoPath string) error {

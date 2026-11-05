@@ -1,0 +1,15 @@
+steps:
+- commands:
+  - go build ./...
+  image: docker.io/golang:1.27
+  name: compile
+- commands:
+  - go test ./...
+  depends_on:
+  - compile
+  image: docker.io/golang:1.27
+  name: unit
+when:
+- branch: main
+  event: push
+- event: pull_request
