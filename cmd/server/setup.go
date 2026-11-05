@@ -22,12 +22,16 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"runtime"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/urfave/cli/v3"
 
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/cache"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge/setup"
@@ -234,6 +238,7 @@ func setupEvilGlobals(ctx context.Context, c *cli.Command, s store.Store) (err e
 	// pipeline config paths
 	server.Config.Pipeline.ConfigPaths = c.StringSlice("default-pipeline-configs")
 	server.Config.Pipeline.ConfigExtensions = c.StringSlice("default-pipeline-config-extensions")
+	setupJsonnet(c) //nolint:contextcheck // each evaluation has a timeout of its own and serves no single request
 
 	// server configuration
 	server.Config.Server.JWTSecret, err = setupJWTSecret(s)
@@ -286,4 +291,51 @@ func setupEvilGlobals(ctx context.Context, c *cli.Command, s store.Store) (err e
 	server.Config.Permissions.Orgs = permissions.NewOrgs(c.StringSlice("orgs"))
 	server.Config.Permissions.OwnersAllowlist = permissions.NewOwnersAllowlist(c.StringSlice("repo-owners"))
 	return nil
+}
+
+// minJsonnetMemoryMiB is the least memory an evaluation gets: below it, the
+// child cannot even start.
+const minJsonnetMemoryMiB = 256
+
+// setupJsonnet evaluates jsonnet configs in child processes of this binary,
+// so that a config can neither hang the server nor take its memory. If that
+// does not work, jsonnet configs fail rather than run unguarded.
+func setupJsonnet(c *cli.Command) {
+	timeout := c.Duration("jsonnet-timeout")
+	memory := uint64(max(c.Int("jsonnet-memory-mib"), minJsonnetMemoryMiB)) << 20 //nolint:gosec,mnd
+	evaluate := jsonnet.Subprocess(serverBinary(), timeout, memory)
+	if err := jsonnet.SelfCheck(evaluate); err != nil {
+		log.Error().Err(err).Msg("jsonnet configs cannot be evaluated in a child process; they fail until a check passes")
+		evaluate = jsonnet.Recovering(evaluate, err, time.Minute)
+	}
+	jsonnet.Default = jsonnet.NewRenderer(evaluate, c.Int("jsonnet-concurrency"))
+
+	if msg := jsonnetExtensionsProblem(server.Config.Pipeline.ConfigExtensions); msg != "" {
+		log.Warn().Msg(msg)
+	}
+}
+
+// serverBinary is how this binary can be run again: on Linux through
+// /proc/self/exe, which still works when the file was replaced since start.
+func serverBinary() string {
+	if runtime.GOOS == "linux" {
+		return "/proc/self/exe"
+	}
+	if executable, err := os.Executable(); err == nil {
+		return executable
+	}
+	return os.Args[0]
+}
+
+// jsonnetExtensionsProblem says what is wrong with config extensions that
+// leave jsonnet half read, or "".
+func jsonnetExtensionsProblem(extensions []string) string {
+	hasConfigs, hasLibraries := slices.Contains(extensions, jsonnet.Ext), slices.Contains(extensions, jsonnet.LibExt)
+	switch {
+	case hasConfigs && !hasLibraries:
+		return fmt.Sprintf("pipeline config extensions include %s but not %s: jsonnet configs cannot import their libraries", jsonnet.Ext, jsonnet.LibExt)
+	case !hasConfigs && hasLibraries:
+		return fmt.Sprintf("pipeline config extensions include %s but not %s: jsonnet libraries are fetched but no config is read", jsonnet.LibExt, jsonnet.Ext)
+	}
+	return ""
 }

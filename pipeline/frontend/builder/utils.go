@@ -15,10 +15,8 @@
 package builder
 
 import (
-	"path/filepath"
-	"strings"
-
 	pipeline_errors "go.woodpecker-ci.org/woodpecker/v3/pipeline/errors"
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/metadata"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/constraint"
@@ -26,11 +24,7 @@ import (
 )
 
 func SanitizePath(path string) string {
-	path = filepath.Base(path)
-	path = strings.TrimSuffix(path, ".yml")
-	path = strings.TrimSuffix(path, ".yaml")
-	path = strings.TrimPrefix(path, ".")
-	return path
+	return jsonnet.WorkflowName(path)
 }
 
 // filterMissingDependencies drops items with missing required deps and

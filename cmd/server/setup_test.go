@@ -136,3 +136,11 @@ func TestSetupGrpcSecret(t *testing.T) {
 		assert.Len(t, decoded, 32)
 	})
 }
+
+func TestJsonnetExtensionsProblem(t *testing.T) {
+	assert.Empty(t, jsonnetExtensionsProblem([]string{".yaml", ".yml", ".jsonnet", ".libsonnet"}))
+	assert.Empty(t, jsonnetExtensionsProblem([]string{".yaml", ".yml"}), "no jsonnet at all is a choice, not a problem")
+	assert.Empty(t, jsonnetExtensionsProblem(nil))
+	assert.Contains(t, jsonnetExtensionsProblem([]string{".yaml", ".jsonnet"}), "cannot import their libraries")
+	assert.Contains(t, jsonnetExtensionsProblem([]string{".yaml", ".libsonnet"}), "no config is read")
+}

@@ -1,0 +1,9 @@
+steps:
+- commands:
+  - "true"
+  image: docker.io/library/alpine:3.24
+  name: probe
+when:
+- event: manual
+- evaluate: TASK == "docs"
+  event: manual

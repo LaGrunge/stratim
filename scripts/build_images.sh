@@ -53,7 +53,8 @@ VERSION="$(git describe --tags --always 2>/dev/null || echo "$SHA")"
 MODULE="go.woodpecker-ci.org/woodpecker/v3"
 
 STAGE="$(mktemp -d)"
-trap 'rm -rf "$STAGE"' EXIT
+SMOKE_TAG="$REPO_PREFIX-server:smoke-$SHA"
+trap 'rm -rf "$STAGE"; docker image rm -f "$SMOKE_TAG" >/dev/null 2>&1 || true' EXIT
 
 if (( SKIP_UI )); then
   [[ -f web/dist/index.html && "$(cat web/dist/index.html)" != "test" ]] || die "no built UI in web/dist"
@@ -96,6 +97,20 @@ image() { # image <name> <platforms>
     -t "$REPO_PREFIX-$name:$SHA" -t "$REPO_PREFIX-$name:next" "$STAGE"
 }
 
+# The server evaluates jsonnet configs in children of its own binary; make
+# sure that works inside the image before anything is pushed.
+smoke_jsonnet() {
+  local out
+  log "checking jsonnet evaluation in the server image"
+  docker buildx build --load --platform linux/amd64 -q \
+    -f "$SRC/docker/Dockerfile.server.prebuilt" -t "$SMOKE_TAG" "$STAGE" >/dev/null
+  out="$(printf '%s' '{"config":"check.jsonnet","sources":{"check.jsonnet":"local s = import '"'"'stratim.libsonnet'"'"'; s.workflow([])"}}' |
+    docker run --rm -i -e STRATIM_JSONNET_MEMORY=1073741824 "$SMOKE_TAG" __stratim-jsonnet-eval 2>&1)" ||
+    die "the server image cannot evaluate jsonnet: $out"
+  [[ "$out" == *'"steps"'* ]] || die "unexpected jsonnet output from the server image: $out"
+}
+
+smoke_jsonnet
 image server linux/amd64
 image agent linux/amd64,linux/arm64
 image autoscaler linux/amd64

@@ -16,15 +16,15 @@ package lint
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/urfave/cli/v3"
 
 	"go.woodpecker-ci.org/woodpecker/v3/cli/common"
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/linter"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/constant"
@@ -66,26 +66,23 @@ func lint(ctx context.Context, c *cli.Command) error {
 	return common.RunPipelineFunc(ctx, c, lintFile, lintDir)
 }
 
-func lintDir(ctx context.Context, c *cli.Command, dir string) error {
-	var errorStrings []string
-	if err := filepath.Walk(dir, func(path string, info os.FileInfo, e error) error {
-		if e != nil {
-			return e
-		}
-
-		// check if it is a regular file (not dir)
-		if info.Mode().IsRegular() && (strings.HasSuffix(info.Name(), ".yaml") || strings.HasSuffix(info.Name(), ".yml")) {
-			fmt.Println("#", info.Name())
-			if err := lintFile(ctx, c, path); err != nil {
-				errorStrings = append(errorStrings, err.Error())
-			}
-			fmt.Println("")
-			return nil
-		}
-
-		return nil
-	}); err != nil {
+func lintDir(_ context.Context, c *cli.Command, dir string) error {
+	files, err := common.ReadConfigDir(dir)
+	if err != nil {
 		return err
+	}
+	workflows, err := jsonnet.Expand(files)
+	if err != nil {
+		return err
+	}
+
+	var errorStrings []string
+	for _, w := range workflows {
+		fmt.Println("#", path.Base(w.Name))
+		if err := lintWorkflow(c, w.Name, w.Data); err != nil {
+			errorStrings = append(errorStrings, err.Error())
+		}
+		fmt.Println("")
 	}
 
 	if len(errorStrings) != 0 {
@@ -95,17 +92,29 @@ func lintDir(ctx context.Context, c *cli.Command, dir string) error {
 }
 
 func lintFile(_ context.Context, c *cli.Command, file string) error {
-	fi, err := os.Open(file)
+	files, err := common.ReadConfigFile(file)
 	if err != nil {
 		return err
 	}
-	defer fi.Close()
-
-	buf, err := os.ReadFile(file)
+	workflows, err := jsonnet.Expand(files)
 	if err != nil {
 		return err
 	}
 
+	var errs []error
+	for _, w := range workflows {
+		if len(workflows) > 1 {
+			fmt.Println("#", path.Base(w.Name))
+		}
+		if err := lintWorkflow(c, w.Name, w.Data); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// lintWorkflow lints one workflow; a jsonnet config yields it as JSON.
+func lintWorkflow(c *cli.Command, file string, buf []byte) error {
 	rawConfig := string(buf)
 
 	parsedConfig, err := yaml.ParseString(rawConfig)

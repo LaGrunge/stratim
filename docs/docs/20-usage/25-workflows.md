@@ -4,7 +4,7 @@ A pipeline has at least one workflow. A workflow is a set of steps that are exec
 
 In case there is a single configuration in `.woodpecker.yaml` Woodpecker will create a pipeline with a single workflow.
 
-By placing the configurations in a folder which is by default named `.woodpecker/` Woodpecker will create a pipeline with multiple workflows each named by the file they are defined in. Only `.yml` and `.yaml` files will be used and files in any subfolders like `.woodpecker/sub-folder/test.yaml` will be ignored.
+By placing the configurations in a folder which is by default named `.woodpecker/` Woodpecker will create a pipeline with multiple workflows each named by the file they are defined in. Only `.yml` and `.yaml` files, and [jsonnet configs](./26-jsonnet.md), will be used and files in any subfolders like `.woodpecker/sub-folder/test.yaml` will be ignored.
 
 You can also set some custom path like `.my-ci/pipelines/` instead of `.woodpecker/` in the [project settings](./75-project-settings.md).
 

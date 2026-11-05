@@ -28,6 +28,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline"
 	backend_types "go.woodpecker-ci.org/woodpecker/v3/pipeline/backend/types"
 	pipeline_errors "go.woodpecker-ci.org/woodpecker/v3/pipeline/errors"
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/metadata"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/compiler"
@@ -54,7 +55,11 @@ type PipelineBuilder struct {
 }
 
 func (b *PipelineBuilder) Build() (items []*Item, errorsAndWarnings error) {
-	b.Yamls = SortYamlFilesByName(b.Yamls)
+	expanded, err := expandJsonnet(b.Yamls)
+	if err != nil {
+		return nil, &pipeline_errors.PipelineError{Type: pipeline_errors.PipelineErrorTypeCompiler, Message: err.Error()}
+	}
+	b.Yamls = SortYamlFilesByName(expanded)
 
 	yamls := b.Yamls
 	selected := SanitizePath(b.SelectedWorkflow)
@@ -287,4 +292,10 @@ func (b *PipelineBuilder) toInternalRepresentation(parsed *yaml_types.Workflow, 
 	options = append(options, b.CompilerOptions...)
 
 	return compiler.New(options...).Compile(parsed)
+}
+
+// expandJsonnet replaces the jsonnet configs among yamls with the workflows
+// they evaluate to, and drops jsonnet libraries; see package jsonnet.
+func expandJsonnet(yamls []*YamlFile) ([]*YamlFile, error) {
+	return jsonnet.Expand(yamls)
 }

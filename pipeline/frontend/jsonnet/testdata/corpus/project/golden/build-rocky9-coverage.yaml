@@ -1,0 +1,24 @@
+steps:
+- commands:
+  - cmake -B build -DCMAKE_BUILD_TYPE=Coverage
+  - cmake --build build -j"$(nproc)"
+  environment:
+    BUILD_TYPE: Coverage
+  image: docker.io/library/rockylinux:9
+  name: build
+- commands:
+  - ctest --test-dir build --output-on-failure
+  depends_on:
+  - build
+  image: docker.io/library/rockylinux:9
+  name: test
+when:
+- branch: main
+  event: push
+- event: pull_request
+  path:
+    exclude:
+    - '**/*.md'
+    include:
+    - src/**
+    - CMakeLists.txt

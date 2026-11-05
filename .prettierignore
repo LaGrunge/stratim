@@ -2,6 +2,9 @@ build/
 dist/
 CHANGELOG.md
 
+# generated golden files of tests
+**/testdata/**/golden/
+
 # web/ and docs/ must be directly formatted from there
 # to prevent conflicts with different prettier version
 web/
