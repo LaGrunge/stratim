@@ -130,7 +130,7 @@ func TestStatusDeployment(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.WithValue(t.Context(), githubClientKey, gh)
-	c := &client{statuses: &statuses{}, statusPolicy: defaultStatusPolicy}
+	c := &client{}
 	err = c.Status(ctx, fakeUser, &model.Repo{
 		ID:    7,
 		Owner: "octocat",
