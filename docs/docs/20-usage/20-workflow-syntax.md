@@ -198,6 +198,21 @@ Some of the steps may be allowed to fail without causing the whole workflow and 
 
 If you would like to cancel the full pipeline once the step fails, you can set `failure: cancel`. For the default behaviour, use `failure: fail`.
 
+### `timeout`
+
+A step that runs longer than its `timeout` is stopped and fails with exit code 124, as after any failure: the steps after it run or not as their `when` and its `failure` say. The timeout counts from when the step runs: pulling its image or waiting for a node does not count. A timeout is a duration (`90s`, `1h30m`) or a number of minutes. A detached step and a service have none: they run as long as the workflow. Agents older than this release ignore a step's timeout.
+
+```diff
+ steps:
+   - name: test
+     image: golang
+     commands:
+       - go test ./...
++    timeout: 20m
+```
+
+The workflow's own [`timeout`](#timeout-1) still applies around it.
+
 ### `when` - Conditional Execution
 
 Woodpecker supports defining a list of conditions for a step by using a `when` block. If at least one of the conditions in the `when` block evaluate to true the step is executed, otherwise it is skipped. A condition is evaluated to true if _all_ sub-conditions are true.
@@ -761,6 +776,14 @@ By default Woodpecker is automatically adding a clone step. This clone step can 
 
 ```yaml
 skip_clone: true
+```
+
+## `timeout`
+
+A workflow that runs longer than its `timeout` is stopped. It takes the place of the [repository's timeout](./75-project-settings.md#timeout), which is also its ceiling: a config can make a workflow's limit shorter, not longer. Give a long workflow room by raising the repository's timeout, and the quick ones a shorter `timeout` of their own. A duration (`90s`, `1h30m`) is rounded up to whole minutes; a number is minutes.
+
+```yaml
+timeout: 3h
 ```
 
 ## `when` - Global workflow conditions

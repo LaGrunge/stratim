@@ -195,7 +195,9 @@ func (e *dummy) WaitStep(ctx context.Context, step *backend_types.Step, taskUUID
 		}
 		if sleepWithContext(ctx, wc, toSleep) {
 			e.kv.Store(key, stepStateDone)
-			return canceledState(), nil
+			state := canceledState()
+			state.Error = ctx.Err() // nil when the workflow was torn down
+			return state, nil
 		}
 	} else if step.Type == backend_types.StepTypeService {
 		if sleepWithContext(ctx, wc, testServiceTimeout) {

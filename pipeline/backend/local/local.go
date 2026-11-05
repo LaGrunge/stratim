@@ -203,17 +203,35 @@ func (e *local) WaitStep(ctx context.Context, step *types.Step, taskUUID string)
 		return nil, errors.New("exec: not started")
 	}
 	if state.cmd.ProcessState == nil {
-		cmdState, err := state.cmd.Process.Wait()
-		if err != nil {
-			return nil, err
+		// wait for the process, or for ctx: a step's timeout ends the wait,
+		// and DestroyStep kills the process, which this wait then reaps
+		cmd := state.cmd
+		type exit struct {
+			state *os.ProcessState
+			err   error
 		}
-		if cmdState == nil {
+		exited := make(chan exit, 1)
+		go func() {
+			cmdState, err := cmd.Process.Wait()
+			exited <- exit{cmdState, err}
+		}()
+		var result exit
+		select {
+		case result = <-exited:
+		case <-ctx.Done():
+			stepState.Error = ctx.Err()
+			return stepState, nil
+		}
+		if result.err != nil {
+			return nil, result.err
+		}
+		if result.state == nil {
 			return nil, errors.New("exec: cmd state after Wait() can not be nil but is")
 		}
-		stepState.ExitCode = cmdState.ExitCode()
+		stepState.ExitCode = result.state.ExitCode()
 		// can be nil if step got canceled
 		if state.cmd != nil {
-			state.cmd.ProcessState = cmdState
+			state.cmd.ProcessState = result.state
 		}
 	} else {
 		stepState.ExitCode = state.cmd.ProcessState.ExitCode()
@@ -249,6 +267,10 @@ func (e *local) DestroyStep(_ context.Context, step *types.Step, taskUUID string
 	}
 	if state.cmd != nil {
 		_ = state.cmd.Cancel()
+		if cmd := state.cmd; cmd.Process != nil && cmd.ProcessState == nil {
+			// reap the killed process, unless a wait for it already runs
+			go func() { _, _ = cmd.Process.Wait() }()
+		}
 		state.cmd = nil
 	}
 	workflowState, err := e.getWorkflowState(taskUUID)

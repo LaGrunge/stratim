@@ -17,6 +17,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"time"
 )
 
 var (
@@ -51,11 +52,27 @@ func (e *OomError) Error() string {
 	return fmt.Sprintf("uuid=%s: received oom kill", e.UUID)
 }
 
+// TimeoutExitCode is the exit code of a step ended by its timeout, as
+// timeout(1) gives it.
+const TimeoutExitCode = 124
+
+// A TimeoutError reports the step ran longer than its timeout and was ended.
+type TimeoutError struct {
+	UUID    string
+	Timeout time.Duration
+}
+
+// Error returns the error message in string format.
+func (e *TimeoutError) Error() string {
+	return fmt.Sprintf("uuid=%s: step timed out after %s", e.UUID, e.Timeout)
+}
+
 // IsStepFailure reports whether err was caused by a step itself terminating
-// unsuccessfully (non-zero exit code or oom kill), as opposed to the runtime
-// or backend failing to execute the workflow.
+// unsuccessfully (non-zero exit code, oom kill or its timeout), as opposed to
+// the runtime or backend failing to execute the workflow.
 func IsStepFailure(err error) bool {
 	var exitErr *ExitError
 	var oomErr *OomError
-	return errors.As(err, &exitErr) || errors.As(err, &oomErr)
+	var timeoutErr *TimeoutError
+	return errors.As(err, &exitErr) || errors.As(err, &oomErr) || errors.As(err, &timeoutErr)
 }

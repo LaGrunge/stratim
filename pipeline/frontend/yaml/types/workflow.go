@@ -16,6 +16,7 @@ package types
 
 import (
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/constraint"
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/types/base"
 )
 
 type (
@@ -30,6 +31,9 @@ type (
 		DependsOn   constraint.DependsOn `yaml:"depends_on,omitempty"`
 		Concurrency Concurrency          `yaml:"concurrency,omitempty"`
 		SkipClone   bool                 `yaml:"skip_clone,omitempty"`
+		// Timeout ends the workflow when it runs longer, in place of the
+		// repository's timeout, which is also its ceiling.
+		Timeout base.Timeout `yaml:"timeout,omitempty"`
 		// Deprecated: use when.status. TODO remove in next major.
 		RunsOn []string `yaml:"runs_on,omitempty"`
 	}

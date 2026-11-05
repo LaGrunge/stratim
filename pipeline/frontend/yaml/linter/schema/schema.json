@@ -20,6 +20,10 @@
     "skip_clone": {
       "type": "boolean"
     },
+    "timeout": {
+      "description": "End the workflow when it runs longer, in place of the repository's timeout, which is also its ceiling: a duration such as 90s or 1h30m, or minutes.",
+      "$ref": "#/definitions/duration"
+    },
     "params": {
       "description": "Parameters of the workflow: variables with a default, which a manual run, a cron job or the API can set. Read more: https://woodpecker-ci.org/docs/usage/environment#parameters",
       "type": "object",
@@ -89,6 +93,18 @@
     }
   },
   "definitions": {
+    "duration": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^(([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+|[0-9]+)$"
+        },
+        {
+          "type": "integer",
+          "minimum": 1
+        }
+      ]
+    },
     "string_or_string_slice": {
       "oneOf": [
         {
@@ -429,6 +445,10 @@
           "description": "Detach a step to run in background until pipeline finishes. Read more: https://woodpecker-ci.org/docs/usage/services#detachment",
           "type": "boolean"
         },
+        "timeout": {
+          "description": "End the step when it runs longer: a duration such as 90s or 1h30m, or minutes. A detached step has none.",
+          "$ref": "#/definitions/duration"
+        },
         "failure": {
           "description": "How to handle the failure of this step. Read more: https://woodpecker-ci.org/docs/usage/workflow-syntax#failure",
           "type": "string",
@@ -489,6 +509,10 @@
         "detach": {
           "description": "Detach a step to run in background until pipeline finishes. Read more: https://woodpecker-ci.org/docs/usage/services#detachment",
           "type": "boolean"
+        },
+        "timeout": {
+          "description": "End the step when it runs longer: a duration such as 90s or 1h30m, or minutes. A detached step has none.",
+          "$ref": "#/definitions/duration"
         },
         "failure": {
           "description": "How to handle the failure of this step. Read more: https://woodpecker-ci.org/docs/usage/workflow-syntax#failure",

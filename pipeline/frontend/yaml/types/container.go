@@ -36,6 +36,8 @@ type Container struct {
 	When      constraint.When      `yaml:"when,omitempty"`
 	Failure   string               `yaml:"failure,omitempty"`
 	Detached  bool                 `yaml:"detach,omitempty"`
+	// Timeout ends the step when it runs longer, if set.
+	Timeout base.Timeout `yaml:"timeout,omitempty"`
 	// state
 	Volumes Volumes `yaml:"volumes,omitempty"`
 	// network

@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"os"
 )
 
 func writeChunks(dst io.Writer, data []byte, size int) error {
@@ -88,8 +89,10 @@ func CopyLineByLine(dst io.Writer, src io.Reader, maxSize int) error {
 			}
 		}
 
-		// and then if it is EOF, write the remaining data and break the loop
-		if errors.Is(err, io.EOF) {
+		// and then if it is EOF, write the remaining data and break the loop;
+		// a stream closed under the reader (a step's timeout closes it) ends
+		// it too
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, os.ErrClosed) {
 			if len(buf) == 0 {
 				break
 			}
