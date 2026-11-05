@@ -65,15 +65,17 @@ type Opts struct {
 // GitHub Enterprise version control hosting provider.
 func New(id int64, opts Opts) (forge.Forge, error) {
 	r := &client{
-		id:         id,
-		API:        defaultAPI,
-		url:        defaultURL,
-		Client:     opts.OAuthClientID,
-		Secret:     opts.OAuthClientSecret,
-		oAuthHost:  opts.OAuthHost,
-		SkipVerify: opts.SkipVerify,
-		MergeRef:   opts.MergeRef,
-		OnlyPublic: opts.OnlyPublic,
+		id:           id,
+		API:          defaultAPI,
+		url:          defaultURL,
+		Client:       opts.OAuthClientID,
+		Secret:       opts.OAuthClientSecret,
+		oAuthHost:    opts.OAuthHost,
+		SkipVerify:   opts.SkipVerify,
+		MergeRef:     opts.MergeRef,
+		OnlyPublic:   opts.OnlyPublic,
+		statuses:     statusesOf(id),
+		statusPolicy: defaultStatusPolicy,
 	}
 	if opts.URL != defaultURL {
 		r.url = strings.TrimSuffix(opts.URL, "/")
@@ -93,6 +95,9 @@ type client struct {
 	MergeRef   bool
 	OnlyPublic bool
 	oAuthHost  string
+
+	statuses     *statuses    // see status.go
+	statusPolicy statusPolicy // see status.go
 }
 
 // Name returns the string name of this driver.
@@ -587,21 +592,37 @@ func (c *client) Status(ctx context.Context, user *model.User, repo *model.Repo,
 		}
 		id, _ := strconv.Atoi(matches[1])
 
-		_, _, err := client.Repositories.CreateDeploymentStatus(ctx, repo.Owner, repo.Name, int64(id), github.DeploymentStatusRequest{
-			State:       convertStatus(pipeline.Status),
-			Description: new(common.GetPipelineStatusDescription(pipeline.Status)),
-			LogURL:      new(common.GetPipelineStatusURL(repo, pipeline, nil)),
-		})
-		return err
+		state := convertStatus(pipeline.Status)
+		return c.sendStatus(ctx, fmt.Sprintf("%s/%s deployment %d", repo.Owner, repo.Name, id), state, fmt.Sprintf("deployment status %s of deployment %d", state, id),
+			func(ctx context.Context) (*github.Response, error) {
+				_, resp, err := client.Repositories.CreateDeploymentStatus(ctx, repo.Owner, repo.Name, int64(id), github.DeploymentStatusRequest{
+					State:       convertStatus(pipeline.Status),
+					Description: new(common.GetPipelineStatusDescription(pipeline.Status)),
+					LogURL:      new(common.GetPipelineStatusURL(repo, pipeline, nil)),
+				})
+				return resp, err
+			})
 	}
 
-	_, _, err = client.Repositories.CreateStatus(ctx, repo.Owner, repo.Name, pipeline.Commit, github.RepoStatus{
+	status := github.RepoStatus{
 		Context:     new(common.GetPipelineStatusContext(repo, pipeline, workflow)),
 		State:       new(convertStatus(workflow.State)),
 		Description: new(common.GetPipelineStatusDescription(workflow.State)),
 		TargetURL:   new(common.GetPipelineStatusURL(repo, pipeline, workflow)),
-	})
-	return err
+	}
+	return c.sendStatus(ctx,
+		repo.Owner+"/"+repo.Name+"@"+pipeline.Commit+" "+status.GetContext(),
+		status.GetState()+" "+status.GetDescription()+" "+status.GetTargetURL(),
+		"commit status "+status.GetState()+" "+status.GetContext()+" of "+pipeline.Commit,
+		func(ctx context.Context) (*github.Response, error) {
+			_, resp, err := client.Repositories.CreateStatus(ctx, repo.Owner, repo.Name, pipeline.Commit, status)
+			return resp, err
+		})
+}
+
+// sendStatus sends a status through the forge's statuses (status.go).
+func (c *client) sendStatus(ctx context.Context, key, value, what string, send func(context.Context) (*github.Response, error)) error {
+	return c.statuses.sendStatus(ctx, c.statusPolicy, key, value, what, send)
 }
 
 // Activate activates a repository by creating the post-commit hook and
