@@ -16,10 +16,8 @@ package cron
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/gdgvda/cron"
 	"github.com/rs/zerolog/log"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server"
@@ -66,28 +64,7 @@ func Run(ctx context.Context, store store.Store) error {
 
 // CalcNewNext parses a cron string and calculates the next exec time based on it.
 func CalcNewNext(schedule, tzLoc string, now time.Time) (time.Time, error) {
-	zone, err := time.LoadLocation(tzLoc)
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	now = now.In(zone)
-
-	parser, err := cron.NewDefaultParser(cron.StandardOptions)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("can't create parser: %w", err)
-	}
-
-	c, err := parser.Parse(schedule)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("cron parse schedule: %w", err)
-	}
-
-	next := c.Next(now)
-	if next.IsZero() {
-		return time.Time{}, fmt.Errorf("cron schedule yields no future execution time")
-	}
-	return next, nil
+	return model.NextAfter(schedule, tzLoc, now)
 }
 
 func runCron(ctx context.Context, store store.Store, cron *model.Cron, now time.Time) error {
@@ -157,5 +134,7 @@ func CreatePipeline(ctx context.Context, store store.Store, cron *model.Cron) (*
 		Cron:                cron.Name,
 		ForgeURL:            commit.ForgeURL,
 		AdditionalVariables: cron.Variables,
+		// a cron of a workflow's config runs that workflow
+		SelectedWorkflow: cron.Workflow,
 	}, nil
 }

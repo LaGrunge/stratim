@@ -19,6 +19,7 @@ package api
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -415,4 +416,117 @@ func TestPatchCron(t *testing.T) {
 		tc.decodeJSON(t, &got)
 		assert.Equal(t, "develop", got.Branch)
 	})
+}
+
+// TestManagedCron: a cron of the config can be enabled and disabled, not
+// changed otherwise nor deleted: the config is where it is.
+func TestManagedCron(t *testing.T) {
+	s := newTestStore(t)
+	repo, user := cronFixture(t, s)
+	cron := &model.Cron{RepoID: repo.ID, Name: "test/nightly", Schedule: "@daily", Timezone: "UTC", Enabled: true, Workflow: "test", Managed: true}
+	require.NoError(t, s.CronCreate(cron))
+
+	patch := func(in *model.CronPatch) *testContext {
+		cronForgeManager(t)
+		tc := newTestContext(t, s)
+		withUser(user)(tc)
+		withRepo(repo, &model.Perm{})(tc)
+		withParam("cron", strItoa(cron.ID))(tc)
+		withRequest(http.MethodPatch, in)(tc)
+		PatchCron(tc.Ctx)
+		return tc
+	}
+
+	disabled := false
+	tc := patch(&model.CronPatch{Enabled: &disabled})
+	require.Equal(t, http.StatusOK, tc.Recorder.Code)
+	var got model.Cron
+	tc.decodeJSON(t, &got)
+	assert.False(t, got.Enabled)
+
+	name, schedule, timezone, branch := "renamed", "@hourly", "Europe/Berlin", "dev"
+	for _, in := range []*model.CronPatch{
+		{Name: &name},
+		{Schedule: &schedule},
+		{Timezone: &timezone},
+		{Branch: &branch},
+		{Variables: map[string]string{"A": "1"}},
+		{Enabled: &disabled, Schedule: &schedule},
+	} {
+		tc = patch(in)
+		assert.Equal(t, http.StatusConflict, tc.Recorder.Code, "%+v", in)
+	}
+
+	// a patch of nothing saves nothing: not the next run it read
+	require.NoError(t, s.CronSetEnabled(repo, &model.Cron{ID: cron.ID, Enabled: true, Schedule: "@daily", Timezone: "UTC", NextExec: 42}))
+	tc = patch(&model.CronPatch{})
+	require.Equal(t, http.StatusOK, tc.Recorder.Code)
+	saved, err := s.CronFind(repo, cron.ID)
+	require.NoError(t, err)
+	assert.EqualValues(t, 42, saved.NextExec)
+
+	// enabled again, it runs next in the future
+	enabled := true
+	tc = patch(&model.CronPatch{Enabled: &enabled})
+	require.Equal(t, http.StatusOK, tc.Recorder.Code)
+	tc.decodeJSON(t, &got)
+	assert.True(t, got.Enabled)
+	assert.Greater(t, got.NextExec, time.Now().Unix())
+
+	tc = newTestContext(t, s)
+	withRepo(repo, &model.Perm{})(tc)
+	withParam("cron", strItoa(cron.ID))(tc)
+	DeleteCron(tc.Ctx)
+	assert.Equal(t, http.StatusConflict, tc.Recorder.Code)
+	_, err = s.CronFind(repo, cron.ID)
+	assert.NoError(t, err, "still there")
+}
+
+// TestCronNameWithSlash: names with / are kept for crons of the config.
+func TestCronNameWithSlash(t *testing.T) {
+	s := newTestStore(t)
+	repo, user := cronFixture(t, s)
+	cronForgeManager(t)
+	tc := newTestContext(t, s)
+	withUser(user)(tc)
+	withRepo(repo, &model.Perm{})(tc)
+	withRequest(http.MethodPost, &model.Cron{Name: "test/nightly", Schedule: "@daily"})(tc)
+	PostCron(tc.Ctx)
+	assert.Equal(t, http.StatusUnprocessableEntity, tc.Recorder.Code)
+
+	cron := seedCron(t, s, repo.ID, "plain")
+	name := "a/b"
+	tc = newTestContext(t, s)
+	withUser(user)(tc)
+	withRepo(repo, &model.Perm{})(tc)
+	withParam("cron", strItoa(cron.ID))(tc)
+	withRequest(http.MethodPatch, &model.CronPatch{Name: &name})(tc)
+	PatchCron(tc.Ctx)
+	assert.Equal(t, http.StatusUnprocessableEntity, tc.Recorder.Code)
+
+	// one named so before the rule can still be disabled, and keep its name
+	cron.Name = "old/name"
+	require.NoError(t, s.CronUpdate(repo, cron))
+	disabled := false
+	tc = newTestContext(t, s)
+	withUser(user)(tc)
+	withRepo(repo, &model.Perm{})(tc)
+	withParam("cron", strItoa(cron.ID))(tc)
+	withRequest(http.MethodPatch, &model.CronPatch{Name: &cron.Name, Enabled: &disabled})(tc)
+	PatchCron(tc.Ctx)
+	assert.Equal(t, http.StatusOK, tc.Recorder.Code, tc.Recorder.Body.String())
+	saved, err := s.CronFind(repo, cron.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "old/name", saved.Name)
+	assert.False(t, saved.Enabled)
+
+	// but not take another name with /
+	other := "old/other"
+	tc = newTestContext(t, s)
+	withUser(user)(tc)
+	withRepo(repo, &model.Perm{})(tc)
+	withParam("cron", strItoa(cron.ID))(tc)
+	withRequest(http.MethodPatch, &model.CronPatch{Name: &other})(tc)
+	PatchCron(tc.Ctx)
+	assert.Equal(t, http.StatusUnprocessableEntity, tc.Recorder.Code)
 }

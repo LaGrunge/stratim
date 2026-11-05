@@ -15,7 +15,10 @@
 package model
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 	"time"
 
 	"github.com/gdgvda/cron"
@@ -33,11 +36,31 @@ type Cron struct {
 	Branch    string            `json:"branch"     xorm:"branch"`
 	Enabled   bool              `json:"enabled"    xorm:"enabled NOT NULL DEFAULT TRUE"`
 	Variables map[string]string `json:"variables"  xorm:"json 'variables'"`
+	// Workflow, if set, is the workflow the cron runs, with its
+	// dependencies, whatever their when says.
+	Workflow string `json:"workflow,omitempty" xorm:"workflow"`
+	// Managed: the cron comes from the config of the default branch, which
+	// the server keeps it in line with; only its being enabled is changed
+	// otherwise.
+	Managed bool `json:"managed" xorm:"managed NOT NULL DEFAULT FALSE"`
 } //	@name	Cron
 
 // TableName returns the database table name for xorm.
 func (Cron) TableName() string {
 	return "crons"
+}
+
+// ErrCronNameSlash: <workflow>/<name> is how crons of the config are named.
+var ErrCronNameSlash = errors.New("a name with / is kept for crons of the config")
+
+// CheckSettingsName reports whether a cron made or renamed in the settings
+// may take name. Crons named so before the rule keep their names, and can
+// still be changed otherwise.
+func CheckSettingsName(name string) error {
+	if strings.Contains(name, "/") {
+		return ErrCronNameSlash
+	}
+	return nil
 }
 
 // Validate ensures cron has a valid name and schedule.
@@ -66,6 +89,55 @@ func (c *Cron) Validate() error {
 	}
 
 	return nil
+}
+
+// NextAfter is when a schedule runs next after now, read in timezone: the
+// one place schedules are worked out.
+func NextAfter(schedule, timezone string, now time.Time) (time.Time, error) {
+	zone, err := time.LoadLocation(timezone)
+	if err != nil {
+		return time.Time{}, err
+	}
+	parser, err := cron.NewDefaultParser(cron.StandardOptions)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("can't create parser: %w", err)
+	}
+	parsed, err := parser.Parse(schedule)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("cron parse schedule: %w", err)
+	}
+	next := parsed.Next(now.In(zone))
+	if next.IsZero() {
+		return time.Time{}, fmt.Errorf("cron schedule yields no future execution time")
+	}
+	return next, nil
+}
+
+// ErrManagedCron: a cron of the config changes there, not here.
+var ErrManagedCron = errors.New("the cron comes from the config of the default branch: change or remove it there; here it can only be enabled or disabled")
+
+// CheckPatch reports whether patch may change the cron: a managed cron
+// takes only enabled.
+func (c *Cron) CheckPatch(patch *CronPatch) error {
+	if !c.Managed {
+		return nil
+	}
+	only := CronPatch{Enabled: patch.Enabled}
+	if !reflect.DeepEqual(*patch, only) {
+		return ErrManagedCron
+	}
+	return nil
+}
+
+// CronPlan is what making a repository's managed crons those of a config
+// takes: crons to create, update and delete.
+type CronPlan struct {
+	Create []*Cron
+	// Update: the config's columns of these crons (schedule, timezone,
+	// workflow, branch, variables), and next_exec of those Rescheduled.
+	Update      []*Cron
+	Rescheduled map[int64]bool
+	Delete      []int64
 }
 
 type CronPatch struct {

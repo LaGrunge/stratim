@@ -79,6 +79,8 @@ func Create(ctx context.Context, _store store.Store, repo *model.Repo, pipeline 
 	switch {
 	case errors.Is(configFetchErr, &forge_types.ErrConfigNotFound{}):
 		log.Debug().Str("repo", repo.FullName).Err(configFetchErr).Msgf("cannot find config '%s' in '%s' with user: '%s'", repo.Config, pipeline.Ref, repoUser.Login)
+		// no config changes no crons: a forge answers so for a token that
+		// lost access too
 		if err := _store.DeletePipeline(pipeline); err != nil {
 			log.Error().Str("repo", repo.FullName).Err(err).Msg("failed to delete pipeline without config")
 		}
@@ -119,6 +121,13 @@ func Create(ctx context.Context, _store store.Store, repo *model.Repo, pipeline 
 	}
 	if err != nil {
 		return nil, fmt.Errorf("createPipelineItems failed: %w", err)
+	}
+
+	// the config of the default branch, if any and once it parses, says which crons
+	// its workflows have. A pipeline with no workflow to run is deleted
+	// below: its warnings reach the server's log only.
+	if configFetchErr == nil {
+		pipeline.Errors = append(pipeline.Errors, reconcileCrons(ctx, _store, _forge, repoUser, repo, pipeline, forgeYamlConfigs)...)
 	}
 
 	if len(pipelineItems) == 0 {

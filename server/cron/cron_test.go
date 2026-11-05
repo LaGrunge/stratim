@@ -69,6 +69,15 @@ func TestCreatePipeline(t *testing.T) {
 		Ref:      "refs/heads/default",
 		Cron:     "test",
 	}, pipeline)
+
+	// a cron of a workflow's config runs that workflow, with its variables
+	_, pipeline, err = CreatePipeline(ctx, store, &model.Cron{
+		Name: "nightly/full", Workflow: "nightly", Managed: true, Variables: map[string]string{"TIER": "full"},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "nightly", pipeline.SelectedWorkflow)
+	assert.Equal(t, "nightly/full", pipeline.Cron)
+	assert.Equal(t, map[string]string{"TIER": "full"}, pipeline.AdditionalVariables)
 }
 
 func TestCalcNewNext(t *testing.T) {

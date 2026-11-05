@@ -36,6 +36,7 @@ func TestCreateSkipCommitMessageReturnsErrFiltered(t *testing.T) {
 	t.Parallel()
 
 	mockStore := store_mocks.NewMockStore(t)
+	mockStore.On("CronApplyConfig", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe() // crons of the config, on a push to the default branch
 	repo := &model.Repo{ID: 10, UserID: 1, FullName: "octocat/hello-world"}
 	mockStore.On("GetUser", int64(1)).Return(&model.User{ID: 1, Login: "octocat"}, nil)
 
@@ -57,6 +58,7 @@ func TestCreateAllWorkflowsFilteredReturnsErrFiltered(t *testing.T) {
 	yaml := []byte("when:\n  - event: tag\n\nsteps:\n  - name: test\n    image: alpine\n    commands:\n      - echo hi\n")
 
 	mockStore := store_mocks.NewMockStore(t)
+	mockStore.On("CronApplyConfig", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe() // crons of the config, on a push to the default branch
 	mockStore.On("GetUser", int64(1)).Return(&model.User{ID: 1, Login: "octocat"}, nil)
 	mockStore.On("CreatePipeline", mock.Anything, mock.Anything).Return(nil)
 	mockStore.On("GetPipelineLastBefore", mock.Anything, mock.Anything, mock.Anything).Return(&model.Pipeline{}, nil)

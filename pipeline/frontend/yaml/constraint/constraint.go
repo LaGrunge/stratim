@@ -56,6 +56,25 @@ type (
 	}
 )
 
+// WithoutTrigger is when without the conditions on what started the
+// pipeline (event, ref, branch, cron, changed paths, evaluate): a run that
+// asks for a workflow runs it whatever those say. The conditions on how it
+// runs (status, matrix, platform, instance, repo, local) stay.
+func (when When) WithoutTrigger() When {
+	out := When{Constraints: make([]Constraint, len(when.Constraints))}
+	for i, c := range when.Constraints {
+		out.Constraints[i] = Constraint{
+			Repo:     c.Repo,
+			Instance: c.Instance,
+			Platform: c.Platform,
+			Status:   c.Status,
+			Matrix:   c.Matrix,
+			Local:    c.Local,
+		}
+	}
+	return out
+}
+
 func (when *When) IsEmpty() bool {
 	return len(when.Constraints) == 0
 }

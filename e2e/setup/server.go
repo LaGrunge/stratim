@@ -66,6 +66,8 @@ type ServerEnv struct {
 	Queue    queue.Queue
 	Fixtures *Fixtures
 	Forge    *forge_mocks.MockForge
+	// Files are the config the forge serves; Set changes it.
+	Files *Files
 	// Statuses are the commit statuses the forge took.
 	Statuses *Statuses
 	Manager  services.Manager
@@ -104,7 +106,8 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	memStore := newStore(ctx, t)
 	fixtures := seedFixtures(t, memStore)
 	statuses := newStatuses()
-	mockForge := newMockForge(t, files, statuses)
+	served := &Files{files: files}
+	mockForge := newMockForge(t, served, statuses)
 
 	mgr, err := newTestManager(memStore, mockForge)
 	require.NoError(t, err, "create services manager")
@@ -154,6 +157,7 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 		Queue:    memQueue,
 		Fixtures: fixtures,
 		Forge:    mockForge,
+		Files:    served,
 		Statuses: statuses,
 		Manager:  mgr,
 		PubSub:   ps,

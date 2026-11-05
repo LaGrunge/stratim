@@ -17,6 +17,8 @@
 package setup
 
 import (
+	"context"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -26,9 +28,29 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 )
 
+// Files are the config files the mock forge serves; a test changes them
+// between pushes with Set.
+type Files struct {
+	mu    sync.Mutex
+	files []*forge_types.FileMeta
+}
+
+// Set makes files the config the next pushes fetch; none is no config.
+func (f *Files) Set(files []*forge_types.FileMeta) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.files = files
+}
+
+func (f *Files) get() []*forge_types.FileMeta {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.files
+}
+
 // newMockForge builds a MockForge that serves the given files for any
 // config-fetch call, records status reporting, and stubs all other methods safely.
-func newMockForge(t *testing.T, files []*forge_types.FileMeta, statuses *Statuses) *forge_mocks.MockForge {
+func newMockForge(t *testing.T, files *Files, statuses *Statuses) *forge_mocks.MockForge {
 	t.Helper()
 	m := forge_mocks.NewMockForge(t)
 
@@ -42,10 +64,10 @@ func newMockForge(t *testing.T, files []*forge_types.FileMeta, statuses *Statuse
 		mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 	).Return(nil, nil).Maybe()
 
-	m.On(
-		"Dir",
-		mock.Anything, mock.Anything, mock.Anything, mock.Anything, ".woodpecker",
-	).Return(files, nil).Maybe()
+	m.EXPECT().Dir(mock.Anything, mock.Anything, mock.Anything, mock.Anything, ".woodpecker").
+		RunAndReturn(func(context.Context, *model.User, *model.Repo, *model.Pipeline, string) ([]*forge_types.FileMeta, error) {
+			return files.get(), nil
+		}).Maybe()
 
 	// Status reporting back to forge, recorded.
 	m.On(
@@ -58,6 +80,12 @@ func newMockForge(t *testing.T, files []*forge_types.FileMeta, statuses *Statuse
 		"Netrc",
 		mock.Anything, mock.Anything,
 	).Return(&model.Netrc{}, nil).Maybe()
+
+	// The head of a branch, for crons.
+	m.On(
+		"BranchHead",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+	).Return(&model.Commit{SHA: "deadbeef"}, nil).Maybe()
 
 	return m
 }

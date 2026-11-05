@@ -71,6 +71,10 @@ func Approve(ctx context.Context, store store.Store, currentPipeline *model.Pipe
 		return nil, err
 	}
 
+	// approved, the config of a push to the default branch says which crons
+	// the workflows have, unless a newer one's did already
+	currentPipeline.Errors = append(currentPipeline.Errors, reconcileCrons(ctx, store, forge, user, repo, currentPipeline, yamls)...)
+
 	if currentPipeline, err = UpdateToStatusPending(store, *currentPipeline, user.Login); err != nil {
 		return nil, fmt.Errorf("error updating pipeline. %w", err)
 	}

@@ -1,0 +1,10 @@
+crons:
+  nightly:
+    schedule: '@daily'
+    branch: dev
+
+steps:
+  - name: test
+    image: alpine
+    commands:
+      - echo test

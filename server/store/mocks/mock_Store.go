@@ -841,6 +841,78 @@ func (_c *MockStore_CreateUser_Call) RunAndReturn(run func(user *model.User) err
 	return _c
 }
 
+// CronApplyConfig provides a mock function for the type MockStore
+func (_mock *MockStore) CronApplyConfig(repo *model.Repo, pipelineID int64, plan func(existing []*model.Cron) (*model.CronPlan, error)) (bool, error) {
+	ret := _mock.Called(repo, pipelineID, plan)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CronApplyConfig")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*model.Repo, int64, func(existing []*model.Cron) (*model.CronPlan, error)) (bool, error)); ok {
+		return returnFunc(repo, pipelineID, plan)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*model.Repo, int64, func(existing []*model.Cron) (*model.CronPlan, error)) bool); ok {
+		r0 = returnFunc(repo, pipelineID, plan)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*model.Repo, int64, func(existing []*model.Cron) (*model.CronPlan, error)) error); ok {
+		r1 = returnFunc(repo, pipelineID, plan)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_CronApplyConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CronApplyConfig'
+type MockStore_CronApplyConfig_Call struct {
+	*mock.Call
+}
+
+// CronApplyConfig is a helper method to define mock.On call
+//   - repo *model.Repo
+//   - pipelineID int64
+//   - plan func(existing []*model.Cron) (*model.CronPlan, error)
+func (_e *MockStore_Expecter) CronApplyConfig(repo any, pipelineID any, plan any) *MockStore_CronApplyConfig_Call {
+	return &MockStore_CronApplyConfig_Call{Call: _e.mock.On("CronApplyConfig", repo, pipelineID, plan)}
+}
+
+func (_c *MockStore_CronApplyConfig_Call) Run(run func(repo *model.Repo, pipelineID int64, plan func(existing []*model.Cron) (*model.CronPlan, error))) *MockStore_CronApplyConfig_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.Repo
+		if args[0] != nil {
+			arg0 = args[0].(*model.Repo)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 func(existing []*model.Cron) (*model.CronPlan, error)
+		if args[2] != nil {
+			arg2 = args[2].(func(existing []*model.Cron) (*model.CronPlan, error))
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_CronApplyConfig_Call) Return(b bool, err error) *MockStore_CronApplyConfig_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockStore_CronApplyConfig_Call) RunAndReturn(run func(repo *model.Repo, pipelineID int64, plan func(existing []*model.Cron) (*model.CronPlan, error)) (bool, error)) *MockStore_CronApplyConfig_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CronCreate provides a mock function for the type MockStore
 func (_mock *MockStore) CronCreate(cron *model.Cron) error {
 	ret := _mock.Called(cron)
@@ -1215,6 +1287,63 @@ func (_c *MockStore_CronListNextExecute_Call) Return(crons []*model.Cron, err er
 }
 
 func (_c *MockStore_CronListNextExecute_Call) RunAndReturn(run func(n int64, n1 int64) ([]*model.Cron, error)) *MockStore_CronListNextExecute_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CronSetEnabled provides a mock function for the type MockStore
+func (_mock *MockStore) CronSetEnabled(repo *model.Repo, cron *model.Cron) error {
+	ret := _mock.Called(repo, cron)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CronSetEnabled")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*model.Repo, *model.Cron) error); ok {
+		r0 = returnFunc(repo, cron)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockStore_CronSetEnabled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CronSetEnabled'
+type MockStore_CronSetEnabled_Call struct {
+	*mock.Call
+}
+
+// CronSetEnabled is a helper method to define mock.On call
+//   - repo *model.Repo
+//   - cron *model.Cron
+func (_e *MockStore_Expecter) CronSetEnabled(repo any, cron any) *MockStore_CronSetEnabled_Call {
+	return &MockStore_CronSetEnabled_Call{Call: _e.mock.On("CronSetEnabled", repo, cron)}
+}
+
+func (_c *MockStore_CronSetEnabled_Call) Run(run func(repo *model.Repo, cron *model.Cron)) *MockStore_CronSetEnabled_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.Repo
+		if args[0] != nil {
+			arg0 = args[0].(*model.Repo)
+		}
+		var arg1 *model.Cron
+		if args[1] != nil {
+			arg1 = args[1].(*model.Cron)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_CronSetEnabled_Call) Return(err error) *MockStore_CronSetEnabled_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockStore_CronSetEnabled_Call) RunAndReturn(run func(repo *model.Repo, cron *model.Cron) error) *MockStore_CronSetEnabled_Call {
 	_c.Call.Return(run)
 	return _c
 }

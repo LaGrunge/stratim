@@ -77,3 +77,102 @@ func (s storage) CronGetLock(cron *model.Cron, newNextExec int64) (bool, error) 
 	}
 	return gotLock, err
 }
+
+func (s storage) CronSetEnabled(repo *model.Repo, cron *model.Cron) error {
+	// enabled, the next run was worked out from the schedule read: only
+	// while the config has not changed it since
+	cond := builder.Eq{"id": cron.ID, "repo_id": repo.ID, "managed": true}
+	cols := []string{"enabled", "creator_id"}
+	if cron.Enabled {
+		cond["schedule"], cond["timezone"] = cron.Schedule, cron.Timezone
+		cols = append(cols, "next_exec")
+	}
+	return retryWrite(func() error {
+		n, err := s.engine.Where(cond).Cols(cols...).Update(cron)
+		if err != nil {
+			return wrapUpdate(n, err)
+		}
+		if n == 0 {
+			// changed or gone, or a value as it was: tell them apart
+			if exist, err := s.engine.Where(cond).Exist(new(model.Cron)); err != nil || !exist {
+				return wrapGet(exist, err)
+			}
+		}
+		return nil
+	})
+}
+
+func (s storage) CronApplyConfig(repo *model.Repo, pipelineID int64, plan func([]*model.Cron) (*model.CronPlan, error)) (bool, error) {
+	applied := false
+	err := retryWrite(func() error {
+		applied = false
+		sess := s.engine.NewSession()
+		defer sess.Close()
+		if err := sess.Begin(); err != nil {
+			return txErr(err)
+		}
+
+		// only a newer pipeline's config: pipeline IDs, unlike their
+		// numbers, are never handed out twice. The row lock this takes
+		// keeps other applies for the repository waiting until commit.
+		n, err := sess.Table(new(model.Repo)).Where("id = ? AND (crons_from IS NULL OR crons_from < ?)", repo.ID, pipelineID).
+			Cols("crons_from").Update(map[string]any{"crons_from": pipelineID})
+		if err != nil {
+			return txErr(err)
+		}
+		if n == 0 {
+			return sess.Rollback()
+		}
+
+		var existing []*model.Cron
+		if err := sess.Where("repo_id = ?", repo.ID).Find(&existing); err != nil {
+			return txErr(err)
+		}
+		p, err := plan(existing)
+		if err != nil {
+			return err
+		}
+		for _, id := range p.Delete {
+			if _, err := sess.ID(id).Where("repo_id = ? AND managed = ?", repo.ID, true).Delete(new(model.Cron)); err != nil {
+				return txErr(err)
+			}
+		}
+		for _, c := range p.Update {
+			cols := []string{"name", "schedule", "timezone", "workflow", "branch", "variables"}
+			if p.Rescheduled[c.ID] {
+				cols = append(cols, "next_exec")
+			}
+			if _, err := sess.ID(c.ID).Where("repo_id = ? AND managed = ?", repo.ID, true).Cols(cols...).Update(c); err != nil {
+				return txErr(err)
+			}
+		}
+		for _, c := range p.Create {
+			c.ID, c.RepoID = 0, repo.ID // a try rolled back may have set the ID
+			if _, err := sess.Insert(c); err != nil {
+				return txErr(err)
+			}
+		}
+		if err := sess.Commit(); err != nil {
+			return txErr(err)
+		}
+		applied = true
+		return nil
+	})
+	return applied, err
+}
+
+// txErr marks the errors after which CronApplyConfig is tried again from
+// the start, keeping their text: a lock SQLite gave up waiting for, or a
+// cron another apply inserted first. A MariaDB deadlock retryWrite knows by
+// itself.
+func txErr(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case isErrDatabaseLocked(err):
+		return fmt.Errorf("%w: %w", types.ErrDatabaseLocked, err)
+	case errors.Is(wrapInsert(0, err), types.ErrInsertDuplicateDetected):
+		return fmt.Errorf("%w: %w", types.ErrInsertDuplicateDetected, err)
+	}
+	return err
+}

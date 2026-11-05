@@ -95,7 +95,9 @@ func (s storage) CreateRepo(repo *model.Repo) error {
 
 func (s storage) UpdateRepo(repo *model.Repo) error {
 	return retryWrite(func() error {
-		return wrapUpdate(s.engine.ID(repo.ID).AllCols().Update(repo))
+		// crons_from is CronApplyConfig's alone: a repo loaded before an
+		// apply must not write back an older one
+		return wrapUpdate(s.engine.ID(repo.ID).AllCols().Omit("crons_from").Update(repo))
 	})
 }
 
