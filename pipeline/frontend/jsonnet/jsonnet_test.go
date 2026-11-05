@@ -295,4 +295,13 @@ func TestExpandStepsByName(t *testing.T) {
 
 	_, err = Expand(files(map[string]string{"a.jsonnet": "{ x: { steps: 'no' } }"}))
 	require.ErrorContains(t, err, `workflow "x" has no steps`)
+
+	ordered, err := Expand(files(map[string]string{"a.jsonnet": "{ steps: { zz: { image: 'alpine' }, aa: { image: 'alpine' } } }"}))
+	require.NoError(t, err)
+	assert.Less(t, strings.Index(string(ordered[0].Data), `"aa"`), strings.Index(string(ordered[0].Data), `"zz"`),
+		"steps by name come out sorted, as jsonnet writes objects: a list keeps the order")
+
+	empty, err := Expand(files(map[string]string{"a.jsonnet": "{ steps: {} }"}))
+	require.NoError(t, err, "no steps at all is the linter's to report, as in YAML")
+	assert.Len(t, empty, 1)
 }

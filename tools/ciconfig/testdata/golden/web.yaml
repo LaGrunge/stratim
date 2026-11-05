@@ -1,0 +1,85 @@
+steps:
+- commands:
+  - npx get-pnpm
+  - export PNPM_HOME='/root/.local/share/pnpm'
+  - export PATH="$PNPM_HOME/bin:$PATH"
+  - pnpm install --frozen-lockfile
+  directory: web/
+  image: docker.io/node:26-alpine
+  name: install-dependencies
+  when:
+    path:
+    - .woodpecker/web.jsonnet
+    - .woodpecker/ci.libsonnet
+    - web/**
+    - server/api/**
+- commands:
+  - npx get-pnpm
+  - export PNPM_HOME='/root/.local/share/pnpm'
+  - export PATH="$PNPM_HOME/bin:$PATH"
+  - pnpm lint
+  depends_on:
+  - install-dependencies
+  directory: web/
+  image: docker.io/node:26-alpine
+  name: lint
+  when:
+    path:
+    - .woodpecker/web.jsonnet
+    - .woodpecker/ci.libsonnet
+    - web/**
+    - server/api/**
+- commands:
+  - npx get-pnpm
+  - export PNPM_HOME='/root/.local/share/pnpm'
+  - export PATH="$PNPM_HOME/bin:$PATH"
+  - pnpm format:check
+  depends_on:
+  - install-dependencies
+  directory: web/
+  image: docker.io/node:26-alpine
+  name: format-check
+  when:
+    path:
+    - .woodpecker/web.jsonnet
+    - .woodpecker/ci.libsonnet
+    - web/**
+    - server/api/**
+- commands:
+  - npx get-pnpm
+  - export PNPM_HOME='/root/.local/share/pnpm'
+  - export PATH="$PNPM_HOME/bin:$PATH"
+  - pnpm typecheck
+  depends_on:
+  - install-dependencies
+  directory: web/
+  image: docker.io/node:26-alpine
+  name: typecheck
+  when:
+    path:
+    - .woodpecker/web.jsonnet
+    - .woodpecker/ci.libsonnet
+    - web/**
+    - server/api/**
+- commands:
+  - npx get-pnpm
+  - export PNPM_HOME='/root/.local/share/pnpm'
+  - export PATH="$PNPM_HOME/bin:$PATH"
+  - pnpm test
+  depends_on:
+  - install-dependencies
+  - format-check
+  directory: web/
+  image: docker.io/node:26-alpine
+  name: test
+  when:
+    path:
+    - .woodpecker/web.jsonnet
+    - .woodpecker/ci.libsonnet
+    - web/**
+    - server/api/**
+when:
+- event: pull_request
+- branch:
+  - release/*
+  event: push

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Command synthetic-check is the last step of the synthetic pipeline
-// (.woodpecker/synthetic-*.yaml): it reads that pipeline from the Stratim API
+// (.woodpecker/synthetic.jsonnet): it reads that pipeline from the Stratim API
 // and fails when a workflow broke its budget.
 //
 // In the pipeline it takes the API from STRATIM_API_URL and STRATIM_API_TOKEN

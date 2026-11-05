@@ -1,0 +1,26 @@
+depends_on:
+- synthetic-logs
+- synthetic-parallel-a
+- synthetic-parallel-b
+- synthetic-tests
+steps:
+- commands:
+  - go run ./tools/synthetic-check -budgets .woodpecker/synthetic/budgets.json
+  environment:
+    STRATIM_API_TOKEN:
+      from_secret: stratim_api_token
+    STRATIM_API_URL:
+      from_secret: stratim_api_url
+  image: docker.io/golang:1.27
+  name: check
+when:
+- cron: synthetic
+  event: cron
+  status:
+  - success
+  - failure
+- evaluate: TASK == "synthetic"
+  event: manual
+  status:
+  - success
+  - failure

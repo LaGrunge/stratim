@@ -1,0 +1,314 @@
+services:
+- environment:
+    POSTGRES_HOST_AUTH_METHOD: trust
+    POSTGRES_USER: postgres
+  image: docker.io/postgres:18
+  name: postgres
+  ports:
+  - "5432"
+  when:
+  - event: pull_request
+    path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+- environment:
+    MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+    MARIADB_DATABASE: test
+  image: docker.io/mariadb:13.0
+  name: mariadb
+  ports:
+  - "3306"
+  when:
+  - path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+steps:
+- commands:
+  - go mod vendor
+  image: docker.io/golang:1.27
+  name: vendor
+  when:
+    path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+    - .woodpecker/**
+- commands:
+  - go run go.woodpecker-ci.org/woodpecker/v3/cmd/cli lint
+  - go test ./tools/ciconfig/
+  depends_on:
+  - vendor
+  environment:
+    WOODPECKER_DISABLE_UPDATE_CHECK: true
+    WOODPECKER_LINT_STRICT: true
+    WOODPECKER_PLUGINS_PRIVILEGED: docker.io/woodpeckerci/plugin-docker-buildx
+  image: docker.io/golang:1.27
+  name: lint-pipeline
+  when:
+  - event: pull_request
+    path:
+    - .woodpecker/**
+- commands:
+  - mkdir -p web/dist/
+  - echo "test" > web/dist/index.html
+  image: docker.io/golang:1.27
+  name: dummy-web
+  when:
+  - path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+- commands:
+  - make lint
+  depends_on:
+  - vendor
+  image: golangci/golangci-lint:v2.15.0
+  name: lint
+  when:
+  - event: pull_request
+    path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+- commands:
+  - make generate-openapi
+  - DIFF=$(git diff | head)
+  - '[ -n "$DIFF" ] && { echo "openapi not up to date, exec make generate-openapi
+    and commit"; exit 1; } || true'
+  depends_on:
+  - vendor
+  image: docker.io/golang:1.27
+  name: check-openapi
+  when:
+  - event: pull_request
+    path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+- commands:
+  - make install-addlicense
+  - bash -c 'shopt -s globstar; addlicense -check -ignore "vendor/**" -ignore cmd/server/openapi/docs.go
+    -ignore "plugins/clone/**" -ignore "plugins/s3/**" **/*.go'
+  image: docker.io/golang:1.27
+  name: lint-license-header
+  when:
+  - event: pull_request
+    path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+- commands:
+  - make test-agent
+  - make test-server
+  - make test-cli
+  - make test-lib
+  depends_on:
+  - vendor
+  image: docker.io/golang:1.27
+  name: test
+  when:
+  - path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+- commands:
+  - make test-e2e
+  depends_on:
+  - vendor
+  image: docker.io/golang:1.27
+  name: test-e2e
+  when:
+  - path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+- commands:
+  - timeout 120 bash -c 'until (exec 3<>/dev/tcp/mariadb/3306) 2>/dev/null; do sleep
+    1; done'
+  - make test-e2e E2E_TIMEOUT=600s E2E_COVERAGE_FILE=e2e-mariadb-coverage.out
+  depends_on:
+  - vendor
+  environment:
+    STRATIM_E2E_DATASOURCE: root@tcp(mariadb:3306)/e2e_test?parseTime=true
+  image: docker.io/golang:1.27
+  name: test-e2e-mariadb
+  when:
+  - path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+- commands:
+  - make fuzz
+  depends_on:
+  - vendor
+  environment:
+    FUZZ_TIME: 2s
+  image: docker.io/golang:1.27
+  name: test-fuzz
+  when:
+  - path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+- commands:
+  - make test-server-datastore
+  depends_on:
+  - vendor
+  environment:
+    WOODPECKER_DATABASE_DRIVER: sqlite3
+  failure: ignore
+  image: docker.io/golang:1.27
+  name: sqlite
+  when:
+  - path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+- commands:
+  - make test-server-datastore
+  depends_on:
+  - vendor
+  environment:
+    WOODPECKER_DATABASE_DATASOURCE: host=postgres user=postgres dbname=postgres sslmode=disable
+    WOODPECKER_DATABASE_DRIVER: postgres
+  failure: ignore
+  image: docker.io/golang:1.27
+  name: postgres
+  when:
+  - event: pull_request
+    path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+- commands:
+  - timeout 120 bash -c 'until (exec 3<>/dev/tcp/mariadb/3306) 2>/dev/null; do sleep
+    1; done'
+  - make test-server-datastore-coverage
+  - go vet -tags 'test fixturegen' ./server/store/datastore/migration/
+  depends_on:
+  - vendor
+  environment:
+    WOODPECKER_DATABASE_DATASOURCE: root@tcp(mariadb:3306)/test?parseTime=true
+    WOODPECKER_DATABASE_DRIVER: mysql
+  image: docker.io/golang:1.27
+  name: mariadb
+  when:
+  - path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+- depends_on:
+  - test
+  - mariadb
+  - test-e2e
+  - test-e2e-mariadb
+  failure: ignore
+  image: docker.io/woodpeckerci/plugin-codecov:2.3.3
+  name: codecov
+  pull: true
+  settings:
+    files:
+    - agent-coverage.out
+    - cli-coverage.out
+    - coverage.out
+    - server-coverage.out
+    - datastore-coverage.out
+    - e2e-coverage.out
+    - e2e-mariadb-coverage.out
+    token:
+      from_secret: codecov_token
+  when:
+  - path:
+    - .woodpecker/test.jsonnet
+    - .woodpecker/ci.libsonnet
+    - .golangci.yaml
+    - '**/*.go'
+    - go.*
+    - pipeline/schema/**
+    - Makefile
+    - codecov.yaml
+when:
+- event: pull_request
+- branch: ${CI_REPO_DEFAULT_BRANCH}
+  event: push
+  path:
+  - .woodpecker/test.jsonnet
+  - .woodpecker/ci.libsonnet
+  - .golangci.yaml
+  - '**/*.go'
+  - go.*
+  - pipeline/schema/**
+  - Makefile
+  - codecov.yaml

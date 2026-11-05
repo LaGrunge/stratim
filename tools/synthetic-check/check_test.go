@@ -21,12 +21,16 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml"
+	yaml_types "go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/types"
 	"go.woodpecker-ci.org/woodpecker/v3/woodpecker-go/woodpecker"
 )
 
@@ -234,49 +238,73 @@ func TestAPISource(t *testing.T) {
 	assert.True(t, Failed(Check(empty, budgets(t))), "a pipeline without workflows breaks every budget")
 }
 
-// TestSyntheticWorkflowsMatchBudgets ties the three places that name the
-// synthetic workflows together: the .woodpecker/synthetic-*.yaml files, the
-// check's depends_on and the budgets. It also keeps their triggers identical
-// and the two parallel workflows interchangeable.
+// TestSyntheticWorkflowsMatchBudgets keeps the budgets and the synthetic
+// workflows of .woodpecker/synthetic.jsonnet together, as the server renders
+// them.
 func TestSyntheticWorkflowsMatchBudgets(t *testing.T) {
-	files, err := filepath.Glob("../../.woodpecker/synthetic-*.yaml")
-	require.NoError(t, err)
-	contents := make(map[string]string, len(files))
-	var names []string
-	for _, f := range files {
-		data, err := os.ReadFile(f)
+	var configs []*jsonnet.File
+	for _, pattern := range []string{"*.jsonnet", "*.libsonnet"} {
+		matches, err := filepath.Glob(filepath.Join("../../.woodpecker", pattern))
 		require.NoError(t, err)
-		name := strings.TrimSuffix(filepath.Base(f), ".yaml")
-		contents[name] = string(data)
+		for _, m := range matches {
+			data, err := os.ReadFile(m)
+			require.NoError(t, err)
+			configs = append(configs, &jsonnet.File{Name: ".woodpecker/" + filepath.Base(m), Data: data})
+		}
+	}
+	rendered, err := jsonnet.Expand(configs)
+	require.NoError(t, err)
+
+	workflows := make(map[string]*yaml_types.Workflow)
+	raw := make(map[string]string)
+	var names []string
+	for _, f := range rendered {
+		name := jsonnet.WorkflowName(f.Name)
+		if !strings.HasPrefix(name, "synthetic-") {
+			continue
+		}
+		w, err := yaml.ParseBytes(f.Data)
+		require.NoError(t, err, name)
+		workflows[name], raw[name] = w, string(f.Data)
 		if name != "synthetic-check" {
 			names = append(names, name)
 		}
 	}
+	require.Contains(t, workflows, "synthetic-check")
 
 	var budgeted []string
 	for name := range budgets(t).Workflows {
 		budgeted = append(budgeted, name)
 	}
-	assert.ElementsMatch(t, names, budgeted, "budgets.json against .woodpecker/synthetic-*.yaml")
+	assert.ElementsMatch(t, names, budgeted, "budgets.json against the synthetic workflows")
+	var deps []string
+	for _, d := range workflows["synthetic-check"].DependsOn {
+		deps = append(deps, d.Name)
+	}
+	assert.ElementsMatch(t, names, deps, "synthetic-check depends on every other")
 
-	check := contents["synthetic-check"]
-	for _, name := range names {
-		assert.Containsf(t, check, "\n  - "+name+"\n", "synthetic-check must depend on %s", name)
+	for name, w := range workflows {
+		var cron, manual bool
+		for _, c := range w.When.Constraints {
+			cron = cron || (slices.Contains(c.Event, "cron") && slices.Equal(c.Cron.Include, []string{"synthetic"}))
+			manual = manual || (slices.Contains(c.Event, "manual") && c.Evaluate == `TASK == "synthetic"`)
+		}
+		assert.Truef(t, cron, "%s runs on the synthetic cron", name)
+		assert.Truef(t, manual, "%s runs on a manual TASK=synthetic", name)
 	}
 
-	trigger := "  - event: cron\n    cron: synthetic\n"
-	manual := "  - event: manual\n    evaluate: 'TASK == \"synthetic\"'\n"
-	for name, content := range contents {
-		assert.Containsf(t, content, trigger, "%s runs on the synthetic cron", name)
-		assert.Containsf(t, content, manual, "%s runs on a manual TASK=synthetic", name)
-	}
-
-	assert.Equal(t, contents["synthetic-parallel-a"], contents["synthetic-parallel-b"],
-		"the parallel workflows must stay identical")
+	assert.Equal(t, raw["synthetic-parallel-a"], raw["synthetic-parallel-b"], "the parallel workflows must stay identical")
 
 	for _, l := range budgets(t).Logs {
-		content := contents[l.Workflow]
-		assert.Containsf(t, content, "  - name: "+l.Step+"\n", "%s has the step %s", l.Workflow, l.Step)
-		assert.Containsf(t, content, fmt.Sprintf("LINES: '%d'", l.Lines), "%s writes the %d lines its log budget expects", l.Workflow, l.Lines)
+		w, ok := workflows[l.Workflow]
+		require.Truef(t, ok, "log budget of unknown workflow %s", l.Workflow)
+		var found bool
+		for _, step := range w.Steps.ContainerList {
+			if step.Name == l.Step {
+				found = true
+				assert.Equalf(t, fmt.Sprint(l.Lines), fmt.Sprint(step.Environment["LINES"]), "%s writes the %d lines its log budget expects", l.Workflow, l.Lines)
+			}
+		}
+		assert.Truef(t, found, "%s has the step %s", l.Workflow, l.Step)
 	}
 }

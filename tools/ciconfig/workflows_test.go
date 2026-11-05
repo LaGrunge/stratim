@@ -16,17 +16,20 @@
 package ciconfig
 
 import (
+	"flag"
 	"os"
 	"path/filepath"
-	"regexp"
+	"slices"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/yaml"
 
 	pipeline_errors "go.woodpecker-ci.org/woodpecker/v3/pipeline/errors"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/builder"
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/metadata"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/compiler"
 )
@@ -50,7 +53,7 @@ var (
 	mariadbSteps = []string{"mariadb", "test-e2e-mariadb", "codecov"}
 )
 
-var fromSecret = regexp.MustCompile(`from_secret:\s*([A-Za-z0-9_]+)`)
+var update = flag.Bool("update", false, "rewrite the golden files of the CI")
 
 // TestWorkflowsBuild builds .woodpecker/ the way the server does, for every
 // event the repository's pipelines run on, and fails on errors the server
@@ -119,12 +122,8 @@ func TestWorkflowsBuild(t *testing.T) {
 	}
 }
 
-// readConfig returns the workflow files and a placeholder for every secret
-// they read, available to every event.
-//
-// A workflow reads a secret only through from_secret, so scanning the text
-// finds them all; one it missed would fail the build as "secret not found"
-// rather than pass unnoticed.
+// readConfig returns the config files and a placeholder for every secret
+// the workflows they yield read, available to every event.
 func readConfig(t *testing.T) ([]*builder.YamlFile, []compiler.Secret) {
 	t.Helper()
 	var files []string
@@ -136,20 +135,86 @@ func readConfig(t *testing.T) ([]*builder.YamlFile, []compiler.Secret) {
 	require.NotEmpty(t, files, "no workflows in %s", configDir)
 
 	var yamls []*builder.YamlFile
-	seen := make(map[string]bool)
-	var secrets []compiler.Secret
 	for _, f := range files {
 		data, err := os.ReadFile(f)
 		require.NoError(t, err)
 		yamls = append(yamls, &builder.YamlFile{Name: filepath.Join(".woodpecker", filepath.Base(f)), Data: data})
-		for _, match := range fromSecret.FindAllSubmatch(data, -1) {
-			if name := string(match[1]); !seen[name] {
+	}
+
+	rendered, err := jsonnet.Expand(yamls)
+	require.NoError(t, err)
+	seen := make(map[string]bool)
+	var secrets []compiler.Secret
+	for _, w := range rendered {
+		var workflow any
+		require.NoError(t, yaml.Unmarshal(w.Data, &workflow), w.Name)
+		for _, name := range secretNames(workflow) {
+			if !seen[name] {
 				seen[name] = true
 				secrets = append(secrets, compiler.Secret{Name: name, Value: "placeholder"})
 			}
 		}
 	}
 	return yamls, secrets
+}
+
+// secretNames finds the secrets a workflow reads: every from_secret in it.
+func secretNames(v any) []string {
+	var names []string
+	switch x := v.(type) {
+	case map[string]any:
+		if name, ok := x["from_secret"].(string); ok {
+			names = append(names, name)
+		}
+		for _, e := range x {
+			names = append(names, secretNames(e)...)
+		}
+	case []any:
+		for _, e := range x {
+			names = append(names, secretNames(e)...)
+		}
+	}
+	return names
+}
+
+// TestCIGolden renders .woodpecker/ and compares each workflow with
+// testdata/golden/<workflow>.yaml, so that a change to the CI shows as a
+// diff of what it runs. The file names are the workflow names, which are
+// also the commit status contexts branch protection requires and what the
+// nightly log pruning matches (synthetic-%): renaming one is a visible
+// change too. Run go test -update to rewrite them.
+func TestCIGolden(t *testing.T) {
+	yamls, _ := readConfig(t)
+	rendered, err := jsonnet.Expand(yamls)
+	require.NoError(t, err)
+
+	const golden = "testdata/golden"
+	if *update {
+		require.NoError(t, os.RemoveAll(golden))
+		require.NoError(t, os.MkdirAll(golden, 0o755))
+	}
+	var names []string
+	for _, w := range rendered {
+		name := jsonnet.WorkflowName(w.Name) + ".yaml"
+		names = append(names, name)
+		got, err := yaml.JSONToYAML(w.Data)
+		require.NoError(t, err, w.Name)
+		if *update {
+			require.NoError(t, os.WriteFile(filepath.Join(golden, name), got, 0o600))
+		}
+		want, err := os.ReadFile(filepath.Join(golden, name))
+		require.NoError(t, err, "golden file of %s (go test -update writes them)", w.Name)
+		assert.Equal(t, string(want), string(got), "workflow %s", name)
+	}
+	entries, err := os.ReadDir(golden)
+	require.NoError(t, err)
+	var stale []string
+	for _, e := range entries {
+		if !slices.Contains(names, e.Name()) {
+			stale = append(stale, e.Name())
+		}
+	}
+	assert.Empty(t, stale, "golden files of workflows that no longer exist")
 }
 
 // stepNames returns the names of the steps and services of the named

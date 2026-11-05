@@ -1,0 +1,15 @@
+skip_clone: true
+steps:
+- commands:
+  - awk -v n="$LINES" 'BEGIN { for (i = 1; i <= n; i++) printf "%09d synthetic log
+    line padded to one hundred bytes ..........................................\n",
+    i }'
+  environment:
+    LINES: "3000000"
+  image: docker.io/alpine:3.24
+  name: big-log
+when:
+- cron: synthetic
+  event: cron
+- evaluate: TASK == "synthetic"
+  event: manual
