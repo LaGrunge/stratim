@@ -16,8 +16,8 @@
 //
 // A config file name.jsonnet evaluates to either
 //
-//   - one workflow, an object whose steps is a list, named after the file
-//     (name); or
+//   - one workflow, an object with steps (a list, or an object of steps by
+//     name), named after the file (name); or
 //   - an object of workflows by name: { build: {steps: [...]}, test: {...} }.
 //
 // Files ending in .libsonnet are libraries: imported, never run. A config
@@ -183,7 +183,7 @@ func split(config string, data []byte) ([]*File, error) {
 		return &File{Name: path.Join(path.Dir(config), name+".yaml"), Data: pretty.Bytes()}, nil
 	}
 
-	if isList(fields["steps"]) {
+	if areSteps(fields["steps"]) {
 		f, err := file(WorkflowName(strings.TrimSuffix(config, Ext)), data)
 		if err != nil {
 			return nil, err
@@ -205,8 +205,8 @@ func split(config string, data []byte) ([]*File, error) {
 		if err := json.Unmarshal(fields[name], &workflow); err != nil || workflow == nil {
 			return nil, fmt.Errorf("workflow %q is not an object", name)
 		}
-		if !isList(workflow["steps"]) {
-			return nil, fmt.Errorf("workflow %q has no list of steps", name)
+		if !areSteps(workflow["steps"]) {
+			return nil, fmt.Errorf("workflow %q has no steps", name)
 		}
 		f, err := file(name, fields[name])
 		if err != nil {
@@ -217,8 +217,27 @@ func split(config string, data []byte) ([]*File, error) {
 	return workflows, nil
 }
 
-func isList(v json.RawMessage) bool {
-	return len(bytes.TrimSpace(v)) > 0 && bytes.TrimSpace(v)[0] == '['
+// areSteps reports whether v is the steps of a workflow: a list of steps, or
+// an object of steps by name, none of which has steps itself (that would be
+// an object of workflows, one of them named "steps").
+func areSteps(v json.RawMessage) bool {
+	v = bytes.TrimSpace(v)
+	if len(v) == 0 {
+		return false
+	}
+	if v[0] == '[' {
+		return true
+	}
+	var byName map[string]map[string]json.RawMessage
+	if json.Unmarshal(v, &byName) != nil || byName == nil {
+		return false
+	}
+	for _, step := range byName {
+		if _, ok := step["steps"]; ok {
+			return false
+		}
+	}
+	return true
 }
 
 // duplicates reports a workflow from jsonnet that gets the same name as

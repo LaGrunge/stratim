@@ -133,7 +133,7 @@ func TestExpandErrors(t *testing.T) {
 		{name: "runtime error", files: map[string]string{"a.jsonnet": `error 'no platforms'`}, want: "no platforms"},
 		{name: "not an object", files: map[string]string{"a.jsonnet": `[1, 2]`}, want: "must evaluate to an object"},
 		{name: "workflow not an object", files: map[string]string{"a.jsonnet": `{b: 1}`}, want: `workflow "b" is not an object`},
-		{name: "workflow without steps", files: map[string]string{"a.jsonnet": `{b: {when: []}}`}, want: `workflow "b" has no list of steps`},
+		{name: "workflow without steps", files: map[string]string{"a.jsonnet": `{b: {when: []}}`}, want: `workflow "b" has no steps`},
 		{name: "steps not a list", files: map[string]string{"a.jsonnet": `{steps: 1}`}, want: `workflow "steps" is not an object`},
 		{name: "a workflow named steps", files: map[string]string{"a.jsonnet": `{steps: {steps: [` + step + `]}, b: 1}`}, want: `workflow "b" is not an object`},
 		{name: "nothing", files: map[string]string{"a.jsonnet": `{}`}, want: "declares no workflows"},
@@ -279,4 +279,20 @@ func TestExpandStopsAtTheFirstTimeout(t *testing.T) {
 	})
 	require.ErrorContains(t, err, "took longer")
 	assert.Equal(t, 1, calls, "a set of hanging configs takes one timeout")
+}
+
+func TestExpandStepsByName(t *testing.T) {
+	out, err := Expand(files(map[string]string{
+		"single.jsonnet": "{ steps: { build: { image: 'alpine' }, test: { image: 'alpine' } } }",
+		"many.jsonnet":   "{ x: { steps: { build: { image: 'alpine' } } }, y: { steps: [{ name: 'a', image: 'alpine' }] } }",
+	}))
+	require.NoError(t, err)
+	var names []string
+	for _, f := range out {
+		names = append(names, WorkflowName(f.Name))
+	}
+	assert.ElementsMatch(t, []string{"single", "x", "y"}, names, "steps by name, as YAML allows, in either form")
+
+	_, err = Expand(files(map[string]string{"a.jsonnet": "{ x: { steps: 'no' } }"}))
+	require.ErrorContains(t, err, `workflow "x" has no steps`)
 }
