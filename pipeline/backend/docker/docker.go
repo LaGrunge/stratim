@@ -27,7 +27,7 @@ import (
 	"github.com/cenkalti/backoff/v7"
 	"github.com/containerd/errdefs"
 	"github.com/docker/go-connections/tlsconfig"
-	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/api/types/system"
 	"github.com/moby/moby/client"
@@ -52,6 +52,9 @@ type docker struct {
 	client client.APIClient
 	info   system.Info
 	config config
+
+	attached  attachments   // see logs.go
+	exitGrace time.Duration // zero: defaultExitGrace
 }
 
 const (
@@ -275,8 +278,22 @@ func (e *docker) StartStep(ctx context.Context, step *backend_types.Step, taskUU
 		}
 	}
 
-	_, err = e.client.ContainerStart(ctx, containerName, client.ContainerStartOptions{})
-	return err
+	// attach before starting, so no output is missed (see logs.go)
+	attach, err := e.client.ContainerAttach(ctx, containerName, client.ContainerAttachOptions{
+		Stream: true,
+		Stdout: true,
+		Stderr: true,
+	})
+	if err != nil {
+		return fmt.Errorf("could not attach to container '%s': %w", step.Name, err)
+	}
+	e.attached.put(step.UUID, attach)
+
+	if _, err := e.client.ContainerStart(ctx, containerName, client.ContainerStartOptions{}); err != nil {
+		e.attached.drop(step.UUID)
+		return err
+	}
+	return nil
 }
 
 func (e *docker) WaitStep(ctx context.Context, step *backend_types.Step, taskUUID string) (*backend_types.State, error) {
@@ -320,7 +337,15 @@ func (e *docker) WaitStep(ctx context.Context, step *backend_types.Step, taskUUI
 func (e *docker) TailStep(ctx context.Context, step *backend_types.Step, taskUUID string) (io.ReadCloser, error) {
 	log.Trace().Str("taskUUID", taskUUID).Msgf("tail logs of step %s", step.Name)
 
-	logs, err := e.client.ContainerLogs(ctx, toContainerName(step), client.ContainerLogsOptions{
+	containerName := toContainerName(step)
+	if attach, ok := e.attached.take(step.UUID); ok {
+		return mergeStreams(ctx, attach.Reader, attach.Close, func() bool { return e.stillRunning(ctx, containerName) }), nil
+	}
+
+	// Only a step this backend did not start, or one tailed twice, has no
+	// attached stream. The log file it falls back to can skip output.
+	log.Warn().Str("taskUUID", taskUUID).Msgf("step %s has no attached output stream: reading its log file, which may skip output", step.Name)
+	logs, err := e.client.ContainerLogs(ctx, containerName, client.ContainerLogsOptions{
 		Follow:     true,
 		ShowStdout: true,
 		ShowStderr: true,
@@ -330,15 +355,29 @@ func (e *docker) TailStep(ctx context.Context, step *backend_types.Step, taskUUI
 	if err != nil {
 		return nil, err
 	}
-	rc, wc := io.Pipe()
+	return mergeStreams(ctx, logs, func() { _ = logs.Close() }, nil), nil
+}
 
-	// de multiplex 'logs' who contains two streams, previously multiplexed together using StdWriter
-	go func() {
-		_, _ = stdcopy.StdCopy(wc, wc, logs)
-		_ = logs.Close()
-		_ = wc.Close()
-	}()
-	return rc, nil
+// stillRunning reports whether the container keeps running for the exit grace
+// after its output stream ended. A step canceled meanwhile does not count.
+func (e *docker) stillRunning(ctx context.Context, containerName string) bool {
+	grace := e.exitGrace
+	if grace == 0 {
+		grace = defaultExitGrace
+	}
+	waitCtx, cancel := context.WithTimeout(ctx, grace)
+	defer cancel()
+	wait := e.client.ContainerWait(waitCtx, containerName, client.ContainerWaitOptions{Condition: container.WaitConditionNotRunning})
+	select {
+	case <-wait.Result:
+		return false
+	case err := <-wait.Error:
+		// the wait gave up: on its deadline, still running; on any other
+		// error, unknown, so no note
+		return ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded)
+	case <-waitCtx.Done():
+		return ctx.Err() == nil
+	}
 }
 
 func (e *docker) DestroyStep(ctx context.Context, step *backend_types.Step, taskUUID string) error {
@@ -346,6 +385,9 @@ func (e *docker) DestroyStep(ctx context.Context, step *backend_types.Step, task
 
 	containerName := toContainerName(step)
 	var stopErr error
+
+	// a step that failed before TailStep took its output stream
+	e.attached.drop(step.UUID)
 
 	// we first signal to the container to stop ...
 	if _, err := e.client.ContainerStop(ctx, containerName, client.ContainerStopOptions{
