@@ -36,6 +36,8 @@ steps:
     image: *golang_image
     commands:
       - go run go.woodpecker-ci.org/woodpecker/v3/cmd/cli lint
+      # builds .woodpecker/ as the server would, for every event
+      - go test ./tools/ciconfig/
     environment:
       WOODPECKER_DISABLE_UPDATE_CHECK: true
       WOODPECKER_LINT_STRICT: true
@@ -114,8 +116,9 @@ steps:
     commands:
       - timeout 120 bash -c 'until (exec 3<>/dev/tcp/mariadb/3306) 2>/dev/null; do sleep 1; done'
       - make test-e2e E2E_TIMEOUT=600s E2E_COVERAGE_FILE=e2e-mariadb-coverage.out
-    # like the mariadb service it needs: pull requests only
-    when: *when
+    # same conditions as the mariadb service it needs
+    when:
+      - path: *when_path
 
   test-fuzz:
     depends_on:
@@ -169,7 +172,10 @@ steps:
       - make test-server-datastore-coverage
       # the fixture generator runs only by hand; keep it compiling
       - go vet -tags 'test fixturegen' ./server/store/datastore/migration/
-    when: *when
+    # MariaDB is the database Stratim runs on, so unlike postgres it is tested
+    # on pushes to main too; codecov depends on it.
+    when:
+      - path: *when_path
 
   codecov:
     depends_on:
@@ -209,4 +215,5 @@ services:
     environment:
       MARIADB_DATABASE: test
       MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
-    when: *when
+    when:
+      - path: *when_path
