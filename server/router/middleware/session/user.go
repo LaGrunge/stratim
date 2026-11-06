@@ -22,6 +22,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server"
+	"go.woodpecker-ci.org/woodpecker/v3/server/bottoken"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/token"
@@ -41,6 +42,12 @@ func User(c *gin.Context) *model.User {
 
 func SetUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// a bot token is the only credential of a request that carries one
+		if raw, found, err := bottoken.FromRequest(c.Request); found {
+			setBotUser(c, raw, err)
+			return
+		}
+
 		var user *model.User
 
 		t, err := token.ParseRequest([]token.Type{token.UserToken, token.SessToken}, c.Request, func(t *token.Token) (string, error) {

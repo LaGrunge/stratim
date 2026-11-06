@@ -255,6 +255,30 @@ type Store interface {
 	// canceledBefore (unix seconds, their finished), their steps with them.
 	WorkflowsLeftInCanceledPipelines(canceledBefore int64, limit int) ([]*model.Workflow, error)
 
+	// BotToken
+	// BotTokenCreate stores a new bot token unless its owner has maxActive
+	// active ones at now (unix seconds): types.ErrBotTokenLimit then.
+	BotTokenCreate(token *model.BotToken, maxActive int, now int64) error
+	BotTokenGet(int64) (*model.BotToken, error)
+	// BotTokenFindByHash gets the bot token whose secret has the hash.
+	BotTokenFindByHash(hash string) (*model.BotToken, error)
+	// BotTokenList lists the bot tokens of a user, of all users when
+	// ownerID is 0, newest first.
+	BotTokenList(ownerID int64, p *model.ListOptionsWithAll) ([]*model.BotToken, error)
+	// BotTokenRevoke revokes a bot token at (unix seconds) unless it is
+	// already, and reports whether it did.
+	BotTokenRevoke(id, at int64) (bool, error)
+	// BotTokenTouch records a use of a bot token at (unix seconds) unless
+	// a later one is.
+	BotTokenTouch(id, at int64) error
+	BotTokenCallAppend(*model.BotTokenCall) error
+	// BotTokenCallList lists the latest calls of a bot token, newest
+	// first.
+	BotTokenCallList(tokenID int64, limit int) ([]*model.BotTokenCall, error)
+	// BotTokenCallPurge deletes the calls made before (unix seconds), a
+	// batch at a time.
+	BotTokenCallPurge(before int64) (int64, error)
+
 	// ForgeStatus
 	ForgeStatusSet(*model.ForgeStatus) error
 	ForgeStatusCandidates(since, before int64, limit int) ([]*model.ForgeStatusCandidate, error)

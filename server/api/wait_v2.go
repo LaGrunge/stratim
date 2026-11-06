@@ -166,13 +166,17 @@ func waitPipeline(c *gin.Context, hub *events.Hub, durations *summary.Durations,
 	}
 
 	w := &waiter{store: store.FromContext(c), durations: durations, loads: loads, id: id, until: until}
-	w.access = newRepoAccess(w.store, session.User(c))
+	w.access = newRepoAccess(w.store, session.PrincipalOf(c))
 	pipeline, err := w.store.GetPipeline(id)
 	if err != nil {
 		return notFoundOr(err)
 	}
 	if w.repo, err = w.access.findRepo(strconv.FormatInt(pipeline.RepoID, 10)); err != nil {
 		return err
+	}
+	if bot := session.Bot(c); bot != nil {
+		// a wait ends by the time its bot token expires
+		timeout = max(min(timeout, time.Until(time.Unix(bot.Expires, 0))), 0)
 	}
 
 	// subscribed before the pipeline is read, no change after it is missed

@@ -330,6 +330,11 @@ const routes: RouteRecordRaw[] = [
         component: (): Component => import('~/views/user/UserCLIAndAPI.vue'),
       },
       {
+        path: 'bot-tokens',
+        name: 'user-bot-tokens',
+        component: (): Component => import('~/views/user/UserBotTokens.vue'),
+      },
+      {
         path: 'agents',
         name: 'user-agents',
         component: (): Component => import('~/views/user/UserAgents.vue'),

@@ -25,9 +25,12 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 )
 
+// Refresh refreshes the forge token of the user of the request, when it
+// is about to expire. A request made with a bot token has the owner as the
+// token acts, which is not stored: it refreshes nothing.
 func Refresh(c *gin.Context) {
 	user := session.User(c)
-	if user != nil {
+	if user != nil && session.Bot(c) == nil {
 		_forge, err := server.Config.Services.Manager.ForgeFromUser(user)
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)

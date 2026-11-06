@@ -77,6 +77,10 @@ type User struct {
 
 	// OrgID is the of the user as model.Org.
 	OrgID int64 `json:"org_id" xorm:"org_id"`
+
+	// ActsForBot marks the copy of a user a bot token acts as, never an
+	// admin: the store refuses to write it.
+	ActsForBot bool `json:"-" xorm:"-"`
 } //	@name	User
 
 // TableName return database table name for xorm.

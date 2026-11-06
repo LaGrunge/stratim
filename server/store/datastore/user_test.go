@@ -24,7 +24,7 @@ import (
 )
 
 func TestUsers(t *testing.T) {
-	store, closer := newTestStore(t, new(model.User), new(model.Org), new(model.Secret), new(model.Repo), new(model.Perm))
+	store, closer := newTestStore(t, new(model.User), new(model.Org), new(model.Secret), new(model.Repo), new(model.Perm), new(model.BotToken))
 	defer closer()
 
 	count, err := store.GetUserCount()
@@ -139,4 +139,19 @@ func TestCreateUserWithExistingOrg(t *testing.T) {
 	newOrg, err := store.OrgFindByName("new-user", 1)
 	assert.NoError(t, err)
 	assert.Equal(t, "new-user", newOrg.Name)
+}
+
+// The copy of a user a bot token acts as is never stored.
+func TestUpdateUserRefusesTheCopyOfABot(t *testing.T) {
+	store, closer := newTestStore(t, new(model.User), new(model.Org))
+	defer closer()
+
+	user := &model.User{Login: "admin", ForgeRemoteID: "1", Hash: "h", Admin: true}
+	assert.NoError(t, store.CreateUser(user))
+	copied := *user
+	copied.Admin, copied.ActsForBot = false, true
+	assert.Error(t, store.UpdateUser(&copied))
+	got, err := store.GetUser(user.ID)
+	assert.NoError(t, err)
+	assert.True(t, got.Admin)
 }

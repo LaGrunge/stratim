@@ -80,7 +80,14 @@ func (s storage) CreateUser(user *model.User) error {
 	return wrapInsert(sess.Insert(user))
 }
 
+// errBotCopy is the copy of a user a bot token acts as, which is not
+// stored: it is not an admin even when the user is.
+var errBotCopy = errors.New("the user a bot token acts as is not stored")
+
 func (s storage) UpdateUser(user *model.User) error {
+	if user.ActsForBot {
+		return errBotCopy
+	}
 	return retryWrite(func() error {
 		return wrapUpdate(s.engine.ID(user.ID).AllCols().Update(user))
 	})
@@ -104,6 +111,10 @@ func (s storage) DeleteUser(user *model.User) error {
 
 		if _, err := sess.Where("user_id = ?", user.ID).Delete(new(model.Perm)); err != nil {
 			return fmt.Errorf("failed to delete perms: %w", err)
+		}
+
+		if _, err := sess.Where("owner_id = ?", user.ID).Delete(new(model.BotToken)); err != nil {
+			return fmt.Errorf("failed to delete bot tokens: %w", err)
 		}
 
 		return sess.Commit()

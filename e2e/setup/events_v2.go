@@ -21,9 +21,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -45,6 +47,13 @@ type SSEFrame struct {
 // EventsV2Stream reads a stream of /api/v2/events.
 type EventsV2Stream struct {
 	frames chan SSEFrame
+	close  func()
+	once   sync.Once
+}
+
+// Close ends the stream from the client's side; the test does at its end.
+func (s *EventsV2Stream) Close() {
+	s.once.Do(s.close)
 }
 
 // eventsV2URL serves /api/v2 of the test server over HTTP, once, to the
@@ -111,12 +120,26 @@ func (env *ServerEnv) GetV2(t *testing.T, path string, out any) {
 // the test.
 func (env *ServerEnv) StreamEventsV2(t *testing.T, query, lastEventID string) *EventsV2Stream {
 	t.Helper()
-	ctx, cancel := context.WithCancelCause(t.Context())
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, env.eventsV2URL(t)+"/api/v2/events?"+query, nil)
-	require.NoError(t, err)
+	header := http.Header{}
 	if lastEventID != "" {
-		req.Header.Set("Last-Event-ID", lastEventID)
+		header.Set("Last-Event-ID", lastEventID)
 	}
+	return streamEventsV2(t, env.eventsV2URL(t)+"/api/v2/events?"+query, header)
+}
+
+// StreamEventsV2Bot opens a stream of /api/v2/events of APIURL with the
+// query and the bot token, as StreamEventsV2 does.
+func (env *ServerEnv) StreamEventsV2Bot(t *testing.T, query, secret string) *EventsV2Stream {
+	t.Helper()
+	return streamEventsV2(t, env.APIURL(t)+"/api/v2/events?"+query, http.Header{woodpecker.BotTokenHeader: {secret}})
+}
+
+func streamEventsV2(t *testing.T, url string, header http.Header) *EventsV2Stream {
+	t.Helper()
+	ctx, cancel := context.WithCancelCause(t.Context())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	maps.Copy(req.Header, header)
 	resp, err := http.DefaultClient.Do(req) //nolint:bodyclose // closed with the test
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "open the event stream")
@@ -150,11 +173,12 @@ func (env *ServerEnv) StreamEventsV2(t *testing.T, query, lastEventID string) *E
 			}
 		}
 	}()
-	t.Cleanup(func() {
+	s.close = func() {
 		cancel(nil)
 		resp.Body.Close()
 		<-done
-	})
+	}
+	t.Cleanup(s.Close)
 
 	hello := s.Next(t, shortTimeout)
 	require.Equal(t, "hello", hello.Event, "the stream starts with hello")

@@ -112,6 +112,27 @@ type Client interface {
 	// follows one across reconnects.
 	PipelineEvents(ctx context.Context, opt PipelineEventsOptions) (EventsFrameReader, error)
 
+	// PipelineRestart restarts the pipeline with the id over /api/v2, which
+	// a bot token with the restart scope may call.
+	PipelineRestart(pipelineID int64, opt PipelineRestartOptions) (*Pipeline, error)
+
+	// Whoami tells who the requests of the client are made by: the user, and
+	// the bot token if any.
+	Whoami() (*Whoami, error)
+
+	// BotTokenList lists the bot tokens of the user.
+	BotTokenList() ([]*BotToken, error)
+
+	// BotTokenCreate creates a bot token of the user; the result carries its
+	// secret, which the server never tells again.
+	BotTokenCreate(opt BotTokenCreateOptions) (*BotTokenCreated, error)
+
+	// BotTokenRevoke revokes a bot token.
+	BotTokenRevoke(id int64) error
+
+	// BotTokenCalls lists the latest calls made with a bot token.
+	BotTokenCalls(id int64, limit int) ([]*BotTokenCall, error)
+
 	// PipelineStop stops the given pipeline.
 	PipelineStop(repoID, pipeline int64) error
 

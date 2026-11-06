@@ -702,7 +702,7 @@ func PostPipeline(c *gin.Context) {
 		}
 	}
 
-	restartPipeline(c, req, pipeline.Restart)
+	restartPipeline(c, session.Repo(c), session.Pipeline(c), req, pipeline.Restart)
 }
 
 // PostPipelineRestartFailed
@@ -725,7 +725,7 @@ func PostPipelineRestartFailed(c *gin.Context) {
 			return
 		}
 	}
-	restartPipeline(c, restartRequest{envs: restartEnvs(c)}, pipeline.RestartFailed)
+	restartPipeline(c, session.Repo(c), session.Pipeline(c), restartRequest{envs: restartEnvs(c)}, pipeline.RestartFailed)
 }
 
 // restartRequest is what a restart endpoint read from its request.
@@ -765,10 +765,10 @@ func restartEnvs(c *gin.Context) map[string]string {
 
 type restartFunc func(ctx context.Context, store store.Store, lastPipeline *model.Pipeline, user *model.User, repo *model.Repo, envs map[string]string) (*model.Pipeline, error)
 
-func restartPipeline(c *gin.Context, req restartRequest, restart restartFunc) {
+// restartPipeline restarts the pipeline pl of the repo as req says, with
+// the forge access of the repo's owner, and answers with the new pipeline.
+func restartPipeline(c *gin.Context, repo *model.Repo, pl *model.Pipeline, req restartRequest, restart restartFunc) {
 	_store := store.FromContext(c)
-	repo := session.Repo(c)
-	pl := session.Pipeline(c)
 
 	user, err := _store.GetUser(repo.UserID)
 	if err != nil {

@@ -30,8 +30,15 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/woodpecker-go/woodpecker"
 )
 
+// Client is what the autoscaler asks of the server: the queue, and the
+// agents it runs.
 type Client interface {
-	woodpecker.Client
+	QueueInfo() (*woodpecker.Info, error)
+	AgentListWithOpts(opt woodpecker.AgentListOptions) ([]*woodpecker.Agent, error)
+	AgentCreate(*woodpecker.Agent) (*woodpecker.Agent, error)
+	AgentUpdate(*woodpecker.Agent) (*woodpecker.Agent, error)
+	AgentDelete(int64) error
+	AgentTasksList(int64) ([]*woodpecker.Task, error)
 }
 
 // NewClient returns a new client from the CLI context.

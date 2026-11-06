@@ -99,6 +99,10 @@ func NewClient(ctx context.Context, c *cli.Command) (woodpecker.Client, error) {
 	// Wrap the base transport with User-Agent support
 	trans.Base = httputil.NewUserAgentRoundTripper(baseTransport, "cli")
 
+	if woodpecker.IsBotToken(token) {
+		// a bot token goes in its own header, not as a Bearer token
+		return woodpecker.NewClient(server, &http.Client{Transport: woodpecker.NewBotTokenTransport(token, trans.Base)}), nil
+	}
 	return woodpecker.NewClient(server, client), nil
 }
 
