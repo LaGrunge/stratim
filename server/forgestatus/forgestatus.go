@@ -146,6 +146,10 @@ type Sender struct {
 	resendAt  time.Time      // when the next request of a resent status may go
 	page      int            // candidates read at once
 	wg        sync.WaitGroup // senders, for tests
+
+	// paced, for tests, learns the turn of each request of a resent status
+	// as the request goes; it is set before the first mark.
+	paced func(turn time.Time)
 }
 
 // marks are the workflows of one pipeline to sync.
@@ -346,39 +350,42 @@ func (f *failure) expired(window time.Duration) bool { return time.Since(f.since
 // stopped before a slot was free. Resent statuses have a slot of their own
 // and give way to the statuses of the moment.
 func (s *Sender) syncInSlot(p *pipelineSync, todo *marks) (retry *marks, after time.Duration, ok bool) {
-	release, ok := s.acquire(p.id, todo)
+	release, turn, ok := s.acquire(p.id, todo)
 	if !ok {
 		return newMarks(), 0, false
 	}
 	defer release()
-	retry, after = s.sync(p, todo)
+	retry, after = s.sync(p, todo, turn)
 	return retry, after, true
 }
 
-func (s *Sender) acquire(pipelineID int64, todo *marks) (release func(), ok bool) {
+// acquire takes a slot for todo; for resent statuses it also waits for the
+// turn of their first request, and returns it.
+func (s *Sender) acquire(pipelineID int64, todo *marks) (release func(), turn time.Time, ok bool) {
 	for todo.resend {
 		select {
 		case s.resendSlot <- struct{}{}:
-			if !s.paceResend() {
+			turn, ok = s.paceResend()
+			if !ok {
 				<-s.resendSlot
-				return nil, false
+				return nil, time.Time{}, false
 			}
 			s.takeLive(pipelineID, todo)
 			if todo.resend {
-				return func() { <-s.resendSlot }, true
+				return func() { <-s.resendSlot }, turn, true
 			}
 			<-s.resendSlot // live now: it goes in a slot of the senders
 		case <-s.ctx.Done():
-			return nil, false
+			return nil, time.Time{}, false
 		case <-time.After(s.policy.FirstWait):
 			s.takeLive(pipelineID, todo) // a live mark does not wait for the resent ones
 		}
 	}
 	select {
 	case s.slots <- struct{}{}:
-		return func() { <-s.slots }, true
+		return func() { <-s.slots }, time.Time{}, true
 	case <-s.ctx.Done():
-		return nil, false
+		return nil, time.Time{}, false
 	}
 }
 
@@ -417,7 +424,8 @@ func refusedForAuth(err error) bool {
 
 // sync sends the statuses of the marked workflows of the pipeline. It
 // returns the workflows to try again, and how long a forge asked to wait.
-func (s *Sender) sync(p *pipelineSync, todo *marks) (*marks, time.Duration) {
+// For resent statuses, turn is the turn of the first request.
+func (s *Sender) sync(p *pipelineSync, todo *marks, turn time.Time) (*marks, time.Duration) {
 	retry := newMarks()
 	retry.resend = todo.resend
 	l, err := s.load(p.id)
@@ -458,10 +466,16 @@ func (s *Sender) sync(p *pipelineSync, todo *marks) (*marks, time.Duration) {
 
 		// each request of resent statuses waits its turn; acquire waited
 		// for the first
-		if todo.resend && requested && !s.paceResend() {
-			return newMarks(), 0 // the server stops
+		if todo.resend && requested {
+			var ok bool
+			if turn, ok = s.paceResend(); !ok {
+				return newMarks(), 0 // the server stops
+			}
 		}
 		requested = true
+		if todo.resend && s.paced != nil {
+			s.paced(turn)
+		}
 		ctx, cancel := context.WithTimeout(s.ctx, s.policy.Attempt)
 		err := l.forge.Status(ctx, l.user, l.repo, l.pipeline, w)
 		cancel()

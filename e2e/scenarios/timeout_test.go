@@ -111,8 +111,7 @@ steps:
 	assert.Equal(t, model.StatusFailure, setup.WaitForStep(t, env.Store, finished, "fails").State)
 	assert.Equal(t, model.StatusSkipped,
 		setup.WaitForStepStatus(t, env.Store, finished, "on-success", model.StatusSkipped, 30*time.Second).State)
-	workflows, err := env.Store.WorkflowGetTree(finished)
-	require.NoError(t, err)
+	workflows := setup.WaitForWorkflowsDone(t, env.Store, finished)
 	require.Len(t, workflows, 1)
 	assert.Equal(t, model.StatusTimeout, workflows[0].State)
 }
@@ -181,8 +180,7 @@ steps:
 
 	step := setup.WaitForStepStatus(t, env.Store, finished, "too-long", model.StatusTimeout, 30*time.Second)
 	assert.Equal(t, model.StatusTimeout, step.State)
-	workflows, err := env.Store.WorkflowGetTree(finished)
-	require.NoError(t, err)
+	workflows := setup.WaitForWorkflowsDone(t, env.Store, finished)
 	require.Len(t, workflows, 1)
 	assert.Equal(t, model.StatusTimeout, workflows[0].State)
 }
@@ -252,8 +250,7 @@ steps:
 	assert.Equal(t, model.StatusTimeout, setup.WaitForStep(t, env.Store, finished, "too-long").State)
 	assert.Equal(t, model.StatusCanceled,
 		setup.WaitForStepStatus(t, env.Store, finished, "on-failure", model.StatusCanceled, 30*time.Second).State)
-	workflows, err := env.Store.WorkflowGetTree(finished)
-	require.NoError(t, err)
+	workflows := setup.WaitForWorkflowsDone(t, env.Store, finished)
 	require.Len(t, workflows, 1)
 	assert.Equal(t, model.StatusKilled, workflows[0].State)
 }
@@ -299,8 +296,7 @@ steps:
 	finished := setup.WaitForPipeline(t, env.Store, created.ID)
 
 	assert.Equal(t, model.StatusTimeout, finished.Status)
-	workflows, err := env.Store.WorkflowGetTree(finished)
-	require.NoError(t, err)
+	workflows := setup.WaitForWorkflowsDone(t, env.Store, finished)
 	byName := make(map[string]model.StatusValue, len(workflows))
 	for _, w := range workflows {
 		byName[w.Name] = w.State

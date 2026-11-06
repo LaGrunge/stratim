@@ -939,12 +939,43 @@ func TestResendRetriesPaced(t *testing.T) {
 	policy := fastPolicy
 	policy.ResendEvery = 30 * time.Millisecond
 	s, st, ff := newTestSender(t, policy, errDown, errDown, errDown)
+	turns := recordTurns(s)
 	st.set(1, model.StatusSuccess, model.StatusSuccess)
 	resentMark(s, 1, 100)
 	idle(t, s)
 	require.Len(t, ff.reqTime, 4)
-	for i := 1; i < len(ff.reqTime); i++ {
-		assert.GreaterOrEqual(t, ff.reqTime[i].Sub(ff.reqTime[i-1]), policy.ResendEvery-5*time.Millisecond)
+	assertPaced(t, policy.ResendEvery, turns(), ff.reqTime)
+}
+
+// recordTurns records the turns the sender gives the requests of resent
+// statuses; it returns them.
+func recordTurns(s *Sender) func() []time.Time {
+	var mu sync.Mutex
+	var turns []time.Time
+	s.paced = func(at time.Time) {
+		mu.Lock()
+		defer mu.Unlock()
+		turns = append(turns, at)
+	}
+	return func() []time.Time {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]time.Time(nil), turns...)
+	}
+}
+
+// assertPaced checks that the requests got turns every pace at least, and
+// that none went before its turn. The turns, not the requests, are compared:
+// a request may go a little after its turn on a busy machine, and the next
+// one on its own turn, which is the pace wanted.
+func assertPaced(t *testing.T, pace time.Duration, turns, requests []time.Time) {
+	t.Helper()
+	require.Len(t, turns, len(requests), "a turn for each request")
+	for i := range requests {
+		assert.False(t, requests[i].Before(turns[i]), "request %d before its turn", i)
+		if i > 0 {
+			assert.GreaterOrEqual(t, turns[i].Sub(turns[i-1]), pace, "turn %d", i)
+		}
 	}
 }
 
@@ -961,15 +992,14 @@ func TestResendOfAPipelinePaced(t *testing.T) {
 	policy := fastPolicy
 	policy.ResendEvery = 30 * time.Millisecond
 	s, st, ff := newTestSender(t, policy, nil, errDown)
+	turns := recordTurns(s)
 	st.set(1, model.StatusSuccess, model.StatusSuccess, model.StatusSuccess, model.StatusSuccess)
 	for id := int64(100); id <= 102; id++ {
 		resentMark(s, 1, id)
 	}
 	idle(t, s)
 	require.Len(t, ff.reqTime, 4, "three, one of them again")
-	for i := 1; i < len(ff.reqTime); i++ {
-		assert.GreaterOrEqual(t, ff.reqTime[i].Sub(ff.reqTime[i-1]), policy.ResendEvery-5*time.Millisecond)
-	}
+	assertPaced(t, policy.ResendEvery, turns(), ff.reqTime)
 	assert.Equal(t, resendCounts{queued: 3, taken: 3}, s.resent)
 }
 
