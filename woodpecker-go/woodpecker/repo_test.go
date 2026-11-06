@@ -16,12 +16,14 @@ package woodpecker
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPipelineList(t *testing.T) {
@@ -455,4 +457,40 @@ func TestClientRepoMove(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestClientStepLogDownload(t *testing.T) {
+	tests := []struct {
+		opt   StepLogDownloadOptions
+		query string
+	}{
+		{StepLogDownloadOptions{}, ""},
+		{StepLogDownloadOptions{LineNumbers: true}, "?line_numbers=true"},
+		{StepLogDownloadOptions{Raw: true}, "?raw=true"},
+		{StepLogDownloadOptions{LineNumbers: true, Raw: true}, "?line_numbers=true&raw=true"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.query, func(t *testing.T) {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodGet, r.Method)
+				assert.Equal(t, "/api/repos/1/logs/2/3/download"+tt.query, r.URL.RequestURI())
+				_, _ = fmt.Fprint(w, "plain\n")
+			}))
+			defer ts.Close()
+
+			body, err := NewClient(ts.URL, http.DefaultClient).StepLogDownload(1, 2, 3, tt.opt)
+			require.NoError(t, err)
+			defer body.Close()
+			data, err := io.ReadAll(body)
+			require.NoError(t, err)
+			assert.Equal(t, "plain\n", string(data))
+		})
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+	_, err := NewClient(ts.URL, http.DefaultClient).StepLogDownload(1, 2, 3, StepLogDownloadOptions{})
+	assert.Error(t, err)
 }

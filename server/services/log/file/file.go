@@ -16,9 +16,11 @@ package file
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,36 +58,68 @@ func (l logStore) filePath(id int64) string {
 	return filepath.Join(l.base, fmt.Sprintf("%d.json", id))
 }
 
-func (l logStore) LogFind(_ context.Context, step *model.Step) ([]*model.LogEntry, error) {
+func (l logStore) LogFind(ctx context.Context, step *model.Step) ([]*model.LogEntry, error) {
+	var entries []*model.LogEntry
+	err := l.LogStream(ctx, step, func(entry *model.LogEntry) error {
+		entries = append(entries, entry)
+		return nil
+	})
+	return entries, err
+}
+
+// LogStream decodes the step's log file line by line, one entry in memory at a
+// time. It reads the file as long as it was when opened, and a last record
+// without its newline is still being written by LogAppend, so it is left out.
+func (l logStore) LogStream(ctx context.Context, step *model.Step, fn func(*model.LogEntry) error) error {
 	filename := l.filePath(step.ID)
 	file, err := os.Open(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return nil
 		}
-		return nil, err
+		return err
 	}
 	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
 
 	buf := make([]byte, 0, bufio.MaxScanTokenSize)
-	s := bufio.NewScanner(file)
+	s := bufio.NewScanner(io.LimitReader(file, info.Size()))
 	s.Buffer(buf, maxLineLength)
+	s.Split(scanWrittenLines)
 
-	var entries []*model.LogEntry
 	for s.Scan() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		j := s.Text()
 		if len(strings.TrimSpace(j)) == 0 {
 			continue
 		}
 		entry := &model.LogEntry{}
-		err = json.Unmarshal([]byte(j), entry)
-		if err != nil {
-			return nil, err
+		if err := json.Unmarshal([]byte(j), entry); err != nil {
+			return err
 		}
-		entries = append(entries, entry)
+		if err := fn(entry); err != nil {
+			return err
+		}
 	}
 
-	return entries, nil
+	return s.Err()
+}
+
+// scanWrittenLines is bufio.ScanLines without the final line that lacks its newline.
+func scanWrittenLines(data []byte, atEOF bool) (int, []byte, error) {
+	if i := bytes.IndexByte(data, '\n'); i >= 0 {
+		return i + 1, data[:i], nil
+	}
+	if atEOF {
+		// a partial record: stop without a token
+		return len(data), nil, nil
+	}
+	return 0, nil, nil
 }
 
 func (l logStore) LogAppend(_ context.Context, step *model.Step, logEntries []*model.LogEntry) error {
@@ -97,18 +131,18 @@ func (l logStore) LogAppend(_ context.Context, step *model.Step, logEntries []*m
 		return err
 	}
 
-	var bytes []byte
+	var data []byte
 
 	for _, logEntry := range logEntries {
 		if jsonLine, err := json.Marshal(logEntry); err == nil {
-			bytes = append(bytes, jsonLine...)
-			bytes = append(bytes, byte('\n'))
+			data = append(data, jsonLine...)
+			data = append(data, byte('\n'))
 		} else {
 			log.Error().Err(err).Msg("could not convert log entry to JSON")
 		}
 	}
 
-	if _, err = file.Write(bytes); err != nil {
+	if _, err = file.Write(data); err != nil {
 		log.Error().Err(err).Msg("could not write out log entries")
 	}
 

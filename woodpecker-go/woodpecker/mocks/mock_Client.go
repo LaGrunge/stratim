@@ -5,6 +5,7 @@
 package mocks
 
 import (
+	"io"
 	"net/http"
 
 	mock "github.com/stretchr/testify/mock"
@@ -4650,6 +4651,86 @@ func (_c *MockClient_SetLogLevel_Call) Return(logLevel1 *woodpecker.LogLevel, er
 }
 
 func (_c *MockClient_SetLogLevel_Call) RunAndReturn(run func(logLevel *woodpecker.LogLevel) (*woodpecker.LogLevel, error)) *MockClient_SetLogLevel_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StepLogDownload provides a mock function for the type MockClient
+func (_mock *MockClient) StepLogDownload(repoID int64, pipeline int64, stepID int64, opt woodpecker.StepLogDownloadOptions) (io.ReadCloser, error) {
+	ret := _mock.Called(repoID, pipeline, stepID, opt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StepLogDownload")
+	}
+
+	var r0 io.ReadCloser
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64, int64, int64, woodpecker.StepLogDownloadOptions) (io.ReadCloser, error)); ok {
+		return returnFunc(repoID, pipeline, stepID, opt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64, int64, int64, woodpecker.StepLogDownloadOptions) io.ReadCloser); ok {
+		r0 = returnFunc(repoID, pipeline, stepID, opt)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64, int64, int64, woodpecker.StepLogDownloadOptions) error); ok {
+		r1 = returnFunc(repoID, pipeline, stepID, opt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_StepLogDownload_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StepLogDownload'
+type MockClient_StepLogDownload_Call struct {
+	*mock.Call
+}
+
+// StepLogDownload is a helper method to define mock.On call
+//   - repoID int64
+//   - pipeline int64
+//   - stepID int64
+//   - opt woodpecker.StepLogDownloadOptions
+func (_e *MockClient_Expecter) StepLogDownload(repoID any, pipeline any, stepID any, opt any) *MockClient_StepLogDownload_Call {
+	return &MockClient_StepLogDownload_Call{Call: _e.mock.On("StepLogDownload", repoID, pipeline, stepID, opt)}
+}
+
+func (_c *MockClient_StepLogDownload_Call) Run(run func(repoID int64, pipeline int64, stepID int64, opt woodpecker.StepLogDownloadOptions)) *MockClient_StepLogDownload_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 woodpecker.StepLogDownloadOptions
+		if args[3] != nil {
+			arg3 = args[3].(woodpecker.StepLogDownloadOptions)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_StepLogDownload_Call) Return(readCloser io.ReadCloser, err error) *MockClient_StepLogDownload_Call {
+	_c.Call.Return(readCloser, err)
+	return _c
+}
+
+func (_c *MockClient_StepLogDownload_Call) RunAndReturn(run func(repoID int64, pipeline int64, stepID int64, opt woodpecker.StepLogDownloadOptions) (io.ReadCloser, error)) *MockClient_StepLogDownload_Call {
 	_c.Call.Return(run)
 	return _c
 }

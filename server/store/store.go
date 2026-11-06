@@ -144,6 +144,7 @@ type Store interface {
 
 	// Logs
 	LogFind(context.Context, *model.Step) ([]*model.LogEntry, error)
+	LogStream(context.Context, *model.Step, func(*model.LogEntry) error) error
 	LogAppend(context.Context, *model.Step, []*model.LogEntry) error
 	LogDelete(context.Context, *model.Step) error
 	StepFinished(context.Context, *model.Step) error

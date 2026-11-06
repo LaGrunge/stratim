@@ -2876,6 +2876,7 @@ const docTemplate = `{
         },
         "/repos/{repo_id}/logs/{pipeline_number}/{step_id}/download": {
             "get": {
+                "description": "The step's log as plain text, one line per log entry, each ending in a newline. ANSI\nescape sequences and control characters are removed, a backspace deletes the character\nbefore it, and of a line rewritten by carriage returns, moves to column 1 or erases of\nthe line only the last part with visible text stays: the final state a terminal shows of\na progress bar. With raw=true the lines are sent as stored instead. With line_numbers=true\neach line starts with its number as the UI shows it, right-aligned to six columns and\nfollowed by a tab, like ` + "`" + `cat -n` + "`" + `. The log is streamed, not loaded whole. If it cannot be\nread to the end, the server aborts the transfer: the client, also one behind a proxy\nthat speaks HTTP/1.1 to the server, sees a connection closed without the final chunk or\na reset stream. Only where the server cannot abort its own connection (HTTP/2 to the\nserver, or an HTTP/1.0 request) the body ends instead with a last line starting with\n\"--- log truncated\". Treat either as an incomplete log.",
                 "produces": [
                     "text/plain"
                 ],
@@ -2912,6 +2913,18 @@ const docTemplate = `{
                         "name": "step_id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "prefix each line with its number",
+                        "name": "line_numbers",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "send the lines as stored, escape sequences included",
+                        "name": "raw",
+                        "in": "query"
                     }
                 ],
                 "responses": {

@@ -235,6 +235,69 @@ func (_c *MockService_LogFind_Call) RunAndReturn(run func(ctx context.Context, s
 	return _c
 }
 
+// LogStream provides a mock function for the type MockService
+func (_mock *MockService) LogStream(ctx context.Context, step *model.Step, fn func(*model.LogEntry) error) error {
+	ret := _mock.Called(ctx, step, fn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogStream")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *model.Step, func(*model.LogEntry) error) error); ok {
+		r0 = returnFunc(ctx, step, fn)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_LogStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogStream'
+type MockService_LogStream_Call struct {
+	*mock.Call
+}
+
+// LogStream is a helper method to define mock.On call
+//   - ctx context.Context
+//   - step *model.Step
+//   - fn func(*model.LogEntry) error
+func (_e *MockService_Expecter) LogStream(ctx any, step any, fn any) *MockService_LogStream_Call {
+	return &MockService_LogStream_Call{Call: _e.mock.On("LogStream", ctx, step, fn)}
+}
+
+func (_c *MockService_LogStream_Call) Run(run func(ctx context.Context, step *model.Step, fn func(*model.LogEntry) error)) *MockService_LogStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *model.Step
+		if args[1] != nil {
+			arg1 = args[1].(*model.Step)
+		}
+		var arg2 func(*model.LogEntry) error
+		if args[2] != nil {
+			arg2 = args[2].(func(*model.LogEntry) error)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_LogStream_Call) Return(err error) *MockService_LogStream_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_LogStream_Call) RunAndReturn(run func(ctx context.Context, step *model.Step, fn func(*model.LogEntry) error) error) *MockService_LogStream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StepFinished provides a mock function for the type MockService
 func (_mock *MockService) StepFinished(ctx context.Context, step *model.Step) error {
 	ret := _mock.Called(ctx, step)

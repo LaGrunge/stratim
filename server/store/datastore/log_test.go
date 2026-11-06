@@ -15,7 +15,9 @@
 package datastore
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -203,4 +205,110 @@ func TestLogCanceled(t *testing.T) {
 		return store.LogAppend(ctx, step, []*model.LogEntry{{StepID: step.ID, Line: 1}})
 	})
 	assertCanceled(t, func(ctx context.Context) error { return store.LogDelete(ctx, step) })
+}
+
+func TestLogStreamPages(t *testing.T) {
+	for _, total := range []int{0, 1, logStreamPage - 1, logStreamPage, logStreamPage + 1, 2 * logStreamPage} {
+		t.Run(fmt.Sprint(total), func(t *testing.T) {
+			store, closer := newTestStore(t, new(model.Step), new(model.LogEntry))
+			defer closer()
+
+			step := &model.Step{ID: 1}
+			other := &model.Step{ID: 2}
+			entries := make([]*model.LogEntry, 0, total)
+			// stored out of line order, the stream must still follow the lines
+			for i := total - 1; i >= 0; i-- {
+				entries = append(entries, &model.LogEntry{StepID: step.ID, Line: i, Data: []byte{byte(i)}})
+			}
+			require.NoError(t, store.LogAppend(t.Context(), step, entries))
+			// another step's line inside the range must not leak in
+			require.NoError(t, store.LogAppend(t.Context(), other, []*model.LogEntry{{StepID: other.ID, Line: total / 2}}))
+
+			var lines []int
+			require.NoError(t, store.LogStream(t.Context(), step, func(entry *model.LogEntry) error {
+				assert.Equal(t, step.ID, entry.StepID)
+				lines = append(lines, entry.Line)
+				return nil
+			}))
+			require.Len(t, lines, total)
+			for i, line := range lines {
+				assert.Equal(t, i, line)
+			}
+		})
+	}
+}
+
+func TestLogStreamBatchesByBytes(t *testing.T) {
+	store, closer := newTestStore(t, new(model.Step), new(model.LogEntry))
+	defer closer()
+
+	step := &model.Step{ID: 1}
+	sizes := []int{4, 4, 4, 30, 0, 9, 1, 12, 3}
+	entries := make([]*model.LogEntry, 0, len(sizes))
+	for i, size := range sizes {
+		entries = append(entries, &model.LogEntry{StepID: step.ID, Line: i, Data: bytes.Repeat([]byte{'a' + byte(i)}, size)})
+	}
+	require.NoError(t, store.LogAppend(t.Context(), step, entries))
+
+	var got []*model.LogEntry
+	var batches [][2]int
+	// pages of 4 lines, batches of up to 10 bytes
+	require.NoError(t, store.logStream(t.Context(), step, func(entry *model.LogEntry) error {
+		got = append(got, entry)
+		return nil
+	}, 4, 10, func(first, last int) {
+		batches = append(batches, [2]int{first, last})
+	}))
+	require.Len(t, got, len(sizes))
+	for i, entry := range got {
+		assert.Equal(t, i, entry.Line)
+		assert.Equal(t, string(entries[i].Data), string(entry.Data))
+	}
+	assert.Equal(t, [][2]int{
+		{0, 1}, // 4+4, another 4 would pass 10
+		{2, 2}, // the 30 byte line does not fit
+		{3, 3}, // longer than a batch, loaded alone
+		{4, 6}, // 0+9+1, exactly 10
+		{7, 7}, // 12 bytes alone
+		{8, 8}, // the last, short page
+	}, batches)
+}
+
+func TestLogStreamSnapshot(t *testing.T) {
+	store, closer := newTestStore(t, new(model.Step), new(model.LogEntry))
+	defer closer()
+
+	step := &model.Step{ID: 1}
+	require.NoError(t, store.LogAppend(t.Context(), step, []*model.LogEntry{
+		{StepID: step.ID, Line: 0}, {StepID: step.ID, Line: 1},
+	}))
+
+	var lines []int
+	require.NoError(t, store.logStream(t.Context(), step, func(entry *model.LogEntry) error {
+		if entry.Line == 0 {
+			// the step is still running; no query is open while fn runs
+			require.NoError(t, store.LogAppend(t.Context(), step, []*model.LogEntry{{StepID: step.ID, Line: 2}}))
+		}
+		lines = append(lines, entry.Line)
+		return nil
+	}, 1, logStreamBatchBytes, nil))
+	assert.Equal(t, []int{0, 1}, lines)
+}
+
+func TestLogStreamStopsOnError(t *testing.T) {
+	store, closer := newTestStore(t, new(model.Step), new(model.LogEntry))
+	defer closer()
+
+	step := &model.Step{ID: 1}
+	require.NoError(t, store.LogAppend(t.Context(), step, []*model.LogEntry{
+		{StepID: step.ID, Line: 0}, {StepID: step.ID, Line: 1},
+	}))
+
+	calls := 0
+	err := store.LogStream(t.Context(), step, func(*model.LogEntry) error {
+		calls++
+		return assert.AnError
+	})
+	assert.ErrorIs(t, err, assert.AnError)
+	assert.Equal(t, 1, calls)
 }

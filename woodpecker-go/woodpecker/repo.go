@@ -16,6 +16,8 @@ package woodpecker
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -33,6 +35,7 @@ const (
 	pathPipeline       = "%s/api/repos/%d/pipelines/%v"
 	pathPipelineLogs   = "%s/api/repos/%d/logs/%d"
 	pathStepLogs       = "%s/api/repos/%d/logs/%d/%d"
+	pathStepLogsFile   = "%s/api/repos/%d/logs/%d/%d/download"
 	pathApprove        = "%s/api/repos/%d/pipelines/%d/approve"
 	pathDecline        = "%s/api/repos/%d/pipelines/%d/decline"
 	pathStop           = "%s/api/repos/%d/pipelines/%d/cancel"
@@ -85,6 +88,13 @@ type RepoPostOptions struct {
 
 type RepoMoveOptions struct {
 	To string
+}
+
+type StepLogDownloadOptions struct {
+	// LineNumbers prefixes each line with its number.
+	LineNumbers bool
+	// Raw sends the lines as stored, escape sequences included.
+	Raw bool
 }
 
 // QueryEncode returns the URL query parameters for the PipelineListOptions.
@@ -147,6 +157,18 @@ func (opt *RepoPostOptions) QueryEncode() string {
 func (opt *RepoMoveOptions) QueryEncode() string {
 	query := make(url.Values)
 	query.Add("to", opt.To)
+	return query.Encode()
+}
+
+// QueryEncode returns the URL query parameters for the StepLogDownloadOptions.
+func (opt *StepLogDownloadOptions) QueryEncode() string {
+	query := make(url.Values)
+	if opt.LineNumbers {
+		query.Add("line_numbers", "true")
+	}
+	if opt.Raw {
+		query.Add("raw", "true")
+	}
 	return query.Encode()
 }
 
@@ -422,6 +444,16 @@ func (c *client) StepLogEntries(repoID, num, step int64) ([]*LogEntry, error) {
 	var out []*LogEntry
 	err := c.get(uri, &out)
 	return out, err
+}
+
+// StepLogDownload returns the step's log as plain text, without ANSI escape
+// sequences unless opt.Raw. The caller closes the reader. The log is
+// truncated when reading it fails, and when its last line starts with
+// "--- log truncated": treat both as an error.
+func (c *client) StepLogDownload(repoID, num, step int64, opt StepLogDownloadOptions) (io.ReadCloser, error) {
+	uri, _ := url.Parse(fmt.Sprintf(pathStepLogsFile, c.addr, repoID, num, step))
+	uri.RawQuery = opt.QueryEncode()
+	return c.open(uri.String(), http.MethodGet, nil)
 }
 
 // StepLogsPurge purges the pipeline logs for the specified step.

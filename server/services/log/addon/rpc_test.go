@@ -33,7 +33,7 @@ import (
 // newRPCService connects the addon RPC client to an RPC server backed by impl
 // in process, so every call takes the same JSON and net/rpc path as with a
 // real addon binary.
-func newRPCService(t *testing.T, impl service_log.Service) service_log.Service {
+func newRPCService(t *testing.T, impl service_log.AddonService) service_log.Service {
 	t.Helper()
 
 	client, _ := plugin.TestPluginRPCConn(t, map[string]plugin.Plugin{
@@ -61,6 +61,19 @@ func TestRPCRoundTrip(t *testing.T) {
 
 		got, err := newRPCService(t, impl).LogFind(t.Context(), step)
 		require.NoError(t, err)
+		assert.Equal(t, entries, got)
+	})
+
+	t.Run("log stream", func(t *testing.T) {
+		// the addon only finds logs, the client streams what it found
+		impl := log_mocks.NewMockAddonService(t)
+		impl.On("LogFind", mock.Anything, step).Return(entries, nil)
+
+		var got []*model.LogEntry
+		require.NoError(t, newRPCService(t, impl).LogStream(t.Context(), step, func(entry *model.LogEntry) error {
+			got = append(got, entry)
+			return nil
+		}))
 		assert.Equal(t, entries, got)
 	})
 
