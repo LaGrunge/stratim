@@ -1,0 +1,9 @@
+retry: 3000
+
+id: 1793934000000040
+event: hello
+data: {"v":1,"server":"https://ci.example.test"}
+
+event: error
+data: {"v":1,"reason":"unauthorized"}
+

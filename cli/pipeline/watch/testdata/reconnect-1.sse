@@ -1,0 +1,10 @@
+retry: 3000
+
+id: 1793934000000100
+event: hello
+data: {"v":1,"server":"https://ci.example.test"}
+
+id: 1793934000000101
+event: pipeline.started
+data: {"v":1,"id":1793934000000101,"type":"pipeline.started","severity":"notice","ts":"2026-11-06T03:10:00Z","repo_id":7,"repo":"owner/name","pipeline_id":812,"number":345,"branch":"main","status":"running","summary":"#345 started"}
+

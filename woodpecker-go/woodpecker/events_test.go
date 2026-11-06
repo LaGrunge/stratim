@@ -30,6 +30,9 @@ func TestEventSeverityText(t *testing.T) {
 		require.NoError(t, parsed.UnmarshalText(text))
 		assert.Equal(t, s, parsed)
 	}
+	var strict EventSeverity
+	require.Error(t, strict.UnmarshalText([]byte("critical")))
+	require.Error(t, strict.UnmarshalText([]byte("")))
 	_, err := ParseEventSeverity("fatal")
 	assert.Error(t, err)
 	_, err = EventSeverity(9).MarshalText()

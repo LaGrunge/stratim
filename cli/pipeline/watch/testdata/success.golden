@@ -1,0 +1,5 @@
+03:09:59  watch              -  running  owner/name #345 (pipeline 812) until finished, events from notice
+03:10:00  pipeline.started   -  running  #345 started
+03:12:01  workflow.finished  build  success  #345 build success after 121s
+03:12:02  pipeline.finished  -  success  #345 success after 122s
+03:09:59  done               -  success  exit 0: #345 success after 122s

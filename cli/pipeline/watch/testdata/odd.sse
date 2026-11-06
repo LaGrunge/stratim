@@ -1,0 +1,17 @@
+retry: 3000
+
+id: 1793934000000040
+event: hello
+data: {"v":1,"server":"https://ci.example.test"}
+
+event: reset
+data: {"v":1}
+
+id: 1793934000000041
+event: pipeline.finished
+data: {"v":1,"id":1793934000000041,"type":"pipeline.finished","severity":"notice","ts":"2026-11-06T03:12:01Z","repo_id":7,"repo":"owner/name","pipeline_id":813,"number":345,"branch":"main","status":"success","summary":"#346 success after 9s"}
+
+id: 1793934000000042
+event: pipeline.finished
+data: {"v":1,"id":"1793934000000042","type":"pipeline.finished"}
+

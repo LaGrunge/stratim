@@ -15,11 +15,13 @@
 package woodpecker
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,4 +78,29 @@ func TestPipelineWait(t *testing.T) {
 	var clientErr *ClientError
 	require.True(t, errors.As(err, &clientErr))
 	assert.Equal(t, http.StatusNotFound, clientErr.StatusCode)
+}
+
+func TestPipelineWaitContext(t *testing.T) {
+	release := make(chan struct{})
+	ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	defer ts.Close()
+	defer close(release)
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	_, err := NewClient(ts.URL, ts.Client()).PipelineWaitContext(ctx, 812, PipelineWaitOptions{})
+	assert.ErrorIs(t, err, context.DeadlineExceeded, "the context ends the wait")
+}
+
+func TestIsFailureStatus(t *testing.T) {
+	for status, want := range map[string]bool{
+		StatusFailure: true, StatusTimeout: true, StatusError: true,
+		StatusSuccess: false, StatusKilled: false, StatusCanceled: false, StatusDeclined: false, StatusRunning: false,
+	} {
+		assert.Equal(t, want, IsFailureStatus(status), status)
+	}
 }

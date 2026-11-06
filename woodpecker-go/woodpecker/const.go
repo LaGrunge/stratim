@@ -38,7 +38,18 @@ const (
 	StatusTimeout = "timeout" // ended by a timeout; it counts as a failure
 	StatusKilled  = "killed"
 	StatusError   = "error"
+	// StatusCanceled is a workflow or step canceled before it started.
+	StatusCanceled = "canceled"
+	// StatusDeclined is a pipeline whose approval was declined.
+	StatusDeclined = "declined"
 )
+
+// IsFailureStatus tells whether a status is a failure, as the server counts
+// it in the summaries and waits: failure, timeout and error. Killed,
+// canceled and declined are not.
+func IsFailureStatus(status string) bool {
+	return status == StatusFailure || status == StatusTimeout || status == StatusError
+}
 
 // LogEntryType identifies the type of line in the logs.
 type LogEntryType int
