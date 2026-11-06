@@ -17,7 +17,6 @@
 package scenarios
 
 import (
-	"slices"
 	"testing"
 	"time"
 
@@ -155,26 +154,6 @@ func workflowStates(t *testing.T, env *setup.ServerEnv, p *model.Pipeline) map[s
 	return states
 }
 
-// statusReportedWorkflows returns the names of the workflows whose status was
-// reported to the forge for the given pipeline.
-func statusReportedWorkflows(env *setup.ServerEnv, pipelineID int64) []string {
-	var names []string
-	for _, call := range env.Forge.Calls {
-		if call.Method != "Status" {
-			continue
-		}
-		p, _ := call.Arguments.Get(3).(*model.Pipeline)
-		wf, _ := call.Arguments.Get(4).(*model.Workflow)
-		if p == nil || wf == nil || p.ID != pipelineID {
-			continue
-		}
-		if !slices.Contains(names, wf.Name) {
-			names = append(names, wf.Name)
-		}
-	}
-	return names
-}
-
 func runFailedPipeline(t *testing.T, env *setup.ServerEnv) *model.Pipeline {
 	t.Helper()
 	agent := setup.StartAgent(t, env.GRPCAddr)
@@ -218,7 +197,15 @@ func TestRestartFailedWorkflows(t *testing.T) {
 		"deploy": model.StatusSuccess,
 	}, workflowStates(t, env, finished), "only the failed workflow and its dependents should be rerun")
 
-	reported := statusReportedWorkflows(env, restarted.ID)
+	// The statuses are sent apart from the pipeline, some after it ends: wait
+	// for the last one, then for the sender to settle, so that a status of an
+	// untouched workflow still to come is seen.
+	for _, wf := range setup.WaitForWorkflowsDone(t, env.Store, finished) {
+		if wf.Name == "deploy" {
+			env.Statuses.WaitForLast(t, wf.ID, model.StatusSuccess, 10*time.Second)
+		}
+	}
+	reported := env.Statuses.RequestedSettled(t, restarted.ID)
 	assert.NotContains(t, reported, "build", "untouched workflows must keep their forge status")
 	assert.NotContains(t, reported, "lint", "untouched workflows must keep their forge status")
 	assert.Contains(t, reported, "test")
@@ -398,11 +385,10 @@ func TestRestartFailedWorkflowsCanceled(t *testing.T) {
 
 	// The pipeline is marked as canceled right away, the running workflow once
 	// the agent stopped it.
-	var states map[string]model.StatusValue
-	require.Eventually(t, func() bool {
-		states = workflowStates(t, env, canceled)
-		return states["one"] != model.StatusRunning && states["two"] != model.StatusRunning
-	}, 10*time.Second, 50*time.Millisecond)
+	states := make(map[string]model.StatusValue)
+	for _, wf := range setup.WaitForWorkflowsDone(t, env.Store, canceled) {
+		states[wf.Name] = wf.State
+	}
 	require.ElementsMatch(t, []model.StatusValue{model.StatusKilled, model.StatusSkipped},
 		[]model.StatusValue{states["one"], states["two"]}, "one workflow was running, the other never started")
 

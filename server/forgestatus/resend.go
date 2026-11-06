@@ -128,8 +128,9 @@ func (s *Sender) unsent(ctx context.Context) ([]*model.ForgeStatusCandidate, err
 }
 
 // paceResend waits for the turn of a request of a resent status: one every
-// ResendEvery at most. It is false when the server stops meanwhile.
-func (s *Sender) paceResend() bool {
+// ResendEvery at most. It returns the turn; ok is false when the server
+// stops meanwhile.
+func (s *Sender) paceResend() (turn time.Time, ok bool) {
 	s.mu.Lock()
 	now := time.Now()
 	at := s.resendAt
@@ -139,7 +140,7 @@ func (s *Sender) paceResend() bool {
 	s.resendAt = at.Add(s.policy.ResendEvery)
 	s.mu.Unlock()
 	sleep(s.ctx, time.Until(at))
-	return s.ctx.Err() == nil
+	return at, s.ctx.Err() == nil
 }
 
 func (s *Sender) wait(ctx context.Context, tick *time.Ticker) bool {

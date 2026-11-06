@@ -223,3 +223,35 @@ func WaitForStepRunning(t *testing.T, s store.Store, pipelineID int64, stepName 
 		t.Fatalf("timeout waiting for step %q in pipeline %d to reach StatusRunning", stepName, pipelineID)
 	}
 }
+
+// WaitForWorkflowsDone polls the store until no workflow of the pipeline is
+// pending or running, and returns them. A pipeline can reach its final
+// status before the last of its workflow rows is updated, so a test that
+// reads workflow states after WaitForPipeline waits for them with this.
+// Fails the test on timeout.
+func WaitForWorkflowsDone(t *testing.T, s store.Store, p *model.Pipeline) []*model.Workflow {
+	t.Helper()
+
+	var workflows []*model.Workflow
+	done := pollUntil(defaultTimeout, func() bool {
+		var err error
+		workflows, err = s.WorkflowGetTree(p)
+		require.NoError(t, err, "get workflow tree for pipeline %d", p.ID)
+		for _, wf := range workflows {
+			if wf.State == model.StatusPending || wf.State == model.StatusRunning {
+				return false
+			}
+		}
+		return true
+	})
+	if done {
+		return workflows
+	}
+
+	states := make(map[string]model.StatusValue, len(workflows))
+	for _, wf := range workflows {
+		states[wf.Name] = wf.State
+	}
+	t.Fatalf("timeout waiting for the workflows of pipeline %d to finish: last states=%v", p.ID, states)
+	return nil
+}
