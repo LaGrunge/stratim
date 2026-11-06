@@ -29,15 +29,19 @@
 // reserved key "_forge_remote_id" pins the document to the repository with
 // that forge id, so a renamed or re-created owner/name gets nothing.
 //
-// The server's request-signing key is read from STRATIM_SECRETS_PUBLIC_KEY_FILE
-// or, without it, fetched from the server at start over plain HTTP: run the
-// extension on the same private network as the server, never across hosts.
+// The server's request-signing key is pinned with STRATIM_SECRETS_PUBLIC_KEY_FILE,
+// a file holding it as PEM (as GET /api/signature/public-key serves it) or as
+// the 32 bare key bytes, hex or base64 encoded; the extension then never asks
+// the server for it. Without the file it fetches the key from STRATIM_SERVER
+// at start, so the extension runs on the same private network as the server.
 package main
 
 import (
 	"context"
 	"crypto/ed25519"
 	"crypto/x509"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -92,16 +96,22 @@ func envOr(key, def string) string {
 	return def
 }
 
-// loadPublicKey reads the key the server signs extension requests with, from
-// STRATIM_SECRETS_PUBLIC_KEY_FILE if set, otherwise from the server itself,
-// retrying while it starts.
+// loadPublicKey reads the key the server signs extension requests with. With
+// STRATIM_SECRETS_PUBLIC_KEY_FILE set it uses that pinned key and never asks
+// the server; otherwise it fetches the key from the server, retrying while the
+// server starts.
 func loadPublicKey(ctx context.Context, server string) (ed25519.PublicKey, error) {
 	if path := os.Getenv("STRATIM_SECRETS_PUBLIC_KEY_FILE"); path != "" {
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("read pinned public key: %w", err)
 		}
-		return parsePublicKey(data)
+		pub, err := parsePublicKey(data)
+		if err != nil {
+			return nil, fmt.Errorf("pinned public key %s: %w", path, err)
+		}
+		log.Info().Str("file", path).Msg("using the pinned public key")
+		return pub, nil
 	}
 
 	url := strings.TrimRight(server, "/") + "/api/signature/public-key"
@@ -138,18 +148,27 @@ func fetch(ctx context.Context, url string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+// parsePublicKey reads an ed25519 public key: PEM (as the server serves it),
+// or the 32 bare key bytes hex or base64 encoded.
 func parsePublicKey(data []byte) (ed25519.PublicKey, error) {
-	block, _ := pem.Decode(data)
-	if block == nil {
-		return nil, errors.New("public key is not PEM")
+	if block, _ := pem.Decode(data); block != nil {
+		key, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		pub, ok := key.(ed25519.PublicKey)
+		if !ok {
+			return nil, fmt.Errorf("public key is %T, not ed25519", key)
+		}
+		return pub, nil
 	}
-	key, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return nil, err
+
+	text := strings.TrimSpace(string(data))
+	if raw, err := hex.DecodeString(text); err == nil && len(raw) == ed25519.PublicKeySize {
+		return ed25519.PublicKey(raw), nil
 	}
-	pub, ok := key.(ed25519.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("public key is %T, not ed25519", key)
+	if raw, err := base64.StdEncoding.DecodeString(text); err == nil && len(raw) == ed25519.PublicKeySize {
+		return ed25519.PublicKey(raw), nil
 	}
-	return pub, nil
+	return nil, errors.New("public key is neither PEM nor 32 hex or base64 encoded bytes")
 }

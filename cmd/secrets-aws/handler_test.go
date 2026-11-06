@@ -19,10 +19,17 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -196,5 +203,105 @@ func TestParsePublicKey(t *testing.T) {
 	assert.Equal(t, pub, got)
 
 	_, err = parsePublicKey([]byte("not a key"))
+	assert.Error(t, err)
+}
+
+func TestParsePublicKeyRaw(t *testing.T) {
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	for name, data := range map[string][]byte{
+		"hex":    []byte(hex.EncodeToString(pub) + "\n"),
+		"base64": []byte(base64.StdEncoding.EncodeToString(pub) + "\n"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := parsePublicKey(data)
+			require.NoError(t, err)
+			assert.Equal(t, pub, got)
+		})
+	}
+
+	_, err = parsePublicKey([]byte(hex.EncodeToString(pub[:16])))
+	assert.Error(t, err)
+}
+
+func TestParsePublicKeyRejects(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	rsaDER, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
+	require.NoError(t, err)
+	privDER, err := x509.MarshalPKCS8PrivateKey(priv)
+	require.NoError(t, err)
+
+	tests := map[string][]byte{
+		"base64 of 31 bytes":         []byte(base64.StdEncoding.EncodeToString(pub[:31])),
+		"hex of 33 bytes":            []byte(hex.EncodeToString(append(slices.Clone(pub), 0))),
+		"RSA public key":             pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: rsaDER}),
+		"ed25519 private key PKCS#8": pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privDER}),
+		"empty":                      {},
+	}
+	for name, data := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := parsePublicKey(data)
+			assert.Error(t, err)
+		})
+	}
+}
+
+// TestPinnedPublicKey pins the key with STRATIM_SECRETS_PUBLIC_KEY_FILE: the
+// server is never asked for its key, requests signed with the pinned key's
+// private half are served and requests signed with another key are rejected.
+func TestPinnedPublicKey(t *testing.T) {
+	pinnedPub, pinnedPriv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	otherPub, otherPriv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	// a server that would hand out another key
+	var asked atomic.Int32
+	keyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		asked.Add(1)
+		der, _ := x509.MarshalPKIXPublicKey(otherPub)
+		_, _ = w.Write(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der}))
+	}))
+	defer keyServer.Close()
+
+	der, err := x509.MarshalPKIXPublicKey(pinnedPub)
+	require.NoError(t, err)
+	keyFile := filepath.Join(t.TempDir(), "public.pem")
+	require.NoError(t, os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der}), 0o600))
+	t.Setenv("STRATIM_SECRETS_PUBLIC_KEY_FILE", keyFile)
+
+	pub, err := loadPublicKey(t.Context(), keyServer.URL)
+	require.NoError(t, err)
+	assert.Equal(t, pinnedPub, pub)
+	assert.Zero(t, asked.Load(), "the server must not be asked for its key")
+
+	srv := httptest.NewServer(&handler{publicKey: pub, source: mapSource{
+		"stratim/repos/acme/engine": `{"a": "b"}`,
+	}, prefix: "stratim/repos/", defaultEvents: []string{"manual"}})
+	defer srv.Close()
+
+	listWith := func(priv ed25519.PrivateKey) ([]*model.Secret, error) {
+		client, err := utils.NewHTTPClient(priv, "loopback")
+		require.NoError(t, err)
+		return secret.NewHTTP(srv.URL, client, false).SecretListPipeline(t.Context(),
+			&model.Repo{FullName: "acme/engine"}, &model.Pipeline{Event: model.EventManual}, nil)
+	}
+
+	secrets, err := listWith(pinnedPriv)
+	require.NoError(t, err)
+	require.Len(t, secrets, 1)
+	assert.Equal(t, "b", secrets[0].Value)
+
+	_, err = listWith(otherPriv)
+	assert.Error(t, err)
+}
+
+func TestPinnedPublicKeyUnreadable(t *testing.T) {
+	t.Setenv("STRATIM_SECRETS_PUBLIC_KEY_FILE", filepath.Join(t.TempDir(), "missing.pem"))
+	_, err := loadPublicKey(t.Context(), "http://127.0.0.1:1")
 	assert.Error(t, err)
 }
