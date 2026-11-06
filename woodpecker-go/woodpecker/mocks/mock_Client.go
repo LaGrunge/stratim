@@ -5,6 +5,7 @@
 package mocks
 
 import (
+	"context"
 	"io"
 	"net/http"
 
@@ -2818,6 +2819,74 @@ func (_c *MockClient_PipelineDelete_Call) RunAndReturn(run func(repoID int64, pi
 	return _c
 }
 
+// PipelineEvents provides a mock function for the type MockClient
+func (_mock *MockClient) PipelineEvents(ctx context.Context, opt woodpecker.PipelineEventsOptions) (woodpecker.EventsFrameReader, error) {
+	ret := _mock.Called(ctx, opt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PipelineEvents")
+	}
+
+	var r0 woodpecker.EventsFrameReader
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, woodpecker.PipelineEventsOptions) (woodpecker.EventsFrameReader, error)); ok {
+		return returnFunc(ctx, opt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, woodpecker.PipelineEventsOptions) woodpecker.EventsFrameReader); ok {
+		r0 = returnFunc(ctx, opt)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(woodpecker.EventsFrameReader)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, woodpecker.PipelineEventsOptions) error); ok {
+		r1 = returnFunc(ctx, opt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_PipelineEvents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PipelineEvents'
+type MockClient_PipelineEvents_Call struct {
+	*mock.Call
+}
+
+// PipelineEvents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - opt woodpecker.PipelineEventsOptions
+func (_e *MockClient_Expecter) PipelineEvents(ctx any, opt any) *MockClient_PipelineEvents_Call {
+	return &MockClient_PipelineEvents_Call{Call: _e.mock.On("PipelineEvents", ctx, opt)}
+}
+
+func (_c *MockClient_PipelineEvents_Call) Run(run func(ctx context.Context, opt woodpecker.PipelineEventsOptions)) *MockClient_PipelineEvents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 woodpecker.PipelineEventsOptions
+		if args[1] != nil {
+			arg1 = args[1].(woodpecker.PipelineEventsOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_PipelineEvents_Call) Return(eventsFrameReader woodpecker.EventsFrameReader, err error) *MockClient_PipelineEvents_Call {
+	_c.Call.Return(eventsFrameReader, err)
+	return _c
+}
+
+func (_c *MockClient_PipelineEvents_Call) RunAndReturn(run func(ctx context.Context, opt woodpecker.PipelineEventsOptions) (woodpecker.EventsFrameReader, error)) *MockClient_PipelineEvents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PipelineLast provides a mock function for the type MockClient
 func (_mock *MockClient) PipelineLast(repoID int64, opt woodpecker.PipelineLastOptions) (*woodpecker.Pipeline, error) {
 	ret := _mock.Called(repoID, opt)
@@ -3403,6 +3472,80 @@ func (_c *MockClient_PipelineWait_Call) Return(pipelineWaitResult *woodpecker.Pi
 }
 
 func (_c *MockClient_PipelineWait_Call) RunAndReturn(run func(pipelineID int64, opt woodpecker.PipelineWaitOptions) (*woodpecker.PipelineWaitResult, error)) *MockClient_PipelineWait_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PipelineWaitContext provides a mock function for the type MockClient
+func (_mock *MockClient) PipelineWaitContext(ctx context.Context, pipelineID int64, opt woodpecker.PipelineWaitOptions) (*woodpecker.PipelineWaitResult, error) {
+	ret := _mock.Called(ctx, pipelineID, opt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PipelineWaitContext")
+	}
+
+	var r0 *woodpecker.PipelineWaitResult
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, woodpecker.PipelineWaitOptions) (*woodpecker.PipelineWaitResult, error)); ok {
+		return returnFunc(ctx, pipelineID, opt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, woodpecker.PipelineWaitOptions) *woodpecker.PipelineWaitResult); ok {
+		r0 = returnFunc(ctx, pipelineID, opt)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*woodpecker.PipelineWaitResult)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, woodpecker.PipelineWaitOptions) error); ok {
+		r1 = returnFunc(ctx, pipelineID, opt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_PipelineWaitContext_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PipelineWaitContext'
+type MockClient_PipelineWaitContext_Call struct {
+	*mock.Call
+}
+
+// PipelineWaitContext is a helper method to define mock.On call
+//   - ctx context.Context
+//   - pipelineID int64
+//   - opt woodpecker.PipelineWaitOptions
+func (_e *MockClient_Expecter) PipelineWaitContext(ctx any, pipelineID any, opt any) *MockClient_PipelineWaitContext_Call {
+	return &MockClient_PipelineWaitContext_Call{Call: _e.mock.On("PipelineWaitContext", ctx, pipelineID, opt)}
+}
+
+func (_c *MockClient_PipelineWaitContext_Call) Run(run func(ctx context.Context, pipelineID int64, opt woodpecker.PipelineWaitOptions)) *MockClient_PipelineWaitContext_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 woodpecker.PipelineWaitOptions
+		if args[2] != nil {
+			arg2 = args[2].(woodpecker.PipelineWaitOptions)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_PipelineWaitContext_Call) Return(pipelineWaitResult *woodpecker.PipelineWaitResult, err error) *MockClient_PipelineWaitContext_Call {
+	_c.Call.Return(pipelineWaitResult, err)
+	return _c
+}
+
+func (_c *MockClient_PipelineWaitContext_Call) RunAndReturn(run func(ctx context.Context, pipelineID int64, opt woodpecker.PipelineWaitOptions) (*woodpecker.PipelineWaitResult, error)) *MockClient_PipelineWaitContext_Call {
 	_c.Call.Return(run)
 	return _c
 }

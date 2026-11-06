@@ -1,0 +1,26 @@
+retry: 3000
+
+id: 1793934000000040
+event: hello
+data: {"v":1,"server":"https://ci.example.test"}
+
+id: 1793934000000041
+event: pipeline.started
+data: {"v":1,"id":1793934000000041,"type":"pipeline.started","severity":"notice","ts":"2026-11-06T03:10:00Z","repo_id":7,"repo":"owner/name","pipeline_id":812,"number":345,"branch":"main","status":"running","summary":"#345 started"}
+
+id: 1793934000000042
+event: step.failed
+data: {"v":1,"id":1793934000000042,"type":"step.failed","severity":"notice","ts":"2026-11-06T03:11:00Z","repo_id":7,"repo":"owner/name","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":4410,"step":"lint","step_id":9910,"exit_code":1,"ignored":true,"duration_s":5,"status":"failure","summary":"#345 build/lint failure after 5s, exit 1, ignored"}
+
+id: 1793934000000043
+event: step.failed
+data: {"v":1,"id":1793934000000043,"type":"step.failed","severity":"error","ts":"2026-11-06T03:12:08Z","repo_id":7,"repo":"owner/name","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":4410,"step":"test","step_id":9911,"exit_code":1,"duration_s":31,"status":"failure","summary":"#345 build/test failure after 31s, exit 1"}
+
+id: 1793934000000044
+event: workflow.finished
+data: {"v":1,"id":1793934000000044,"type":"workflow.finished","severity":"error","ts":"2026-11-06T03:12:09Z","repo_id":7,"repo":"owner/name","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":4410,"duration_s":130,"status":"failure","summary":"#345 build failure after 130s"}
+
+id: 1793934000000045
+event: step.explained
+data: {"v":1,"id":1793934000000045,"type":"step.explained","severity":"error","ts":"2026-11-06T03:12:10Z","repo_id":7,"repo":"owner/name","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":4410,"step":"test","step_id":9911,"exit_code":1,"duration_s":31,"cause":{"kind":"gtest","title":"gtest: Rowgroup.SerializeNulls failed at rowgroup-tests.cpp:211","line":1187,"confidence":"high","excerpt":"\u001b[31m/src/tests/rowgroup-tests.cpp:211: Failure\u001b[0m\tsee below\nExpected equality of these values:\n[  FAILED  ] Rowgroup.SerializeNulls (3 ms)","untrusted":true},"status":"failure","summary":"#345 build/test failure after 31s, exit 1"}
+

@@ -25,6 +25,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/cli/output"
 	"go.woodpecker-ci.org/woodpecker/v3/cli/pipeline/deploy"
 	"go.woodpecker-ci.org/woodpecker/v3/cli/pipeline/log"
+	"go.woodpecker-ci.org/woodpecker/v3/cli/pipeline/watch"
 	"go.woodpecker-ci.org/woodpecker/v3/woodpecker-go/woodpecker"
 )
 
@@ -47,6 +48,7 @@ var Command = &cli.Command{
 		pipelineShowCmd,
 		pipelineStartCmd,
 		pipelineStopCmd,
+		watch.Command,
 	},
 }
 

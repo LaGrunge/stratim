@@ -1,0 +1,3 @@
+03:09:59  watch              -  running  owner/name #345 (pipeline 812) until finished, events from notice
+03:09:59  reset              -  -  events missed (expired), reading the state of the pipeline
+03:09:59  done               -  killed  exit 2: #345 killed · 1/3 ok

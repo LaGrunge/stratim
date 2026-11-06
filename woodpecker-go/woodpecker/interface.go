@@ -15,6 +15,7 @@
 package woodpecker
 
 import (
+	"context"
 	"io"
 	"net/http"
 )
@@ -103,6 +104,13 @@ type Client interface {
 	// PipelineWait waits until a condition of the pipeline with the id is
 	// met, at most the timeout; see PipelineWaitResult.
 	PipelineWait(pipelineID int64, opt PipelineWaitOptions) (*PipelineWaitResult, error)
+
+	// PipelineWaitContext is PipelineWait, ending with the context.
+	PipelineWaitContext(ctx context.Context, pipelineID int64, opt PipelineWaitOptions) (*PipelineWaitResult, error)
+
+	// PipelineEvents opens a stream of pipeline events; EventsFollower
+	// follows one across reconnects.
+	PipelineEvents(ctx context.Context, opt PipelineEventsOptions) (EventsFrameReader, error)
 
 	// PipelineStop stops the given pipeline.
 	PipelineStop(repoID, pipeline int64) error

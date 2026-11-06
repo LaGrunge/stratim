@@ -15,6 +15,7 @@
 package woodpecker
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,6 +25,10 @@ import (
 )
 
 const pathPipelineWait = "%s/api/v2/pipelines/%d/wait"
+
+// waitMaxErrorBody bounds the body of an answer other than 200 and 204 read
+// into a ClientError.
+const waitMaxErrorBody = 4096
 
 // PipelineWaitSummaryHeader carries the summary of the pipeline when a wait
 // timed out.
@@ -118,6 +123,11 @@ type PipelineWaitInfo struct {
 // ask again. While the server is deployed, a wait may fail with 502 or 503:
 // ask again after a backoff.
 func (c *client) PipelineWait(pipelineID int64, opt PipelineWaitOptions) (*PipelineWaitResult, error) {
+	return c.PipelineWaitContext(context.Background(), pipelineID, opt)
+}
+
+// PipelineWaitContext is PipelineWait, ending with the context.
+func (c *client) PipelineWaitContext(ctx context.Context, pipelineID int64, opt PipelineWaitOptions) (*PipelineWaitResult, error) {
 	query := url.Values{}
 	if opt.Until != "" {
 		query.Set("until", opt.Until)
@@ -130,7 +140,7 @@ func (c *client) PipelineWait(pipelineID int64, opt PipelineWaitOptions) (*Pipel
 		uri += "?" + query.Encode()
 	}
 
-	req, err := http.NewRequest(http.MethodGet, uri, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +156,7 @@ func (c *client) PipelineWait(pipelineID int64, opt PipelineWaitOptions) (*Pipel
 	case http.StatusNoContent:
 		return &PipelineWaitResult{TimedOut: true, Summary: resp.Header.Get(PipelineWaitSummaryHeader)}, nil
 	default:
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, waitMaxErrorBody))
 		return nil, &ClientError{StatusCode: resp.StatusCode, Message: string(body)}
 	}
 }

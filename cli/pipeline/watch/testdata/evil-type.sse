@@ -1,0 +1,14 @@
+retry: 3000
+
+id: 1793934000000040
+event: hello
+data: {"v":1,"server":"https://ci.example.test"}
+
+id: 1793934000000041
+event: step.[2Jodd‮
+data: {"v":1,"id":1793934000000041,"type":"step.\u001b[2Jodd‮","severity":"notice","ts":"2026-11-06T03:11:00Z","repo_id":7,"repo":"owner/name","pipeline_id":812,"number":345,"branch":"main","status":"success","summary":"#345 odd"}
+
+id: 1793934000000042
+event: pipeline.finished
+data: {"v":1,"id":1793934000000042,"type":"pipeline.finished","severity":"notice","ts":"2026-11-06T03:12:02Z","repo_id":7,"repo":"owner/name","pipeline_id":812,"number":345,"branch":"main","status":"success","summary":"#345 success after 122s"}
+

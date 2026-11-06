@@ -7,7 +7,7 @@ curl -N -H "Authorization: Bearer $TOKEN" \
   "$SERVER/api/v2/events?repo=owner/name&branch=main"
 ```
 
-The web UI keeps using `/api/stream/events`.
+The web UI keeps using `/api/stream/events`. The CLI follows a pipeline over this API with [`woodpecker-cli pipeline watch`](../40-cli/30-watch.md).
 
 ## Access
 
