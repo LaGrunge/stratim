@@ -139,12 +139,14 @@ generate: generate-openapi ## Run all code generations
 generate-openapi: ## Run openapi code generation
 	CGO_ENABLED=0 go generate cmd/server/openapi.go
 
-generate-license-header:
-	@if command -v addlicense > /dev/null 2>&1; then \
-		addlicense -c "Woodpecker Authors" -l apache -ignore "vendor/**" -ignore cmd/server/openapi/docs.go **/*.go; \
-	else \
-		go run github.com/google/addlicense@latest -c "Woodpecker Authors" -l apache -ignore "vendor/**" -ignore cmd/server/openapi/docs.go **/*.go; \
-	fi
+# the paths CI's lint-license-header leaves alone: the plugins started as
+# Drone plugins and carry their own Apache-2.0 LICENSE
+LICENSE_HEADER_IGNORE := -ignore 'vendor/**' -ignore cmd/server/openapi/docs.go -ignore 'plugins/clone/**' -ignore 'plugins/s3/**'
+
+generate-license-header: ## Add a LaGrunge license header to Go files that have none
+	@if command -v addlicense > /dev/null 2>&1; then addlicense=addlicense; \
+	else addlicense='go run github.com/google/addlicense@latest'; fi; \
+	bash -c "shopt -s globstar; $$addlicense -c LaGrunge -l apache $(LICENSE_HEADER_IGNORE) **/*.go"
 
 check-xgo: ## Check if xgo is installed
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
