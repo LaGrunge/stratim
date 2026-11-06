@@ -165,6 +165,20 @@ Example response:
 }
 ```
 
+## AWS Secrets Manager extension
+
+Stratim ships a secret extension that serves pipeline secrets from AWS Secrets Manager (image `lagrunge/stratim-secrets-aws`, source `cmd/secrets-aws`). For a pipeline of repository `owner/name` it reads the secret `<prefix>owner/name`, a JSON object from secret name to either a string or `{"value": "...", "events": [...], "images": [...]}`. AWS credentials and region come from the usual AWS SDK configuration.
+
+| Variable                          | Default                           | Description                                                                                                                                                                                               |
+| --------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STRATIM_SECRETS_ADDR`            | `:8080`                           | Address the extension listens on                                                                                                                                                                          |
+| `STRATIM_SECRETS_PREFIX`          | `stratim/repos/`                  | Prefix of the Secrets Manager secret names                                                                                                                                                                |
+| `STRATIM_SECRETS_DEFAULT_EVENTS`  | `push,tag,deployment,cron,manual` | Events a secret without its own `events` list is available to                                                                                                                                             |
+| `STRATIM_SERVER`                  | `http://server:8000`              | Server the signing public key is fetched from at start, unless it is pinned                                                                                                                               |
+| `STRATIM_SECRETS_PUBLIC_KEY_FILE` | _(unset)_                         | File holding the server's signing public key, as PEM (what `GET /api/signature/public-key` returns) or the 32 key bytes hex or base64 encoded. When set, the extension uses this key and never fetches it |
+
+The extension accepts only requests signed with the server's key. A pinned key file holds one particular key: when the server's signing key changes, replace the file with the new public key and restart the extension.
+
 ## 3rd Party Extensions
 
 :::danger
