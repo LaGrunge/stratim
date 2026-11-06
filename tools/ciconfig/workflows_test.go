@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -32,6 +33,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/metadata"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/compiler"
+	"go.woodpecker-ci.org/woodpecker/v3/server/cronconfig"
 )
 
 const (
@@ -78,6 +80,12 @@ func TestWorkflowsBuild(t *testing.T) {
 		wantRuns bool
 		// wantTest: steps the test workflow must have
 		wantTest []string
+		// cron is the cron's name; selected the workflow it runs, which
+		// runs with its dependencies whatever their when says
+		cron, selected string
+		// wantWorkflows, if exact, are the workflows that run, all of them
+		wantWorkflows []string
+		exact         bool
 	}{
 		{name: "push to main", event: metadata.EventPush, changed: codeChange, wantRuns: true, wantTest: mariadbSteps},
 		{name: "push to main, docs only", event: metadata.EventPush, changed: docsChange},
@@ -88,6 +96,11 @@ func TestWorkflowsBuild(t *testing.T) {
 		{name: "pull request, no file list", event: metadata.EventPull, wantRuns: true},
 		{name: "tag", event: metadata.EventTag, changed: codeChange},
 		{name: "cron", event: metadata.EventCron},
+		{
+			name: "the synthetic cron", event: metadata.EventCron, cron: "synthetic-check/nightly", selected: "synthetic-check",
+			wantWorkflows: syntheticWorkflows, exact: true,
+		},
+		{name: "a cron of the settings", event: metadata.EventCron, cron: "synthetic", exact: true},
 		{name: "manual", event: metadata.EventManual},
 	}
 	for _, tt := range tests {
@@ -100,6 +113,7 @@ func TestWorkflowsBuild(t *testing.T) {
 				m.Curr.Commit.Branch = tt.branch
 			}
 			m.Curr.Commit.ChangedFiles = tt.changed
+			m.Curr.Cron = tt.cron
 			if tt.event == metadata.EventTag {
 				m.Curr.Commit.Ref = "refs/tags/v0.0.0"
 			}
@@ -109,11 +123,20 @@ func TestWorkflowsBuild(t *testing.T) {
 				RepoTrusted:         &metadata.TrustedConfiguration{},
 				CompilerOptions:     []compiler.Option{compiler.WithSecret(secrets...)},
 				GetWorkflowMetadata: func(*builder.Workflow) metadata.Metadata { return m },
+				SelectedWorkflow:    tt.selected,
+				RunSelected:         tt.selected != "",
 			}
 			items, err := b.Build()
 			require.False(t, pipeline_errors.HasBlockingErrors(err), "build: %v", err)
 			if tt.wantRuns {
 				assert.NotEmpty(t, items, "no workflow runs")
+			}
+			if tt.exact {
+				var names []string
+				for _, item := range items {
+					names = append(names, item.Workflow.Name)
+				}
+				assert.ElementsMatch(t, tt.wantWorkflows, names, "the workflows that run")
 			}
 			if tt.wantTest != nil {
 				assert.Subset(t, stepNames(items, "test"), tt.wantTest, "steps of the test workflow")
@@ -232,4 +255,22 @@ func stepNames(items []*builder.Item, workflow string) []string {
 		}
 	}
 	return names
+}
+
+// syntheticWorkflows are those the nightly synthetic cron runs.
+var syntheticWorkflows = []string{"synthetic-check", "synthetic-logs", "synthetic-parallel-a", "synthetic-parallel-b", "synthetic-tests"}
+
+// TestCrons: the server makes exactly one cron of .woodpecker/, the
+// synthetic one, nightly at 03:00 UTC.
+func TestCrons(t *testing.T) {
+	yamls, _ := readConfig(t)
+	crons, err := cronconfig.Desired(yamls, time.Now())
+	require.NoError(t, err)
+	require.Len(t, crons, 1)
+	c := crons[0]
+	assert.Equal(t, "synthetic-check/nightly", c.Name)
+	assert.Equal(t, "synthetic-check", c.Workflow)
+	assert.Equal(t, "0 3 * * *", c.Schedule)
+	assert.Equal(t, "UTC", c.Timezone)
+	assert.Empty(t, c.Variables)
 }

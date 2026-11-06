@@ -282,11 +282,14 @@ func TestSyntheticWorkflowsMatchBudgets(t *testing.T) {
 		deps = append(deps, d.Name)
 	}
 	assert.ElementsMatch(t, names, deps, "synthetic-check depends on every other")
+	// its cron runs it and what it depends on: all of them
+	require.Contains(t, workflows["synthetic-check"].Crons, "nightly", "synthetic-check declares the nightly cron")
+	assert.Equal(t, "0 3 * * *", workflows["synthetic-check"].Crons["nightly"].Schedule)
 
 	for name, w := range workflows {
 		var cron, manual bool
 		for _, c := range w.When.Constraints {
-			cron = cron || (slices.Contains(c.Event, "cron") && slices.Equal(c.Cron.Include, []string{"synthetic"}))
+			cron = cron || (slices.Contains(c.Event, "cron") && slices.Equal(c.Cron.Include, []string{"synthetic-check/nightly"}))
 			manual = manual || (slices.Contains(c.Event, "manual") && c.Evaluate == `TASK == "synthetic"`)
 		}
 		assert.Truef(t, cron, "%s runs on the synthetic cron", name)
