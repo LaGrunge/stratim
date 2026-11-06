@@ -133,9 +133,9 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("can't parse agent-billing-teardown-margin: %w", err)
 	}
 
-	reconciliationInterval, err := time.ParseDuration(cmd.String("reconciliation-interval"))
+	reconciliationInterval, err := parseReconciliationInterval(cmd.String("reconciliation-interval"))
 	if err != nil {
-		return fmt.Errorf("can't parse reconciliation-interval: %w", err)
+		return err
 	}
 	config.ReconciliationInterval = reconciliationInterval
 
@@ -151,17 +151,35 @@ func run(ctx context.Context, cmd *cli.Command) error {
 			Msg("hourly-round-up billing: idle agents are kept warm until just before each paid-hour boundary")
 	}
 
+	// A ticker keeps reconciliations reconciliationInterval apart, start to
+	// start, however long one takes; one that overruns the interval is
+	// followed by the next right away.
+	ticker := time.NewTicker(reconciliationInterval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-time.After(reconciliationInterval):
+		case <-ticker.C:
 			err := autoscaler.Reconcile(ctx)
 			if err != nil {
 				log.Error().Err(err).Msg("reconciliation failed")
 			}
 		}
 	}
+}
+
+// parseReconciliationInterval reads the reconcile period, which must be
+// positive.
+func parseReconciliationInterval(value string) (time.Duration, error) {
+	interval, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, fmt.Errorf("can't parse reconciliation-interval: %w", err)
+	}
+	if interval <= 0 {
+		return 0, fmt.Errorf("reconciliation-interval must be positive, got %s", value)
+	}
+	return interval, nil
 }
 
 func main() {
