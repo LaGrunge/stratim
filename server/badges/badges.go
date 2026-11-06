@@ -24,6 +24,7 @@ var (
 	// Status labels.
 	badgeStatusSuccess = "success"
 	badgeStatusFailure = "failure"
+	badgeStatusTimeout = "timeout"
 	badgeStatusStarted = "started"
 	badgeStatusError   = "error"
 	badgeStatusNone    = "none"
@@ -39,6 +40,8 @@ func getBadgeStatusLabelAndColor(status *model.StatusValue) (string, Color) {
 		return badgeStatusSuccess, ColorGreen
 	case model.StatusFailure:
 		return badgeStatusFailure, ColorRed
+	case model.StatusTimeout:
+		return badgeStatusTimeout, ColorRed
 	case model.StatusPending, model.StatusRunning:
 		return badgeStatusStarted, ColorYellow
 	case model.StatusError, model.StatusKilled:

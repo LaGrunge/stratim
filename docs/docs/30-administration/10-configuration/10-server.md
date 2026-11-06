@@ -419,6 +419,8 @@ woodpecker_step_duration_seconds_sum{repo="woodpecker-ci/woodpecker",step="deplo
 woodpecker_step_duration_seconds_count{repo="woodpecker-ci/woodpecker",step="deploy",workflow="woodpecker"} 1
 ```
 
+`woodpecker_pipeline_count` and `woodpecker_pipeline_time` count the pipelines that ended `success`, `failure` or `timeout`. Before the `timeout` status, a pipeline a step's timeout ended counted as `failure`, and one its workflow's timeout ended (then `killed`) did not count at all. A timed out step counts in `woodpecker_step_failures_total`, as before.
+
 Step-level metrics are exported as long as `WOODPECKER_STEP_LEVEL_METRICS` is not disabled.
 
 #### Example response structure
@@ -841,14 +843,14 @@ Example: `platform=linux/amd64,backend=docker`
 - Name: `WOODPECKER_DEFAULT_PIPELINE_TIMEOUT`
 - Default: 60
 
-The default time for a repo in minutes before a pipeline gets killed
+The default time for a repo in minutes before a pipeline times out
 
 ### MAX_PIPELINE_TIMEOUT
 
 - Name: `WOODPECKER_MAX_PIPELINE_TIMEOUT`
 - Default: 120
 
-The maximum time in minutes you can set in the repo settings before a pipeline gets killed
+The maximum time in minutes you can set in the repo settings before a pipeline times out
 
 ---
 

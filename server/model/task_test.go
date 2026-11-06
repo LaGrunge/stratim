@@ -123,3 +123,16 @@ func TestTask_ApplyLabelsFromOrg(t *testing.T) {
 		}, task.Labels)
 	})
 }
+
+func TestTask_ShouldRunAfterTimeout(t *testing.T) {
+	dep := map[string]StatusValue{"build": StatusTimeout}
+
+	onSuccess := &Task{DepStatus: dep}
+	assert.False(t, onSuccess.ShouldRun(), "runs_on success: a timed out dependency failed")
+
+	onFailure := &Task{DepStatus: dep, RunOn: []string{string(StatusFailure)}}
+	assert.True(t, onFailure.ShouldRun(), "runs_on failure: a timeout is a failure")
+
+	onBoth := &Task{DepStatus: dep, RunOn: []string{string(StatusSuccess), string(StatusFailure)}}
+	assert.True(t, onBoth.ShouldRun(), "runs_on success and failure")
+}

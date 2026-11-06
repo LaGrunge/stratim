@@ -83,9 +83,55 @@ func TestStatusValueMerge(t *testing.T) {
 			t: model.StatusCanceled,
 			e: model.StatusKilled,
 		},
+		// a timeout is named over a plain failure, a kill or an error over it
+		{
+			s: model.StatusFailure,
+			t: model.StatusTimeout,
+			e: model.StatusTimeout,
+		},
+		{
+			s: model.StatusSuccess,
+			t: model.StatusTimeout,
+			e: model.StatusTimeout,
+		},
+		{
+			s: model.StatusSkipped,
+			t: model.StatusTimeout,
+			e: model.StatusTimeout,
+		},
+		{
+			s: model.StatusRunning,
+			t: model.StatusTimeout,
+			e: model.StatusRunning,
+		},
+		{
+			s: model.StatusKilled,
+			t: model.StatusTimeout,
+			e: model.StatusKilled,
+		},
+		{
+			s: model.StatusError,
+			t: model.StatusTimeout,
+			e: model.StatusError,
+		},
+		{
+			s: model.StatusTimeout,
+			t: model.StatusTimeout,
+			e: model.StatusTimeout,
+		},
 	}
 	for _, tt := range tests {
 		assert.Equal(t, tt.e, MergeStatusValues(tt.s, tt.t))
 		assert.Equal(t, tt.e, MergeStatusValues(tt.t, tt.s))
 	}
+}
+
+// A status the server does not know ranks as a failure, not as declined.
+func TestStatusValueMergeUnknown(t *testing.T) {
+	unknown := model.StatusValue("from-the-future")
+	assert.Equal(t, model.StatusFailure, MergeStatusValues(unknown, model.StatusSuccess))
+	assert.Equal(t, model.StatusFailure, MergeStatusValues(model.StatusSkipped, unknown))
+	assert.Equal(t, model.StatusFailure, MergeStatusValues(unknown, unknown))
+	assert.Equal(t, model.StatusTimeout, MergeStatusValues(unknown, model.StatusTimeout))
+	assert.Equal(t, model.StatusKilled, MergeStatusValues(unknown, model.StatusKilled))
 }

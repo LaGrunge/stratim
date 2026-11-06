@@ -117,6 +117,7 @@ func (s *WoodpeckerServer) Update(c context.Context, req *proto.UpdateRequest) (
 		ExitCode: int(req.GetState().GetExitCode()),
 		Canceled: req.GetState().GetCanceled(),
 		Skipped:  req.GetState().GetSkipped(),
+		TimedOut: req.GetState().GetTimedOut(),
 	}
 	res := new(proto.Empty)
 	err := s.peer.Update(c, req.GetId(), state)
@@ -130,6 +131,7 @@ func (s *WoodpeckerServer) Done(c context.Context, req *proto.DoneRequest) (*pro
 		Finished: req.GetState().GetFinished(),
 		Error:    req.GetState().GetError(),
 		Canceled: req.GetState().GetCanceled(),
+		TimedOut: req.GetState().GetTimedOut(),
 	}
 	res := new(proto.Empty)
 	err := s.peer.Done(c, req.GetId(), state)

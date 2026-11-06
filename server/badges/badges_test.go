@@ -48,6 +48,10 @@ func TestGenerate(t *testing.T) {
 	badge, err = Generate("pipeline", &status)
 	assert.NoError(t, err)
 	assert.Equal(t, badgeFailure, badge)
+	status = model.StatusTimeout
+	badge, err = Generate("pipeline", &status)
+	assert.NoError(t, err)
+	assert.Contains(t, badge, ">timeout<")
 	status = model.StatusError
 	badge, err = Generate("pipeline", &status)
 	assert.NoError(t, err)

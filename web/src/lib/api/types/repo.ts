@@ -55,7 +55,7 @@ export interface Repo {
   trusted: RepoTrusted;
 
   // x-dart-type: Duration
-  // The amount of time in minutes before the pipeline is killed.
+  // The amount of time in minutes before the pipeline times out.
   timeout: number;
 
   // Whether pull requests should trigger a pipeline.

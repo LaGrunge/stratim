@@ -17,6 +17,7 @@ package rpc
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -443,6 +444,81 @@ func TestRPCInit(t *testing.T) {
 		err := rpcInst.Init(ctx, "not-a-number", rpc.WorkflowState{})
 		assert.Error(t, err)
 	})
+}
+
+// Done acks the queue with the status the workflow was stored with, which
+// the workflows depending on it run or not by.
+func TestRPCDoneQueueStatus(t *testing.T) {
+	tests := []struct {
+		name     string
+		children []*model.Step
+		state    rpc.WorkflowState
+		want     model.StatusValue // acked with Done, or with Error if empty
+	}{
+		{
+			name:  "workflow timed out",
+			state: rpc.WorkflowState{Started: 100, Finished: 200, Canceled: true, TimedOut: true},
+			want:  model.StatusTimeout,
+		},
+		{
+			name:  "workflow canceled",
+			state: rpc.WorkflowState{Started: 100, Finished: 200, Canceled: true},
+			want:  model.StatusKilled,
+		},
+		{
+			name:     "step timed out",
+			children: []*model.Step{{ID: 40, State: model.StatusTimeout, Failure: model.FailureFail, Started: 100, Finished: 150}},
+			state:    rpc.WorkflowState{Started: 100, Finished: 200},
+			want:     model.StatusTimeout,
+		},
+		{
+			name:     "step failed",
+			children: []*model.Step{{ID: 40, State: model.StatusFailure, Failure: model.FailureFail, Started: 100, Finished: 150}},
+			state:    rpc.WorkflowState{Started: 100, Finished: 200},
+			want:     model.StatusFailure,
+		},
+		{
+			name:  "workflow error",
+			state: rpc.WorkflowState{Started: 100, Finished: 200, Error: "boom"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockStore := store_mocks.NewMockStore(t)
+			mockQueue := queue_mocks.NewMockQueue(t)
+			mockLogStore := log_mocks.NewMockService(t)
+			origLogStore := server.Config.Services.LogStore
+			server.Config.Services.LogStore = mockLogStore
+			t.Cleanup(func() { server.Config.Services.LogStore = origLogStore })
+
+			children := tt.children
+			if children == nil {
+				children = []*model.Step{}
+			}
+			mockStore.On("WorkflowLoad", int64(30)).Return(defaultWorkflow(model.StatusRunning), nil)
+			mockStore.On("StepListFromWorkflowFind", mock.Anything).Return(children, nil)
+			mockStore.On("GetPipeline", int64(20)).Return(defaultPipeline(model.StatusRunning), nil)
+			mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
+			mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
+			mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+			mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{}, nil)
+			mockStore.On("UpdatePipeline", mock.Anything).Return(nil)
+			mockStore.On("AgentUpdate", mock.Anything).Return(nil)
+			// an unexpected call to the mocked queue fails the test
+			if tt.want == "" {
+				mockQueue.On("Error", mock.Anything, "30", mock.MatchedBy(func(err error) bool {
+					return strings.Contains(err.Error(), "boom")
+				})).Return(nil).Once()
+			} else {
+				mockQueue.On("Done", mock.Anything, "30", tt.want).Return(nil).Once()
+			}
+
+			rpcInst := newTestRPC(t, mockStore, mockQueue)
+			ctx := context.WithValue(t.Context(), agentIDKey, int64(1))
+
+			require.NoError(t, rpcInst.Done(ctx, "30", tt.state))
+		})
+	}
 }
 
 func TestRPCDone(t *testing.T) {

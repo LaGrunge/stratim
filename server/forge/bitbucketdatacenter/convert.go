@@ -33,7 +33,7 @@ func convertStatus(status model.StatusValue) bitbucket.BuildStatusState {
 		return bitbucket.BuildStatusStateInProgress
 	case model.StatusSuccess:
 		return bitbucket.BuildStatusStateSuccessful
-	case model.StatusFailure, model.StatusKilled, model.StatusError, model.StatusDeclined, model.StatusSkipped, model.StatusCanceled, model.StatusBlocked:
+	case model.StatusFailure, model.StatusTimeout, model.StatusKilled, model.StatusError, model.StatusDeclined, model.StatusSkipped, model.StatusCanceled, model.StatusBlocked:
 		return bitbucket.BuildStatusStateFailed
 	default:
 		log.Warn().Str("status", string(status)).Msg("unknown pipeline status")

@@ -111,18 +111,7 @@ func (q *persistentQueue) restorePausedState() {
 }
 
 func isTerminalWorkflowState(state model.StatusValue) bool {
-	switch state {
-	case model.StatusSuccess,
-		model.StatusFailure,
-		model.StatusKilled,
-		model.StatusCanceled,
-		model.StatusSkipped,
-		model.StatusError,
-		model.StatusDeclined:
-		return true
-	default:
-		return false
-	}
+	return state.IsDone()
 }
 
 // PushAtOnce pushes multiple tasks to the tail of this queue.

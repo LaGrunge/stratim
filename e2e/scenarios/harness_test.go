@@ -50,11 +50,8 @@ func TestRecordEvents(t *testing.T) {
 
 // TestWorkflowTimeoutInSeconds checks the harness's timeout unit: with the
 // agent counting in seconds, a repository timeout of 2 stops a step that
-// would sleep for 30 seconds.
-//
-// A timeout currently ends a workflow exactly like a cancel (killed, exit
-// code 130, "Canceled"); S0-8 gives it a status of its own and updates the
-// expectations here.
+// would sleep for 30 seconds. The step is stopped as a canceled one is (exit
+// code 130), but ends as timeout, not killed.
 func TestWorkflowTimeoutInSeconds(t *testing.T) {
 	env := setup.StartServer(t.Context(), t, []*forge_types.FileMeta{
 		{Name: ".woodpecker.yaml", Data: []byte(`
@@ -80,11 +77,11 @@ steps:
 	finished := setup.WaitForPipeline(t, env.Store, created.ID)
 
 	elapsed := time.Since(start)
-	assert.Equal(t, model.StatusKilled, finished.Status, "pipeline status after the timeout")
+	assert.Equal(t, model.StatusTimeout, finished.Status, "pipeline status after the timeout")
 	assert.GreaterOrEqual(t, elapsed, 2*time.Second, "the workflow ended before its timeout")
 	assert.Less(t, elapsed, 20*time.Second, "the timeout should have stopped the 30s step")
 
 	step := setup.WaitForStep(t, env.Store, finished, "too-long")
-	assert.Equal(t, model.StatusKilled, step.State, "step state after the timeout")
+	assert.Equal(t, model.StatusTimeout, step.State, "step state after the timeout")
 	assert.Equal(t, 130, step.ExitCode, "step exit code after the timeout")
 }

@@ -43,9 +43,9 @@ func (p *Workflow) Running() bool {
 	return p.State == StatusPending || p.State == StatusRunning
 }
 
-// Failing returns true if the process state is failed, killed or error.
+// Failing returns true if the process state is failed, timed out, killed or error.
 func (p *Workflow) Failing() bool {
-	return p.State == StatusError || p.State == StatusKilled || p.State == StatusFailure
+	return p.State.IsFailure()
 }
 
 // IsThereRunningStage determine if it contains workflows running or pending to run.

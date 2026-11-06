@@ -201,6 +201,11 @@ func (s *RPC) Update(c context.Context, strWorkflowID string, state rpc.StepStat
 		return err
 	}
 
+	// sanitize agent input: reject states no compatible agent can produce
+	if err := checkAgentReportedStepState(agent.ID, state); err != nil {
+		return err
+	}
+
 	// sanitize agent input: only allow step updates that the workflow state permits
 	if err := checkWorkflowAllowsStepUpdate(workflow.State, step, state); err != nil {
 		return err
@@ -212,9 +217,7 @@ func (s *RPC) Update(c context.Context, strWorkflowID string, state rpc.StepStat
 
 	if metric.FailurePipelineStepInfoCount != nil &&
 		state.Exited &&
-		(step.State == model.StatusFailure ||
-			step.State == model.StatusKilled ||
-			step.State == model.StatusError) {
+		step.State.IsFailure() {
 		metric.FailurePipelineStepInfoCount.WithLabelValues(workflow.Name, repo.FullName, step.Name, string(step.Type)).Inc()
 	}
 
@@ -369,25 +372,19 @@ func (s *RPC) Done(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 
 	// Complete any still-running children (e.g. service containers) before
 	// computing the workflow status, so their final state is reflected.
-	s.completeChildrenIfParentCompleted(workflow, state.Finished)
+	s.completeChildrenIfParentCompleted(workflow, state)
 
 	if workflow, err = pipeline.UpdateWorkflowStatusToDone(s.store, *workflow, state); err != nil {
 		logger.Error().Err(err).Msgf("pipeline.UpdateWorkflowStatusToDone: cannot update workflow state: %s", err)
 	}
 
+	// The queue gets the status the workflow was stored with: the workflows
+	// depending on it run or not by it.
 	var queueErr error
-	if !state.Canceled {
-		if workflow.Failing() {
-			queueErr = s.scheduler.Error(c, strWorkflowID, fmt.Errorf("workflow finished with error %s", state.Error))
-		} else {
-			queueErr = s.scheduler.Done(c, strWorkflowID, workflow.State)
-		}
+	if workflow.State == model.StatusFailure && state.Error != "" {
+		queueErr = s.scheduler.Error(c, strWorkflowID, fmt.Errorf("workflow finished with error %s", state.Error))
 	} else {
-		if workflow.Started > 0 {
-			queueErr = s.scheduler.Done(c, strWorkflowID, model.StatusKilled)
-		} else {
-			queueErr = s.scheduler.Done(c, strWorkflowID, model.StatusCanceled)
-		}
+		queueErr = s.scheduler.Done(c, strWorkflowID, workflow.State)
 	}
 	if queueErr != nil {
 		logger.Error().Err(queueErr).Msg("queue.Done: cannot ack workflow")
@@ -435,7 +432,7 @@ func (s *RPC) Done(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 		return err
 	}
 
-	if currentPipeline.Status == model.StatusSuccess || currentPipeline.Status == model.StatusFailure {
+	if currentPipeline.Status == model.StatusSuccess || currentPipeline.Status == model.StatusFailure || currentPipeline.Status == model.StatusTimeout {
 		s.pipelineCount.WithLabelValues(repo.FullName, currentPipeline.Branch, string(currentPipeline.Status), "total").Inc()
 		s.pipelineTime.WithLabelValues(repo.FullName, currentPipeline.Branch, string(currentPipeline.Status), "total").Set(float64(currentPipeline.Finished - currentPipeline.Started))
 	}
@@ -575,10 +572,18 @@ func (s *RPC) ReportHealth(ctx context.Context, status string) error {
 	return s.store.AgentUpdate(agent)
 }
 
-func (s *RPC) completeChildrenIfParentCompleted(completedWorkflow *model.Workflow, finished int64) {
+// completeChildrenIfParentCompleted ends the steps of a done workflow still
+// pending or running. A step the workflow's end stopped was killed; one that
+// never started when the workflow timed out is canceled, as after a cancel:
+// it was not killed by anyone.
+func (s *RPC) completeChildrenIfParentCompleted(completedWorkflow *model.Workflow, state rpc.WorkflowState) {
 	for _, c := range completedWorkflow.Children {
 		if c.Running() {
-			if updated, err := pipeline.UpdateStepToStatusSkipped(s.store, *c, finished, model.StatusKilled); err != nil {
+			status := model.StatusKilled
+			if state.TimedOut && c.Started == 0 {
+				status = model.StatusCanceled
+			}
+			if updated, err := pipeline.UpdateStepToStatusSkipped(s.store, *c, state.Finished, status); err != nil {
 				log.Error().Err(err).Msgf("done: cannot update step_id %d child state", c.ID)
 			} else {
 				// Update in-memory state so WorkflowStatus sees the final state

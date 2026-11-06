@@ -189,6 +189,7 @@ func TestGetStatus(t *testing.T) {
 		{model.StatusRunning, gitea.StatusPending},
 		{model.StatusSuccess, gitea.StatusSuccess},
 		{model.StatusFailure, gitea.StatusFailure},
+		{model.StatusTimeout, gitea.StatusFailure},
 		{model.StatusKilled, gitea.StatusFailure},
 		{model.StatusSkipped, gitea.StatusFailure},
 		{model.StatusCanceled, gitea.StatusFailure},

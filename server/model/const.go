@@ -60,6 +60,7 @@ const (
 	StatusRunning  StatusValue = "running"  // currently running
 	StatusSuccess  StatusValue = "success"  // successfully finished
 	StatusFailure  StatusValue = "failure"  // failed to finish (exit code != 0)
+	StatusTimeout  StatusValue = "timeout"  // ended by its own or its workflow's timeout
 	StatusKilled   StatusValue = "killed"   // killed by user
 	StatusCanceled StatusValue = "canceled" // canceled but hasn't been started
 	StatusError    StatusValue = "error"    // error with the config / while parsing / some other system problem
@@ -72,10 +73,32 @@ var ErrInvalidStatusValue = errors.New("invalid status value")
 
 func (s StatusValue) Validate() error {
 	switch s {
-	case StatusSkipped, StatusPending, StatusRunning, StatusSuccess, StatusFailure, StatusKilled, StatusCanceled, StatusError, StatusBlocked, StatusDeclined, StatusCreated:
+	case StatusSkipped, StatusPending, StatusRunning, StatusSuccess, StatusFailure, StatusTimeout, StatusKilled, StatusCanceled, StatusError, StatusBlocked, StatusDeclined, StatusCreated:
 		return nil
 	default:
 		return fmt.Errorf("%w: %s", ErrInvalidStatusValue, s)
+	}
+}
+
+// IsDone reports whether s is a final state: no further work will happen.
+func (s StatusValue) IsDone() bool {
+	switch s {
+	case StatusSuccess, StatusFailure, StatusTimeout, StatusKilled, StatusCanceled, StatusSkipped, StatusError, StatusDeclined:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsFailure reports whether s is a final state that did not succeed: a
+// failure, a timeout, a kill or an error. Skipped, canceled (never started)
+// and declined are not failures.
+func (s StatusValue) IsFailure() bool {
+	switch s {
+	case StatusFailure, StatusTimeout, StatusKilled, StatusError:
+		return true
+	default:
+		return false
 	}
 }
 

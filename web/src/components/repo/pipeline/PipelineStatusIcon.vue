@@ -38,6 +38,7 @@ const statusDescriptions = {
   declined: t('repo.pipeline.status.declined'),
   error: t('repo.pipeline.status.error'),
   failure: t('repo.pipeline.status.failure'),
+  timeout: t('repo.pipeline.status.timeout'),
   killed: t('repo.pipeline.status.killed'),
   pending: t('repo.pipeline.status.pending'),
   running: t('repo.pipeline.status.running'),

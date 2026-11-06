@@ -35,6 +35,7 @@ const (
 	descPending  = "this pipeline is pending"
 	descSuccess  = "the pipeline was successful"
 	descFailure  = "the pipeline failed"
+	descTimeout  = "the pipeline timed out"
 	descBlocked  = "the pipeline requires approval"
 	descDeclined = "the pipeline was rejected"
 	descError    = "oops, something went wrong"
@@ -52,7 +53,7 @@ func convertStatus(status model.StatusValue) string {
 	switch status {
 	case model.StatusPending, model.StatusRunning, model.StatusBlocked, model.StatusSkipped, model.StatusCanceled, model.StatusCreated:
 		return statusPending
-	case model.StatusFailure, model.StatusDeclined:
+	case model.StatusFailure, model.StatusTimeout, model.StatusDeclined:
 		return statusFailure
 	case model.StatusKilled, model.StatusError:
 		return statusError
@@ -74,6 +75,8 @@ func convertDesc(status model.StatusValue) string {
 		return descSuccess
 	case model.StatusFailure:
 		return descFailure
+	case model.StatusTimeout:
+		return descTimeout
 	case model.StatusBlocked:
 		return descBlocked
 	case model.StatusDeclined:

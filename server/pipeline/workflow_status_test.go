@@ -33,6 +33,19 @@ func TestWorkflowStatus(t *testing.T) {
 		{
 			s: []*model.Step{
 				{
+					State:   model.StatusTimeout,
+					Failure: model.FailureIgnore,
+				},
+				{
+					State:   model.StatusSuccess,
+					Failure: model.FailureFail,
+				},
+			},
+			e: model.StatusSuccess,
+		},
+		{
+			s: []*model.Step{
+				{
 					State:   model.StatusFailure,
 					Failure: model.FailureIgnore,
 				},
@@ -270,6 +283,72 @@ func TestUpdateWorkflowStatusToDone(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, model.StatusFailure, result.State)
 		assert.Equal(t, "some error occurred", result.Error)
+	})
+
+	t.Run("should mark as timeout when the workflow timed out", func(t *testing.T) {
+		workflow := model.Workflow{
+			ID:       7,
+			State:    model.StatusRunning,
+			Children: []*model.Step{{ID: 1, State: model.StatusKilled}},
+		}
+		state := rpc.WorkflowState{
+			Started:  1234567800,
+			Finished: 1234567900,
+			Canceled: true,
+			TimedOut: true,
+		}
+
+		mockStore := store_mocks.NewMockStore(t)
+		mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+
+		result, err := UpdateWorkflowStatusToDone(mockStore, workflow, state)
+
+		assert.NoError(t, err)
+		assert.Equal(t, model.StatusTimeout, result.State)
+	})
+
+	t.Run("should mark as killed when canceled", func(t *testing.T) {
+		workflow := model.Workflow{
+			ID:       8,
+			State:    model.StatusRunning,
+			Children: []*model.Step{{ID: 1, State: model.StatusKilled}},
+		}
+		state := rpc.WorkflowState{
+			Started:  1234567800,
+			Finished: 1234567900,
+			Canceled: true,
+		}
+
+		mockStore := store_mocks.NewMockStore(t)
+		mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+
+		result, err := UpdateWorkflowStatusToDone(mockStore, workflow, state)
+
+		assert.NoError(t, err)
+		assert.Equal(t, model.StatusKilled, result.State)
+	})
+
+	t.Run("should mark as timeout when a step timed out", func(t *testing.T) {
+		workflow := model.Workflow{
+			ID:    9,
+			State: model.StatusRunning,
+			Children: []*model.Step{
+				{ID: 1, State: model.StatusFailure, Failure: model.FailureFail},
+				{ID: 2, State: model.StatusTimeout, Failure: model.FailureFail},
+			},
+		}
+		state := rpc.WorkflowState{
+			Started:  1234567800,
+			Finished: 1234567900,
+		}
+
+		mockStore := store_mocks.NewMockStore(t)
+		mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+
+		result, err := UpdateWorkflowStatusToDone(mockStore, workflow, state)
+
+		assert.NoError(t, err)
+		assert.Equal(t, model.StatusTimeout, result.State)
 	})
 
 	t.Run("should mark as success when all children are successful", func(t *testing.T) {

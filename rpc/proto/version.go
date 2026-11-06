@@ -14,6 +14,9 @@
 
 package proto
 
-// Version is the version of the woodpecker.proto file,
-// IMPORTANT: increased by 1 each time it get changed.
+// Version is the version of the woodpecker.proto file. Agent and server
+// must report the same one, so it is increased by 1 only for a change the
+// wire cannot accept from the other side (a removed or retyped field, a
+// changed meaning). A new optional field whose zero value keeps the old
+// behavior needs no bump: an older peer leaves it unset.
 const Version int32 = 16

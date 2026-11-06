@@ -61,14 +61,9 @@ func CalcStepStatus(step model.Step, state rpc.StepState) (_ *model.Step, cancel
 			step.ExitCode = state.ExitCode
 			step.Error = state.Error
 
-			if state.ExitCode == 0 && state.Error == "" {
-				step.State = model.StatusSuccess
-			} else {
-				step.State = model.StatusFailure
-
-				if step.Failure == model.FailureCancel {
-					cancelPipelineFromStep = true
-				}
+			step.State = finishedStepStatus(state)
+			if step.State != model.StatusSuccess && step.Failure == model.FailureCancel {
+				cancelPipelineFromStep = true
 			}
 		}
 
@@ -82,14 +77,9 @@ func CalcStepStatus(step model.Step, state rpc.StepState) (_ *model.Step, cancel
 			step.ExitCode = state.ExitCode
 			step.Error = state.Error
 
-			if state.ExitCode == 0 && state.Error == "" {
-				step.State = model.StatusSuccess
-			} else {
-				step.State = model.StatusFailure
-
-				if step.Failure == model.FailureCancel {
-					cancelPipelineFromStep = true
-				}
+			step.State = finishedStepStatus(state)
+			if step.State != model.StatusSuccess && step.Failure == model.FailureCancel {
+				cancelPipelineFromStep = true
 			}
 		}
 
@@ -97,15 +87,36 @@ func CalcStepStatus(step model.Step, state rpc.StepState) (_ *model.Step, cancel
 		return nil, false, fmt.Errorf("step has state %s and does not expect rpc state updates", step.State)
 	}
 
-	// Handle cancellation across both cases
-	if state.Canceled && step.State != model.StatusKilled {
-		step.State = model.StatusKilled
-		if step.Finished == 0 {
-			step.Finished = time.Now().Unix()
+	// Handle cancellation across both cases: a step the workflow's timeout
+	// stopped timed out, any other stopped step was killed
+	if state.Canceled {
+		stopped := model.StatusKilled
+		if state.TimedOut {
+			stopped = model.StatusTimeout
+		}
+		if step.State != stopped {
+			step.State = stopped
+			if step.Finished == 0 {
+				step.Finished = time.Now().Unix()
+			}
 		}
 	}
 
 	return &step, cancelPipelineFromStep, nil
+}
+
+// finishedStepStatus is the status of a step that ended. The agent tells a
+// timeout explicitly: its exit code is the one timeout(1) gives, which a
+// command may exit with by itself.
+func finishedStepStatus(state rpc.StepState) model.StatusValue {
+	switch {
+	case state.TimedOut:
+		return model.StatusTimeout
+	case state.ExitCode == 0 && state.Error == "":
+		return model.StatusSuccess
+	default:
+		return model.StatusFailure
+	}
 }
 
 // UpdateStepStatus updates step status based on agent reports via RPC.
@@ -118,18 +129,24 @@ func UpdateStepStatus(ctx context.Context, store store.Store, step *model.Step, 
 	}
 	*step = *updatedStep // update step for external callers
 
-	if shouldCancelPipelineFromStep {
-		if err := cancelPipelineFromStep(ctx, store, step); err != nil {
-			return err
-		}
+	// the step is stored first: canceling the pipeline must not lose it
+	if err := store.StepUpdate(step); err != nil {
+		return err
 	}
-	return store.StepUpdate(step)
+	if shouldCancelPipelineFromStep {
+		return cancelPipelineFromStep(ctx, store, step)
+	}
+	return nil
 }
 
 func cancelPipelineFromStep(ctx context.Context, store store.Store, step *model.Step) error {
 	pipeline, err := store.GetPipeline(step.PipelineID)
 	if err != nil {
 		return err
+	}
+	// another step canceled it already, or it ended meanwhile
+	if !pipelineCancelable(pipeline) {
+		return nil
 	}
 
 	repo, err := store.GetRepo(pipeline.RepoID)

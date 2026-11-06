@@ -85,6 +85,7 @@ func TestGetPipelineStatusDescription(t *testing.T) {
 		model.StatusRunning:  "Pipeline is running",
 		model.StatusSuccess:  "Pipeline was successful",
 		model.StatusFailure:  "Pipeline failed",
+		model.StatusTimeout:  "Pipeline timed out",
 		model.StatusError:    "Pipeline failed",
 		model.StatusKilled:   "Pipeline was canceled",
 		model.StatusBlocked:  "Pipeline is pending approval",

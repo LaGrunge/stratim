@@ -207,6 +207,7 @@ func TestGetStatus(t *testing.T) {
 		{model.StatusRunning, forgejo.StatusPending},
 		{model.StatusSuccess, forgejo.StatusSuccess},
 		{model.StatusFailure, forgejo.StatusFailure},
+		{model.StatusTimeout, forgejo.StatusFailure},
 		{model.StatusKilled, forgejo.StatusFailure},
 		{model.StatusSkipped, forgejo.StatusFailure},
 		{model.StatusCanceled, forgejo.StatusFailure},

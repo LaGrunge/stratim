@@ -30,7 +30,7 @@ func getStatus(status model.StatusValue) gitlab.BuildStateValue {
 		return gitlab.Running
 	case model.StatusSuccess:
 		return gitlab.Success
-	case model.StatusFailure, model.StatusError, model.StatusSkipped, model.StatusCanceled, model.StatusDeclined:
+	case model.StatusFailure, model.StatusTimeout, model.StatusError, model.StatusSkipped, model.StatusCanceled, model.StatusDeclined:
 		return gitlab.Failed
 	case model.StatusKilled:
 		return gitlab.Canceled

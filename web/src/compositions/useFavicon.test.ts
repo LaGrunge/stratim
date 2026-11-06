@@ -66,6 +66,15 @@ describe('useFavicon', () => {
     wrapper.unmount();
   });
 
+  it('maps a timeout to the error favicon', async () => {
+    const { wrapper } = mountConsumer('timeout');
+    await nextTick();
+
+    expect(faviconHref()).toMatch(/favicon-(light|dark)-error\.png$/);
+
+    wrapper.unmount();
+  });
+
   it('resets to the default favicon when the consuming component unmounts', async () => {
     // real world: user opens a failing pipeline, then navigates back to the
     // repo list — the error favicon must not stick around globally

@@ -100,3 +100,13 @@ func TestEnviron(t *testing.T) {
 	envs = m.Environ()
 	assert.Equal(t, "false", envs["CI_COMMIT_PULL_REQUEST_DRAFT"])
 }
+
+func TestEnvironPrevPipelineTimeout(t *testing.T) {
+	m := Metadata{Prev: Pipeline{Status: "timeout"}}
+	envs := m.Environ()
+	assert.Equal(t, "failure", envs["CI_PREV_PIPELINE_STATUS"], "a timeout reads as failure")
+
+	m = Metadata{Prev: Pipeline{Status: "killed"}}
+	envs = m.Environ()
+	assert.Equal(t, "killed", envs["CI_PREV_PIPELINE_STATUS"])
+}

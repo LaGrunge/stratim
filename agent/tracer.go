@@ -27,7 +27,10 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/rpc"
 )
 
-func (r *Runner) createTracer(ctxMeta context.Context, logger zerolog.Logger, workflow *rpc.Workflow) tracing.TraceFunc {
+// createTracer returns the tracer reporting step states. The workflowCtx is
+// the context the workflow runs in: it tells a step stopped by the
+// workflow's timeout from a canceled one.
+func (r *Runner) createTracer(ctxMeta, workflowCtx context.Context, logger zerolog.Logger, workflow *rpc.Workflow) tracing.TraceFunc {
 	return func(state *state.State) error {
 		stepLogger := logger.With().
 			Str("image", state.CurrStep.Image).
@@ -45,6 +48,8 @@ func (r *Runner) createTracer(ctxMeta context.Context, logger zerolog.Logger, wo
 			Canceled: errors.Is(state.CurrStepState.Error, pipeline_errors.ErrCancel),
 			Skipped:  state.CurrStepState.Skipped,
 		}
+		stepState.TimedOut = stepTimedOut(state.CurrStepState.Error) ||
+			(stepState.Canceled && workflowTimedOut(workflowCtx))
 		if state.CurrStepState.Error != nil {
 			stepState.Error = state.CurrStepState.Error.Error()
 		}
@@ -57,4 +62,16 @@ func (r *Runner) createTracer(ctxMeta context.Context, logger zerolog.Logger, wo
 
 		return r.client.Update(ctxMeta, workflow.ID, stepState)
 	}
+}
+
+// stepTimedOut reports whether err ended a step by its own timeout.
+func stepTimedOut(err error) bool {
+	var timeoutErr *pipeline_errors.TimeoutError
+	return errors.As(err, &timeoutErr)
+}
+
+// workflowTimedOut reports whether workflowCtx ended by the workflow's
+// timeout, not by a cancel, a sigterm or the workflow's end.
+func workflowTimedOut(workflowCtx context.Context) bool {
+	return errors.Is(context.Cause(workflowCtx), context.DeadlineExceeded)
 }

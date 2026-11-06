@@ -82,6 +82,18 @@ func TestCC(t *testing.T) {
 		assert.Equal(t, "Sleeping", cc.Project.Activity)
 	})
 
+	t.Run("properly label timeout", func(t *testing.T) {
+		r := &model.Repo{FullName: "foo/bar"}
+		b := &model.Pipeline{
+			Status:  model.StatusTimeout,
+			Number:  1,
+			Started: 1257894000,
+		}
+		cc := New(r, b, "http://localhost/foo/bar/1")
+		assert.Equal(t, "Failure", cc.Project.LastBuildStatus)
+		assert.Equal(t, "Sleeping", cc.Project.Activity)
+	})
+
 	t.Run("properly label running", func(t *testing.T) {
 		r := &model.Repo{FullName: "foo/bar"}
 		b := &model.Pipeline{

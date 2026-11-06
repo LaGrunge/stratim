@@ -52,6 +52,10 @@ func TestConvertStatus(t *testing.T) {
 			to:   bitbucket.BuildStatusStateFailed,
 		},
 		{
+			from: model.StatusTimeout,
+			to:   bitbucket.BuildStatusStateFailed,
+		},
+		{
 			from: model.StatusSkipped,
 			to:   bitbucket.BuildStatusStateFailed,
 		},

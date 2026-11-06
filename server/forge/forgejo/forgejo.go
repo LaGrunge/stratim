@@ -613,7 +613,7 @@ func getStatus(status model.StatusValue) forgejo.StatusState {
 		return forgejo.StatusPending
 	case model.StatusSuccess:
 		return forgejo.StatusSuccess
-	case model.StatusFailure, model.StatusKilled, model.StatusSkipped, model.StatusCanceled:
+	case model.StatusFailure, model.StatusTimeout, model.StatusKilled, model.StatusSkipped, model.StatusCanceled:
 		return forgejo.StatusFailure
 	case model.StatusDeclined:
 		return forgejo.StatusWarning

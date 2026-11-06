@@ -32,6 +32,7 @@ func TestConvertStatus(t *testing.T) {
 	}{
 		{name: "success", status: model.StatusSuccess, want: statusSuccess},
 		{name: "failure", status: model.StatusFailure, want: statusFailure},
+		{name: "timeout", status: model.StatusTimeout, want: statusFailure},
 		{name: "declined", status: model.StatusDeclined, want: statusFailure},
 		{name: "killed", status: model.StatusKilled, want: statusError},
 		{name: "error", status: model.StatusError, want: statusError},
@@ -57,6 +58,7 @@ func TestConvertDesc(t *testing.T) {
 	assert.Equal(t, descPending, convertDesc(model.StatusPending))
 	assert.Equal(t, descPending, convertDesc(model.StatusRunning))
 	assert.Equal(t, descFailure, convertDesc(model.StatusFailure))
+	assert.Equal(t, descTimeout, convertDesc(model.StatusTimeout))
 	assert.Equal(t, descBlocked, convertDesc(model.StatusBlocked))
 	assert.Equal(t, descDeclined, convertDesc(model.StatusDeclined))
 	assert.Equal(t, descError, convertDesc(model.StatusKilled))

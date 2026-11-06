@@ -50,6 +50,7 @@ message StepState {
   string error = 6;
   bool   canceled = 7;
   bool   skipped = 8;
+  bool   timed_out = 9; // ended by its own or its workflow's timeout
 }
 
 message WorkflowState {
@@ -57,6 +58,7 @@ message WorkflowState {
   int64  finished = 2;
   string error = 3;
   bool   canceled = 4;
+  bool   timed_out = 5; // ended by its timeout
 }
 
 message LogEntry {
