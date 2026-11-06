@@ -21,6 +21,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"go.woodpecker-ci.org/woodpecker/v3/server/events"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forgestatus"
 	"go.woodpecker-ci.org/woodpecker/v3/server/services/utils/hostmatcher"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/constant"
@@ -343,6 +344,12 @@ var flags = append([]cli.Flag{
 		Name:    "jsonnet-memory-mib",
 		Usage:   "the most memory evaluating one jsonnet config may use, in MiB",
 		Value:   1024,
+	},
+	&cli.IntFlag{
+		Sources: cli.EnvVars("STRATIM_EVENTS_BUFFER_SIZE"),
+		Name:    "events-buffer-size",
+		Usage:   "how many of the latest pipeline events /api/v2/events keeps to replay to a client that reconnects, at most 100000",
+		Value:   events.DefaultBufferSize,
 	},
 	&cli.DurationFlag{
 		Sources: cli.EnvVars("STRATIM_JSONNET_TIMEOUT"),

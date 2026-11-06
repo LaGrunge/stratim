@@ -1,0 +1,12 @@
+# snapshot 0: pending
+{"v":1,"id":0,"type":"pipeline.created","severity":"info","ts":"2026-11-06T03:00:00Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","status":"pending","summary":"#345 created on main"}
+# snapshot 1: running
+{"v":1,"id":0,"type":"pipeline.started","severity":"notice","ts":"2026-11-06T03:00:05Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","status":"running","summary":"#345 started"}
+{"v":1,"id":0,"type":"workflow.started","severity":"info","ts":"2026-11-06T03:00:05Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":1,"status":"running","summary":"#345 build started"}
+{"v":1,"id":0,"type":"step.started","severity":"debug","ts":"2026-11-06T03:00:06Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":1,"step":"test","step_id":11,"status":"running","summary":"#345 build/test started"}
+# snapshot 2: killed
+{"v":1,"id":0,"type":"step.finished","severity":"warning","ts":"2026-11-06T03:00:19Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":1,"step":"test","step_id":11,"status":"killed","exit_code":130,"duration_s":13,"summary":"#345 build/test killed after 13s"}
+{"v":1,"id":0,"type":"workflow.finished","severity":"warning","ts":"2026-11-06T03:00:20Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":1,"status":"killed","duration_s":15,"summary":"#345 build killed after 15s"}
+{"v":1,"id":0,"type":"step.finished","severity":"debug","ts":"2026-11-06T03:01:40Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"deploy","workflow_id":2,"step":"push","step_id":21,"status":"canceled","summary":"#345 deploy/push canceled"}
+{"v":1,"id":0,"type":"workflow.finished","severity":"info","ts":"2026-11-06T03:00:20Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"deploy","workflow_id":2,"status":"canceled","summary":"#345 deploy canceled"}
+{"v":1,"id":0,"type":"pipeline.finished","severity":"warning","ts":"2026-11-06T03:00:20Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","status":"killed","duration_s":15,"summary":"#345 killed after 15s"}

@@ -35,6 +35,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/cache"
+	"go.woodpecker-ci.org/woodpecker/v3/server/events"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge/setup"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forgestatus"
@@ -196,7 +197,14 @@ func setupEvilGlobals(ctx context.Context, c *cli.Command, s store.Store) (err e
 	if err != nil {
 		return fmt.Errorf("could not setup queue: %w", err)
 	}
-	server.Config.Services.Scheduler = scheduler.NewScheduler(ctx, s, queue, pubsub)
+	bufferSize := c.Int("events-buffer-size")
+	if err := events.CheckBufferSize(bufferSize); err != nil {
+		return fmt.Errorf("events-buffer-size: %w", err)
+	}
+	log.Info().Int("events", bufferSize).Msg("pipeline events: keeping the latest for replay")
+	server.Config.Services.Events = events.NewHub(events.Options{BufferSize: bufferSize})
+	server.Config.Services.Scheduler = scheduler.NewScheduler(ctx, s, queue, pubsub,
+		scheduler.WithPipelineObserver(server.Config.Services.Events))
 	server.Config.Services.Manager, err = services.NewManager(c, s, setup.Forge)
 	if err != nil {
 		return fmt.Errorf("could not setup service manager: %w", err)
