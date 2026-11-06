@@ -60,13 +60,13 @@ func runMain(budgetsPath, pipelinePath string, getenv func(string) string, out i
 		return false, err
 	}
 	src := fileSource(pipelinePath)
-	var logs logSource
+	var logs *logSources
 	if pipelinePath == "" {
 		cfg, err := apiConfigFromEnv(getenv)
 		if err != nil {
 			return false, err
 		}
-		src, logs = apiSource(cfg), apiLogSource(cfg)
+		src, logs = apiSource(cfg), &logSources{count: apiLogSource(cfg), status: apiStatusSource(cfg)}
 	}
 	return run(budgets, src, logs, out)
 }
@@ -100,8 +100,14 @@ func fileSource(path string) source {
 	}
 }
 
+// logSources read the logs of steps.
+type logSources struct {
+	count  logSource
+	status statusSource
+}
+
 // run checks the pipeline from src, and the logs from logs unless it is nil.
-func run(budgets Budgets, src source, logs logSource, out io.Writer) (bool, error) {
+func run(budgets Budgets, src source, logs *logSources, out io.Writer) (bool, error) {
 	p, err := src()
 	if err != nil {
 		return false, err
@@ -110,16 +116,17 @@ func run(budgets Budgets, src source, logs logSource, out io.Writer) (bool, erro
 		return false, errors.New("no pipeline")
 	}
 	results := Check(p, budgets)
-	var logErr error
+	var countErr, statusErr error
 	if logs != nil {
-		var logResults []Result
-		logResults, logErr = CheckLogs(p, budgets.Logs, logs)
-		results = append(results, logResults...)
-	} else if len(budgets.Logs) > 0 {
+		var counted, seen []Result
+		counted, countErr = CheckLogs(p, budgets.Logs, logs.count)
+		seen, statusErr = CheckFinalizerLogs(p, budgets.Timeouts, logs.status)
+		results = append(append(results, counted...), seen...)
+	} else if len(budgets.Logs) > 0 || len(budgets.Timeouts) > 0 {
 		fmt.Fprintln(out, "logs not checked: no API")
 	}
 	// report what was checked even when a log could not be read
-	return Failed(results), errors.Join(report(out, p.Number, results), logErr)
+	return Failed(results), errors.Join(report(out, p.Number, results), countErr, statusErr)
 }
 
 func report(out io.Writer, number int64, results []Result) error {

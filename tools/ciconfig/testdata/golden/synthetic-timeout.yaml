@@ -1,0 +1,33 @@
+depends_on:
+- synthetic-parallel-a
+- synthetic-parallel-b
+labels:
+  backend: docker
+skip_clone: true
+steps:
+- commands:
+  - sleep 600
+  failure: ignore
+  image: docker.io/alpine:3.24
+  name: hang
+  timeout: 30s
+- commands:
+  - echo the workflow went on
+  image: docker.io/alpine:3.24
+  name: after
+- commands:
+  - echo "STRATIM_PIPELINE_STATUS=$STRATIM_PIPELINE_STATUS"
+  image: docker.io/alpine:3.24
+  name: report
+  on_finish: true
+when:
+- cron: synthetic-check/nightly
+  event: cron
+  status:
+  - success
+  - failure
+- evaluate: TASK == "synthetic"
+  event: manual
+  status:
+  - success
+  - failure

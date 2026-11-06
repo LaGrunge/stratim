@@ -36,12 +36,32 @@ local workflows = {
 
   'synthetic-parallel-a': parallel,
   'synthetic-parallel-b': parallel,
+
+  // a step that hangs runs into its timeout, as a deadlocked test does. It
+  // ignores SIGTERM (its shell is PID 1), so the backend kills it after its
+  // stop grace. Its failure is ignored: it ends `timeout`, the next step runs
+  // all the same, and the workflow and the outcome the finalizer is given
+  // stay success; a workflow ended `timeout` would leave the whole pipeline
+  // `timeout` every night. The finalizer prints that outcome for the check.
+  // It waits for the parallel pair, whatever their outcome: the pool holds
+  // four agents of one workflow each, and a fifth workflow taking one at
+  // 03:00 could leave one of the pair queued and the overlap unmet; it ends
+  // long before the big log does. Its kill budget counts on the docker
+  // backend's stop grace, so it runs on docker agents only.
+  'synthetic-timeout': load([
+    s.step('hang', ci.images.alpine, ['sleep 600'], { timeout: '30s', failure: 'ignore' }),
+    s.step('after', ci.images.alpine, ['echo the workflow went on']),
+    s.step('report', ci.images.alpine, ['echo "STRATIM_PIPELINE_STATUS=$STRATIM_PIPELINE_STATUS"'], { on_finish: true }),
+  ]) + {
+    when: [w + s.when.status(['success', 'failure']) for w in ci.synthetic],
+    depends_on: ['synthetic-parallel-a', 'synthetic-parallel-b'],
+    labels: { backend: 'docker' },
+  },
 };
 
 workflows {
   // reads this very pipeline from the API once the others are done, whatever
-  // their outcome, and fails when one of them broke a budget. Not yet here: a
-  // step that hits its timeout; S0-6 makes timeouts workflow settings.
+  // their outcome, and fails when one of them broke a budget
   'synthetic-check': s.workflow([
     s.step('check', ci.images.golang, ['go run ./tools/synthetic-check -budgets .woodpecker/synthetic/budgets.json'], {
       environment: {

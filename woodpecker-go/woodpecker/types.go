@@ -181,6 +181,8 @@ type (
 		Started  int64    `json:"started,omitempty"`
 		Stopped  int64    `json:"finished,omitempty"`
 		Type     StepType `json:"type,omitempty"`
+		// Finalizer is set for an on_finish step.
+		Finalizer bool `json:"finalizer,omitempty"`
 	}
 
 	// Registry represents a docker registry with credentials.
