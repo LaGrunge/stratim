@@ -465,6 +465,242 @@ func (_c *MockClient_AgentUpdate_Call) RunAndReturn(run func(agent *woodpecker.A
 	return _c
 }
 
+// BotTokenCalls provides a mock function for the type MockClient
+func (_mock *MockClient) BotTokenCalls(id int64, limit int) ([]*woodpecker.BotTokenCall, error) {
+	ret := _mock.Called(id, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenCalls")
+	}
+
+	var r0 []*woodpecker.BotTokenCall
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64, int) ([]*woodpecker.BotTokenCall, error)); ok {
+		return returnFunc(id, limit)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64, int) []*woodpecker.BotTokenCall); ok {
+		r0 = returnFunc(id, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*woodpecker.BotTokenCall)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64, int) error); ok {
+		r1 = returnFunc(id, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_BotTokenCalls_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenCalls'
+type MockClient_BotTokenCalls_Call struct {
+	*mock.Call
+}
+
+// BotTokenCalls is a helper method to define mock.On call
+//   - id int64
+//   - limit int
+func (_e *MockClient_Expecter) BotTokenCalls(id any, limit any) *MockClient_BotTokenCalls_Call {
+	return &MockClient_BotTokenCalls_Call{Call: _e.mock.On("BotTokenCalls", id, limit)}
+}
+
+func (_c *MockClient_BotTokenCalls_Call) Run(run func(id int64, limit int)) *MockClient_BotTokenCalls_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_BotTokenCalls_Call) Return(botTokenCalls []*woodpecker.BotTokenCall, err error) *MockClient_BotTokenCalls_Call {
+	_c.Call.Return(botTokenCalls, err)
+	return _c
+}
+
+func (_c *MockClient_BotTokenCalls_Call) RunAndReturn(run func(id int64, limit int) ([]*woodpecker.BotTokenCall, error)) *MockClient_BotTokenCalls_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BotTokenCreate provides a mock function for the type MockClient
+func (_mock *MockClient) BotTokenCreate(opt woodpecker.BotTokenCreateOptions) (*woodpecker.BotTokenCreated, error) {
+	ret := _mock.Called(opt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenCreate")
+	}
+
+	var r0 *woodpecker.BotTokenCreated
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(woodpecker.BotTokenCreateOptions) (*woodpecker.BotTokenCreated, error)); ok {
+		return returnFunc(opt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(woodpecker.BotTokenCreateOptions) *woodpecker.BotTokenCreated); ok {
+		r0 = returnFunc(opt)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*woodpecker.BotTokenCreated)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(woodpecker.BotTokenCreateOptions) error); ok {
+		r1 = returnFunc(opt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_BotTokenCreate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenCreate'
+type MockClient_BotTokenCreate_Call struct {
+	*mock.Call
+}
+
+// BotTokenCreate is a helper method to define mock.On call
+//   - opt woodpecker.BotTokenCreateOptions
+func (_e *MockClient_Expecter) BotTokenCreate(opt any) *MockClient_BotTokenCreate_Call {
+	return &MockClient_BotTokenCreate_Call{Call: _e.mock.On("BotTokenCreate", opt)}
+}
+
+func (_c *MockClient_BotTokenCreate_Call) Run(run func(opt woodpecker.BotTokenCreateOptions)) *MockClient_BotTokenCreate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 woodpecker.BotTokenCreateOptions
+		if args[0] != nil {
+			arg0 = args[0].(woodpecker.BotTokenCreateOptions)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_BotTokenCreate_Call) Return(botTokenCreated *woodpecker.BotTokenCreated, err error) *MockClient_BotTokenCreate_Call {
+	_c.Call.Return(botTokenCreated, err)
+	return _c
+}
+
+func (_c *MockClient_BotTokenCreate_Call) RunAndReturn(run func(opt woodpecker.BotTokenCreateOptions) (*woodpecker.BotTokenCreated, error)) *MockClient_BotTokenCreate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BotTokenList provides a mock function for the type MockClient
+func (_mock *MockClient) BotTokenList() ([]*woodpecker.BotToken, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenList")
+	}
+
+	var r0 []*woodpecker.BotToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() ([]*woodpecker.BotToken, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() []*woodpecker.BotToken); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*woodpecker.BotToken)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_BotTokenList_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenList'
+type MockClient_BotTokenList_Call struct {
+	*mock.Call
+}
+
+// BotTokenList is a helper method to define mock.On call
+func (_e *MockClient_Expecter) BotTokenList() *MockClient_BotTokenList_Call {
+	return &MockClient_BotTokenList_Call{Call: _e.mock.On("BotTokenList")}
+}
+
+func (_c *MockClient_BotTokenList_Call) Run(run func()) *MockClient_BotTokenList_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockClient_BotTokenList_Call) Return(botTokens []*woodpecker.BotToken, err error) *MockClient_BotTokenList_Call {
+	_c.Call.Return(botTokens, err)
+	return _c
+}
+
+func (_c *MockClient_BotTokenList_Call) RunAndReturn(run func() ([]*woodpecker.BotToken, error)) *MockClient_BotTokenList_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BotTokenRevoke provides a mock function for the type MockClient
+func (_mock *MockClient) BotTokenRevoke(id int64) error {
+	ret := _mock.Called(id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenRevoke")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(int64) error); ok {
+		r0 = returnFunc(id)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClient_BotTokenRevoke_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenRevoke'
+type MockClient_BotTokenRevoke_Call struct {
+	*mock.Call
+}
+
+// BotTokenRevoke is a helper method to define mock.On call
+//   - id int64
+func (_e *MockClient_Expecter) BotTokenRevoke(id any) *MockClient_BotTokenRevoke_Call {
+	return &MockClient_BotTokenRevoke_Call{Call: _e.mock.On("BotTokenRevoke", id)}
+}
+
+func (_c *MockClient_BotTokenRevoke_Call) Run(run func(id int64)) *MockClient_BotTokenRevoke_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_BotTokenRevoke_Call) Return(err error) *MockClient_BotTokenRevoke_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClient_BotTokenRevoke_Call) RunAndReturn(run func(id int64) error) *MockClient_BotTokenRevoke_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CronCreate provides a mock function for the type MockClient
 func (_mock *MockClient) CronCreate(repoID int64, cron *woodpecker.Cron) (*woodpecker.Cron, error) {
 	ret := _mock.Called(repoID, cron)
@@ -3203,6 +3439,74 @@ func (_c *MockClient_PipelineQueue_Call) RunAndReturn(run func() ([]*woodpecker.
 	return _c
 }
 
+// PipelineRestart provides a mock function for the type MockClient
+func (_mock *MockClient) PipelineRestart(pipelineID int64, opt woodpecker.PipelineRestartOptions) (*woodpecker.Pipeline, error) {
+	ret := _mock.Called(pipelineID, opt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PipelineRestart")
+	}
+
+	var r0 *woodpecker.Pipeline
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64, woodpecker.PipelineRestartOptions) (*woodpecker.Pipeline, error)); ok {
+		return returnFunc(pipelineID, opt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64, woodpecker.PipelineRestartOptions) *woodpecker.Pipeline); ok {
+		r0 = returnFunc(pipelineID, opt)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*woodpecker.Pipeline)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64, woodpecker.PipelineRestartOptions) error); ok {
+		r1 = returnFunc(pipelineID, opt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_PipelineRestart_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PipelineRestart'
+type MockClient_PipelineRestart_Call struct {
+	*mock.Call
+}
+
+// PipelineRestart is a helper method to define mock.On call
+//   - pipelineID int64
+//   - opt woodpecker.PipelineRestartOptions
+func (_e *MockClient_Expecter) PipelineRestart(pipelineID any, opt any) *MockClient_PipelineRestart_Call {
+	return &MockClient_PipelineRestart_Call{Call: _e.mock.On("PipelineRestart", pipelineID, opt)}
+}
+
+func (_c *MockClient_PipelineRestart_Call) Run(run func(pipelineID int64, opt woodpecker.PipelineRestartOptions)) *MockClient_PipelineRestart_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		var arg1 woodpecker.PipelineRestartOptions
+		if args[1] != nil {
+			arg1 = args[1].(woodpecker.PipelineRestartOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_PipelineRestart_Call) Return(pipeline *woodpecker.Pipeline, err error) *MockClient_PipelineRestart_Call {
+	_c.Call.Return(pipeline, err)
+	return _c
+}
+
+func (_c *MockClient_PipelineRestart_Call) RunAndReturn(run func(pipelineID int64, opt woodpecker.PipelineRestartOptions) (*woodpecker.Pipeline, error)) *MockClient_PipelineRestart_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PipelineRestartFailed provides a mock function for the type MockClient
 func (_mock *MockClient) PipelineRestartFailed(repoID int64, num int64, opt woodpecker.PipelineStartOptions) (*woodpecker.Pipeline, error) {
 	ret := _mock.Called(repoID, num, opt)
@@ -5594,6 +5898,61 @@ func (_c *MockClient_Version_Call) Return(version *woodpecker.Version, err error
 }
 
 func (_c *MockClient_Version_Call) RunAndReturn(run func() (*woodpecker.Version, error)) *MockClient_Version_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Whoami provides a mock function for the type MockClient
+func (_mock *MockClient) Whoami() (*woodpecker.Whoami, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Whoami")
+	}
+
+	var r0 *woodpecker.Whoami
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (*woodpecker.Whoami, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() *woodpecker.Whoami); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*woodpecker.Whoami)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_Whoami_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Whoami'
+type MockClient_Whoami_Call struct {
+	*mock.Call
+}
+
+// Whoami is a helper method to define mock.On call
+func (_e *MockClient_Expecter) Whoami() *MockClient_Whoami_Call {
+	return &MockClient_Whoami_Call{Call: _e.mock.On("Whoami")}
+}
+
+func (_c *MockClient_Whoami_Call) Run(run func()) *MockClient_Whoami_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockClient_Whoami_Call) Return(whoami *woodpecker.Whoami, err error) *MockClient_Whoami_Call {
+	_c.Call.Return(whoami, err)
+	return _c
+}
+
+func (_c *MockClient_Whoami_Call) RunAndReturn(run func() (*woodpecker.Whoami, error)) *MockClient_Whoami_Call {
 	_c.Call.Return(run)
 	return _c
 }

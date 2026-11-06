@@ -28,4 +28,8 @@ var (
 
 	// ErrDatabaseLocked is returned when an operation failed because the database is locked (usually a transitory state).
 	ErrDatabaseLocked = errors.New("database is locked")
+
+	// ErrBotTokenLimit is a user with as many active bot tokens as they may
+	// have.
+	ErrBotTokenLimit = errors.New("too many active bot tokens")
 )

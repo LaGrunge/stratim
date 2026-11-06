@@ -15,16 +15,19 @@
 package router
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/api"
 	"go.woodpecker-ci.org/woodpecker/v3/server/api/debug"
+	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware/session"
 )
 
-func apiRoutes(e *gin.RouterGroup) {
+func apiRoutes(e *gin.RouterGroup, bots *session.BotRoutes) {
 	apiBase := e.Group("/api")
 	{
 		apiBase.GET("/version", api.Version)
@@ -271,10 +274,32 @@ func apiRoutes(e *gin.RouterGroup) {
 
 		v2 := apiBase.Group("/v2")
 		{
-			v2.GET("/events", session.MustUser(), api.EventStreamV2(server.Config.Services.Events))
-			v2.GET("/pipelines/:pipeline_id/wait", session.MustUser(), api.WaitPipelineV2(server.Config.Services.Events, server.Config.Services.Durations))
-			v2.GET("/steps/:step_id/explain", session.MustUser(), api.StepExplainV2(server.Config.Services.Explain))
-			v2.GET("/steps/:step_id/log", session.MustUser(), api.StepLogV2(server.Config.Services.LogWindows))
+			// the only routes open to bot tokens, with the scope each needs
+			read := func(audit session.BotAudit) session.BotRoute {
+				return session.BotRoute{Scope: model.BotScopeRead, Audit: audit}
+			}
+			bots.Handle(v2, http.MethodGet, "/whoami", session.BotRoute{}, session.MustUser(), api.WhoamiV2)
+			bots.Handle(v2, http.MethodGet, "/events", read(session.BotAuditNone),
+				session.MustUser(), api.EventStreamV2(server.Config.Services.Events))
+			bots.Handle(v2, http.MethodGet, "/pipelines/:pipeline_id/wait", read(session.BotAuditPipeline),
+				session.MustUser(), api.WaitPipelineV2(server.Config.Services.Events, server.Config.Services.Durations))
+			bots.Handle(v2, http.MethodGet, "/steps/:step_id/explain", read(session.BotAuditStep),
+				session.MustUser(), api.StepExplainV2(server.Config.Services.Explain))
+			bots.Handle(v2, http.MethodGet, "/steps/:step_id/log", read(session.BotAuditStep),
+				session.MustUser(), api.StepLogV2(server.Config.Services.LogWindows))
+			bots.Handle(v2, http.MethodPost, "/pipelines/:pipeline_id/restart",
+				session.BotRoute{Scope: model.BotScopeRestart, Audit: session.BotAuditPipeline},
+				session.MustUser(), api.RestartPipelineV2)
+
+			// bot tokens are managed by their owner, never with a bot token
+			botTokens := v2.Group("/bot-tokens")
+			{
+				botTokens.Use(session.MustUser())
+				botTokens.GET("", api.GetBotTokens)
+				botTokens.POST("", api.PostBotToken)
+				botTokens.DELETE("/:token_id", api.DeleteBotToken)
+				botTokens.GET("/:token_id/calls", api.GetBotTokenCalls)
+			}
 		}
 
 		if zerolog.GlobalLevel() <= zerolog.DebugLevel {

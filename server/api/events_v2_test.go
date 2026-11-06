@@ -110,8 +110,22 @@ func newEventsV2EnvWith(t *testing.T, options events.Options) *eventsV2Env {
 			}
 		}
 	})
-	e.GET("/api/v2/events", session.MustUser(), EventStreamV2(env.hub))
-	e.GET("/api/v2/pipelines/:pipeline_id/wait", session.MustUser(), WaitPipelineV2(env.hub, env.durations))
+	// a request with a token is authenticated by it, as by the server
+	e.Use(session.SetUser())
+	bots := session.NewBotRoutes("")
+	e.Use(session.AuditBot(bots))
+	e.Use(session.GuardBot(bots))
+	v2 := e.Group("/api/v2")
+	read := session.BotRoute{Scope: model.BotScopeRead, Audit: session.BotAuditPipeline}
+	bots.Handle(v2, http.MethodGet, "/events", session.BotRoute{Scope: model.BotScopeRead}, session.MustUser(), EventStreamV2(env.hub))
+	bots.Handle(v2, http.MethodGet, "/pipelines/:pipeline_id/wait", read, session.MustUser(), WaitPipelineV2(env.hub, env.durations))
+	bots.Handle(v2, http.MethodPost, "/pipelines/:pipeline_id/restart", session.BotRoute{Scope: model.BotScopeRestart, Audit: session.BotAuditPipeline},
+		session.MustUser(), RestartPipelineV2)
+	bots.Handle(v2, http.MethodGet, "/whoami", session.BotRoute{}, session.MustUser(), WhoamiV2)
+	e.GET("/api/v2/bot-tokens", session.MustUser(), GetBotTokens)
+	e.POST("/api/v2/bot-tokens", session.MustUser(), PostBotToken)
+	e.DELETE("/api/v2/bot-tokens/:token_id", session.MustUser(), DeleteBotToken)
+	e.GET("/api/v2/bot-tokens/:token_id/calls", session.MustUser(), GetBotTokenCalls)
 	env.srv = httptest.NewServer(e)
 	t.Cleanup(env.srv.Close)
 	return env
@@ -564,7 +578,7 @@ func TestEventsV2AccessBackoff(t *testing.T) {
 	s.On("GetRepo", repo.ID).Return(repo, nil).Once()
 	s.On("PermFind", user, repo).Return(nil, errors.New("database is down")).Once()
 
-	access := newRepoAccess(s, user)
+	access := newRepoAccess(s, session.Principal{User: user})
 	for range 3 {
 		allowed, err := access.allowed(repo.ID)
 		require.NoError(t, err)

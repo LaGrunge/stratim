@@ -29,6 +29,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/pubsub/memory"
 	queue_mocks "go.woodpecker-ci.org/woodpecker/v3/server/queue/mocks"
+	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware/session"
 	"go.woodpecker-ci.org/woodpecker/v3/server/scheduler"
 	manager_mocks "go.woodpecker-ci.org/woodpecker/v3/server/services/mocks"
 	store_mocks "go.woodpecker-ci.org/woodpecker/v3/server/store/mocks"
@@ -77,7 +78,7 @@ func TestPrioritizeRouteAdminOnly(t *testing.T) {
 				c.Set("user", tt.user)
 				c.Next()
 			})
-			apiRoutes(e.Group(""))
+			apiRoutes(e.Group(""), session.NewBotRoutes(""))
 
 			w := httptest.NewRecorder()
 			e.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/repos/1/pipelines/2/prioritize", nil))

@@ -83,8 +83,9 @@ func EventStreamV2(hub *events.Hub) gin.HandlerFunc {
 }
 
 func streamEvents(c *gin.Context, hub *events.Hub) {
-	user := session.User(c)
-	access := newRepoAccess(store.FromContext(c), user)
+	principal := session.PrincipalOf(c)
+	user := principal.User
+	access := newRepoAccess(store.FromContext(c), principal)
 
 	filter, err := parseEventsFilter(c, access)
 	if err != nil {

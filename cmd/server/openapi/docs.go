@@ -4826,6 +4826,174 @@ const docTemplate = `{
                 }
             }
         },
+        "/v2/bot-tokens": {
+            "get": {
+                "description": "The bot tokens of the user, newest first; an admin lists those of all users with all=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Bot tokens"
+                ],
+                "summary": "List bot tokens",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cpersonal access token\u003e",
+                        "description": "Insert your personal access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "of all users (admins only)",
+                        "name": "all",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "for response pagination, page offset number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "for response pagination, max items per page",
+                        "name": "perPage",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/BotTokenInfo"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Creates a bot token of the user. The response carries the token, which the server never tells again.\nScopes: read, restart. A token never may more than its owner; it can be restricted to some repos, and\nan admin's has to be.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Bot tokens"
+                ],
+                "summary": "Create a bot token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cpersonal access token\u003e",
+                        "description": "Insert your personal access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "the token to create",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/BotTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/BotTokenCreated"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/bot-tokens/{token_id}": {
+            "delete": {
+                "description": "Revokes a bot token of the user, or any for an admin: it is refused from then on, and requests running\nwith it end within a minute. A revoked token stays listed; revoking it again changes nothing.",
+                "tags": [
+                    "Bot tokens"
+                ],
+                "summary": "Revoke a bot token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cpersonal access token\u003e",
+                        "description": "Insert your personal access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the id of the bot token",
+                        "name": "token_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
+        "/v2/bot-tokens/{token_id}/calls": {
+            "get": {
+                "description": "The latest calls made with a bot token of the user, or any for an admin, newest first: what was\ncalled, the answer and why a call was refused. Calls are kept for a retention set on the server.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Bot tokens"
+                ],
+                "summary": "List the calls of a bot token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cpersonal access token\u003e",
+                        "description": "Insert your personal access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the id of the bot token",
+                        "name": "token_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 100,
+                        "description": "how many calls at most, up to 1000",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/BotTokenCall"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/v2/events": {
             "get": {
                 "description": "Server-sent events, one per change of a pipeline, workflow or step, of the repos the user can read.\nEach has an id; a client that reconnects with the last one in Last-Event-ID is replayed what it missed,\nor told by a reset event that it has to load the current state. See the documentation of /api/v2/events.",
@@ -4898,6 +5066,51 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "OK"
+                    }
+                }
+            }
+        },
+        "/v2/pipelines/{pipeline_id}/restart": {
+            "post": {
+                "description": "Creates a new pipeline out of the pipeline, or only out of its failed workflows and those depending on\nthem. Needs push access to the repo; a bot token needs the restart scope and the repo among those it may\nuse. The body is optional.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Pipelines"
+                ],
+                "summary": "Restart a pipeline",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cpersonal access token\u003e",
+                        "description": "Insert your personal access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the id of the pipeline",
+                        "name": "pipeline_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "what to restart",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/RestartRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Pipeline"
+                        }
                     }
                 }
             }
@@ -5056,6 +5269,36 @@ const docTemplate = `{
                 }
             }
         },
+        "/v2/whoami": {
+            "get": {
+                "description": "The user of the request; with a bot token, its owner and the token, scopes and expiry included.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Bot tokens"
+                ],
+                "summary": "Who the request is made by",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cpersonal access token\u003e",
+                        "description": "Insert your personal access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Whoami"
+                        }
+                    }
+                }
+            }
+        },
         "/version": {
             "get": {
                 "description": "Endpoint returns the server version and build information.",
@@ -5145,6 +5388,172 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "string"
+                }
+            }
+        },
+        "BotTokenCall": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "description": "Created is unix seconds.",
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "ip": {
+                    "type": "string"
+                },
+                "latency_ms": {
+                    "type": "integer"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "integer"
+                },
+                "pipeline_id": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "description": "Reason is the reason of a write the caller gave, or why the call was\nrefused.",
+                    "type": "string"
+                },
+                "repo_id": {
+                    "type": "integer"
+                },
+                "route": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "token_id": {
+                    "description": "TokenID is 0 when the token was not known.",
+                    "type": "integer"
+                }
+            }
+        },
+        "BotTokenCreated": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "description": "Created, Expires, LastUsed and Revoked are unix seconds; 0 is never.",
+                    "type": "integer"
+                },
+                "expires": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_used": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "integer"
+                },
+                "prefix": {
+                    "description": "Prefix is the start of the token, to tell it in a list.",
+                    "type": "string"
+                },
+                "repo_ids": {
+                    "description": "RepoIDs restrict the token to these repos; none restricts it to\nnothing more than its owner's.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "revoked": {
+                    "type": "integer"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.BotScope"
+                    }
+                },
+                "status": {
+                    "$ref": "#/definitions/model.BotTokenStatus"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "BotTokenInfo": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "description": "Created, Expires, LastUsed and Revoked are unix seconds; 0 is never.",
+                    "type": "integer"
+                },
+                "expires": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_used": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "integer"
+                },
+                "prefix": {
+                    "description": "Prefix is the start of the token, to tell it in a list.",
+                    "type": "string"
+                },
+                "repo_ids": {
+                    "description": "RepoIDs restrict the token to these repos; none restricts it to\nnothing more than its owner's.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "revoked": {
+                    "type": "integer"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.BotScope"
+                    }
+                },
+                "status": {
+                    "$ref": "#/definitions/model.BotTokenStatus"
+                }
+            }
+        },
+        "BotTokenRequest": {
+            "type": "object",
+            "properties": {
+                "expires_in_days": {
+                    "description": "ExpiresInDays is how long the token lives: 1 to 365 days, 30 if 0.",
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "repo_ids": {
+                    "description": "RepoIDs restrict the token to these repos; an admin has to name them.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.BotScope"
+                    }
                 }
             }
         },
@@ -6136,6 +6545,19 @@ const docTemplate = `{
                 "VisibilityInternal"
             ]
         },
+        "RestartRequest": {
+            "type": "object",
+            "properties": {
+                "failed_only": {
+                    "description": "FailedOnly restarts only the failed workflows and those depending on\nthem.",
+                    "type": "boolean"
+                },
+                "reason": {
+                    "description": "Reason is recorded in the audit of a call made with a bot token.",
+                    "type": "string"
+                }
+            }
+        },
         "ReusedWorkflow": {
             "type": "object",
             "properties": {
@@ -6515,6 +6937,33 @@ const docTemplate = `{
                 "EventCron",
                 "EventManual"
             ]
+        },
+        "Whoami": {
+            "type": "object",
+            "properties": {
+                "bot": {
+                    "description": "Bot is the bot token the request is made with, if any.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/BotTokenInfo"
+                        }
+                    ]
+                },
+                "user": {
+                    "$ref": "#/definitions/WhoamiUser"
+                }
+            }
+        },
+        "WhoamiUser": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "login": {
+                    "type": "string"
+                }
+            }
         },
         "WorkflowInfo": {
             "type": "object",
@@ -7026,6 +7475,32 @@ const docTemplate = `{
                 "RequireApprovalForks",
                 "RequireApprovalPullRequests",
                 "RequireApprovalAllEvents"
+            ]
+        },
+        "model.BotScope": {
+            "type": "string",
+            "enum": [
+                "read",
+                "restart",
+                "annotate"
+            ],
+            "x-enum-varnames": [
+                "BotScopeRead",
+                "BotScopeRestart",
+                "BotScopeAnnotate"
+            ]
+        },
+        "model.BotTokenStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "expired",
+                "revoked"
+            ],
+            "x-enum-varnames": [
+                "BotTokenActive",
+                "BotTokenExpired",
+                "BotTokenRevoked"
             ]
         },
         "model.ForgeType": {

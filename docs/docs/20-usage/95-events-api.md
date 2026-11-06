@@ -11,7 +11,7 @@ The web UI keeps using `/api/stream/events`. The CLI follows a pipeline over thi
 
 ## Access
 
-The stream needs a login: a personal access token as above, or the session of the web UI. It carries the events of the repositories the user can read: all of them for an admin; otherwise the public and internal ones and those the user may pull by the permission the server has stored for them. The stream does not ask the forge; the rest of the API syncs the stored permissions with it once they are an hour old, and until then a stored pull counts. The user and these permissions are looked up again every minute while the stream runs, and the stream ends with an `error` event once the user is gone or their tokens are reset.
+The stream needs a login: a personal access token as above, a [bot token](96-bot-tokens.md) with the `read` scope, or the session of the web UI. It carries the events of the repositories the user can read: all of them for an admin; otherwise the public and internal ones and those the user may pull by the permission the server has stored for them. The stream does not ask the forge; the rest of the API syncs the stored permissions with it once they are an hour old, and until then a stored pull counts. The user and these permissions are looked up again every minute while the stream runs, and the stream ends with an `error` event once the user is gone or their tokens are reset. A bot token gets the events of the repositories it is restricted to only, and its stream ends once it expired or was revoked.
 
 ## Stream
 

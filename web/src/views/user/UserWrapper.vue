@@ -7,6 +7,7 @@
     <Tab icon="secret" :to="{ name: 'user-secrets' }" :title="$t('secrets.secrets')" />
     <Tab icon="docker" :to="{ name: 'user-registries' }" :title="$t('registries.registries')" />
     <Tab icon="console" :to="{ name: 'user-cli-and-api' }" :title="$t('user.settings.cli_and_api.cli_and_api')" />
+    <Tab icon="toolbox" :to="{ name: 'user-bot-tokens' }" :title="$t('user.settings.bot_tokens.bot_tokens')" />
     <Tab
       v-if="userRegisteredAgents"
       icon="agent"

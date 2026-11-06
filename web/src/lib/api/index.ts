@@ -1,6 +1,9 @@
 import ApiClient, { encodeQueryString } from './client';
 import type {
   Agent,
+  BotToken,
+  BotTokenCreated,
+  BotTokenRequest,
   Cron,
   ExtensionSettings,
   Forge,
@@ -432,6 +435,18 @@ export default class WoodpeckerClient extends ApiClient {
 
   async resetToken(): Promise<string> {
     return this._delete('/api/user/token') as Promise<string>;
+  }
+
+  async getBotTokens(): Promise<BotToken[]> {
+    return this._get('/api/v2/bot-tokens') as Promise<BotToken[]>;
+  }
+
+  async createBotToken(request: BotTokenRequest): Promise<BotTokenCreated> {
+    return this._post('/api/v2/bot-tokens', request) as Promise<BotTokenCreated>;
+  }
+
+  async revokeBotToken(id: number): Promise<unknown> {
+    return this._delete(`/api/v2/bot-tokens/${id}`);
   }
 
   async getOrgs(opts?: PaginationOptions): Promise<Org[] | null> {

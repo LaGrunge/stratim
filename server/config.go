@@ -68,6 +68,9 @@ var Config = struct {
 		CustomJsFile          string
 		AsyncRepositoryUpdate bool
 		WebhookSyncTimeout    time.Duration
+		// TrustedProxies are the addresses or networks of the proxies whose
+		// X-Forwarded-For gives the client's address; none by default.
+		TrustedProxies []string
 	}
 	Agent struct {
 		DisableUserRegisteredAgentRegistration bool

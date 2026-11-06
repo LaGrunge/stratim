@@ -21,6 +21,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"go.woodpecker-ci.org/woodpecker/v3/server/bottoken"
 	"go.woodpecker-ci.org/woodpecker/v3/server/events"
 	"go.woodpecker-ci.org/woodpecker/v3/server/explain/worker"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forgestatus"
@@ -363,6 +364,17 @@ var flags = append([]cli.Flag{
 		Name:    "explain-timeout",
 		Usage:   "the longest explaining one failed step in the background may take",
 		Value:   worker.DefaultTimeout,
+	},
+	&cli.StringSliceFlag{
+		Sources: cli.EnvVars("STRATIM_TRUSTED_PROXIES"),
+		Name:    "trusted-proxies",
+		Usage:   "addresses or networks (CIDR) of the reverse proxies whose X-Forwarded-For header gives the client's address; none by default, the address of the connection is used",
+	},
+	&cli.DurationFlag{
+		Sources: cli.EnvVars("STRATIM_BOT_TOKEN_AUDIT_RETENTION"),
+		Name:    "bot-token-audit-retention",
+		Usage:   "how long the audit lines of the calls made with bot tokens are kept",
+		Value:   bottoken.DefaultRetention,
 	},
 	&cli.DurationFlag{
 		Sources: cli.EnvVars("STRATIM_JSONNET_TIMEOUT"),

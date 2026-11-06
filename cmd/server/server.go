@@ -126,6 +126,9 @@ func run(ctx context.Context, c *cli.Command) error {
 	// API, a webhook, a cron, a step) and the sweep
 	end := setupWorkflowEnd(_store, prometheus.DefaultRegisterer)
 	startCanceledWorkflowsSweep(ctx, end)
+	if err := startBotTokenAuditPurge(ctx, c, _store); err != nil {
+		return err
+	}
 
 	// wait for all services until one do stops with an error
 	serviceWaitingGroup := errgroup.Group{}

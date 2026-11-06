@@ -454,6 +454,563 @@ func (_c *MockStore_AgentUpdate_Call) RunAndReturn(run func(agent *model.Agent) 
 	return _c
 }
 
+// BotTokenCallAppend provides a mock function for the type MockStore
+func (_mock *MockStore) BotTokenCallAppend(botTokenCall *model.BotTokenCall) error {
+	ret := _mock.Called(botTokenCall)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenCallAppend")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*model.BotTokenCall) error); ok {
+		r0 = returnFunc(botTokenCall)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockStore_BotTokenCallAppend_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenCallAppend'
+type MockStore_BotTokenCallAppend_Call struct {
+	*mock.Call
+}
+
+// BotTokenCallAppend is a helper method to define mock.On call
+//   - botTokenCall *model.BotTokenCall
+func (_e *MockStore_Expecter) BotTokenCallAppend(botTokenCall any) *MockStore_BotTokenCallAppend_Call {
+	return &MockStore_BotTokenCallAppend_Call{Call: _e.mock.On("BotTokenCallAppend", botTokenCall)}
+}
+
+func (_c *MockStore_BotTokenCallAppend_Call) Run(run func(botTokenCall *model.BotTokenCall)) *MockStore_BotTokenCallAppend_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.BotTokenCall
+		if args[0] != nil {
+			arg0 = args[0].(*model.BotTokenCall)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_BotTokenCallAppend_Call) Return(err error) *MockStore_BotTokenCallAppend_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockStore_BotTokenCallAppend_Call) RunAndReturn(run func(botTokenCall *model.BotTokenCall) error) *MockStore_BotTokenCallAppend_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BotTokenCallList provides a mock function for the type MockStore
+func (_mock *MockStore) BotTokenCallList(tokenID int64, limit int) ([]*model.BotTokenCall, error) {
+	ret := _mock.Called(tokenID, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenCallList")
+	}
+
+	var r0 []*model.BotTokenCall
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64, int) ([]*model.BotTokenCall, error)); ok {
+		return returnFunc(tokenID, limit)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64, int) []*model.BotTokenCall); ok {
+		r0 = returnFunc(tokenID, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*model.BotTokenCall)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64, int) error); ok {
+		r1 = returnFunc(tokenID, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_BotTokenCallList_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenCallList'
+type MockStore_BotTokenCallList_Call struct {
+	*mock.Call
+}
+
+// BotTokenCallList is a helper method to define mock.On call
+//   - tokenID int64
+//   - limit int
+func (_e *MockStore_Expecter) BotTokenCallList(tokenID any, limit any) *MockStore_BotTokenCallList_Call {
+	return &MockStore_BotTokenCallList_Call{Call: _e.mock.On("BotTokenCallList", tokenID, limit)}
+}
+
+func (_c *MockStore_BotTokenCallList_Call) Run(run func(tokenID int64, limit int)) *MockStore_BotTokenCallList_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_BotTokenCallList_Call) Return(botTokenCalls []*model.BotTokenCall, err error) *MockStore_BotTokenCallList_Call {
+	_c.Call.Return(botTokenCalls, err)
+	return _c
+}
+
+func (_c *MockStore_BotTokenCallList_Call) RunAndReturn(run func(tokenID int64, limit int) ([]*model.BotTokenCall, error)) *MockStore_BotTokenCallList_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BotTokenCallPurge provides a mock function for the type MockStore
+func (_mock *MockStore) BotTokenCallPurge(before int64) (int64, error) {
+	ret := _mock.Called(before)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenCallPurge")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64) (int64, error)); ok {
+		return returnFunc(before)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64) int64); ok {
+		r0 = returnFunc(before)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64) error); ok {
+		r1 = returnFunc(before)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_BotTokenCallPurge_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenCallPurge'
+type MockStore_BotTokenCallPurge_Call struct {
+	*mock.Call
+}
+
+// BotTokenCallPurge is a helper method to define mock.On call
+//   - before int64
+func (_e *MockStore_Expecter) BotTokenCallPurge(before any) *MockStore_BotTokenCallPurge_Call {
+	return &MockStore_BotTokenCallPurge_Call{Call: _e.mock.On("BotTokenCallPurge", before)}
+}
+
+func (_c *MockStore_BotTokenCallPurge_Call) Run(run func(before int64)) *MockStore_BotTokenCallPurge_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_BotTokenCallPurge_Call) Return(n int64, err error) *MockStore_BotTokenCallPurge_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockStore_BotTokenCallPurge_Call) RunAndReturn(run func(before int64) (int64, error)) *MockStore_BotTokenCallPurge_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BotTokenCreate provides a mock function for the type MockStore
+func (_mock *MockStore) BotTokenCreate(token *model.BotToken, maxActive int, now int64) error {
+	ret := _mock.Called(token, maxActive, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenCreate")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*model.BotToken, int, int64) error); ok {
+		r0 = returnFunc(token, maxActive, now)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockStore_BotTokenCreate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenCreate'
+type MockStore_BotTokenCreate_Call struct {
+	*mock.Call
+}
+
+// BotTokenCreate is a helper method to define mock.On call
+//   - token *model.BotToken
+//   - maxActive int
+//   - now int64
+func (_e *MockStore_Expecter) BotTokenCreate(token any, maxActive any, now any) *MockStore_BotTokenCreate_Call {
+	return &MockStore_BotTokenCreate_Call{Call: _e.mock.On("BotTokenCreate", token, maxActive, now)}
+}
+
+func (_c *MockStore_BotTokenCreate_Call) Run(run func(token *model.BotToken, maxActive int, now int64)) *MockStore_BotTokenCreate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.BotToken
+		if args[0] != nil {
+			arg0 = args[0].(*model.BotToken)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_BotTokenCreate_Call) Return(err error) *MockStore_BotTokenCreate_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockStore_BotTokenCreate_Call) RunAndReturn(run func(token *model.BotToken, maxActive int, now int64) error) *MockStore_BotTokenCreate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BotTokenFindByHash provides a mock function for the type MockStore
+func (_mock *MockStore) BotTokenFindByHash(hash string) (*model.BotToken, error) {
+	ret := _mock.Called(hash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenFindByHash")
+	}
+
+	var r0 *model.BotToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (*model.BotToken, error)); ok {
+		return returnFunc(hash)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) *model.BotToken); ok {
+		r0 = returnFunc(hash)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.BotToken)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(hash)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_BotTokenFindByHash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenFindByHash'
+type MockStore_BotTokenFindByHash_Call struct {
+	*mock.Call
+}
+
+// BotTokenFindByHash is a helper method to define mock.On call
+//   - hash string
+func (_e *MockStore_Expecter) BotTokenFindByHash(hash any) *MockStore_BotTokenFindByHash_Call {
+	return &MockStore_BotTokenFindByHash_Call{Call: _e.mock.On("BotTokenFindByHash", hash)}
+}
+
+func (_c *MockStore_BotTokenFindByHash_Call) Run(run func(hash string)) *MockStore_BotTokenFindByHash_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_BotTokenFindByHash_Call) Return(botToken *model.BotToken, err error) *MockStore_BotTokenFindByHash_Call {
+	_c.Call.Return(botToken, err)
+	return _c
+}
+
+func (_c *MockStore_BotTokenFindByHash_Call) RunAndReturn(run func(hash string) (*model.BotToken, error)) *MockStore_BotTokenFindByHash_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BotTokenGet provides a mock function for the type MockStore
+func (_mock *MockStore) BotTokenGet(n int64) (*model.BotToken, error) {
+	ret := _mock.Called(n)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenGet")
+	}
+
+	var r0 *model.BotToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64) (*model.BotToken, error)); ok {
+		return returnFunc(n)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64) *model.BotToken); ok {
+		r0 = returnFunc(n)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.BotToken)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64) error); ok {
+		r1 = returnFunc(n)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_BotTokenGet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenGet'
+type MockStore_BotTokenGet_Call struct {
+	*mock.Call
+}
+
+// BotTokenGet is a helper method to define mock.On call
+//   - n int64
+func (_e *MockStore_Expecter) BotTokenGet(n any) *MockStore_BotTokenGet_Call {
+	return &MockStore_BotTokenGet_Call{Call: _e.mock.On("BotTokenGet", n)}
+}
+
+func (_c *MockStore_BotTokenGet_Call) Run(run func(n int64)) *MockStore_BotTokenGet_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_BotTokenGet_Call) Return(botToken *model.BotToken, err error) *MockStore_BotTokenGet_Call {
+	_c.Call.Return(botToken, err)
+	return _c
+}
+
+func (_c *MockStore_BotTokenGet_Call) RunAndReturn(run func(n int64) (*model.BotToken, error)) *MockStore_BotTokenGet_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BotTokenList provides a mock function for the type MockStore
+func (_mock *MockStore) BotTokenList(ownerID int64, p *model.ListOptionsWithAll) ([]*model.BotToken, error) {
+	ret := _mock.Called(ownerID, p)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenList")
+	}
+
+	var r0 []*model.BotToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64, *model.ListOptionsWithAll) ([]*model.BotToken, error)); ok {
+		return returnFunc(ownerID, p)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64, *model.ListOptionsWithAll) []*model.BotToken); ok {
+		r0 = returnFunc(ownerID, p)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*model.BotToken)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64, *model.ListOptionsWithAll) error); ok {
+		r1 = returnFunc(ownerID, p)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_BotTokenList_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenList'
+type MockStore_BotTokenList_Call struct {
+	*mock.Call
+}
+
+// BotTokenList is a helper method to define mock.On call
+//   - ownerID int64
+//   - p *model.ListOptionsWithAll
+func (_e *MockStore_Expecter) BotTokenList(ownerID any, p any) *MockStore_BotTokenList_Call {
+	return &MockStore_BotTokenList_Call{Call: _e.mock.On("BotTokenList", ownerID, p)}
+}
+
+func (_c *MockStore_BotTokenList_Call) Run(run func(ownerID int64, p *model.ListOptionsWithAll)) *MockStore_BotTokenList_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		var arg1 *model.ListOptionsWithAll
+		if args[1] != nil {
+			arg1 = args[1].(*model.ListOptionsWithAll)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_BotTokenList_Call) Return(botTokens []*model.BotToken, err error) *MockStore_BotTokenList_Call {
+	_c.Call.Return(botTokens, err)
+	return _c
+}
+
+func (_c *MockStore_BotTokenList_Call) RunAndReturn(run func(ownerID int64, p *model.ListOptionsWithAll) ([]*model.BotToken, error)) *MockStore_BotTokenList_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BotTokenRevoke provides a mock function for the type MockStore
+func (_mock *MockStore) BotTokenRevoke(id int64, at int64) (bool, error) {
+	ret := _mock.Called(id, at)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenRevoke")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64, int64) (bool, error)); ok {
+		return returnFunc(id, at)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64, int64) bool); ok {
+		r0 = returnFunc(id, at)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64, int64) error); ok {
+		r1 = returnFunc(id, at)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_BotTokenRevoke_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenRevoke'
+type MockStore_BotTokenRevoke_Call struct {
+	*mock.Call
+}
+
+// BotTokenRevoke is a helper method to define mock.On call
+//   - id int64
+//   - at int64
+func (_e *MockStore_Expecter) BotTokenRevoke(id any, at any) *MockStore_BotTokenRevoke_Call {
+	return &MockStore_BotTokenRevoke_Call{Call: _e.mock.On("BotTokenRevoke", id, at)}
+}
+
+func (_c *MockStore_BotTokenRevoke_Call) Run(run func(id int64, at int64)) *MockStore_BotTokenRevoke_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_BotTokenRevoke_Call) Return(b bool, err error) *MockStore_BotTokenRevoke_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockStore_BotTokenRevoke_Call) RunAndReturn(run func(id int64, at int64) (bool, error)) *MockStore_BotTokenRevoke_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BotTokenTouch provides a mock function for the type MockStore
+func (_mock *MockStore) BotTokenTouch(id int64, at int64) error {
+	ret := _mock.Called(id, at)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BotTokenTouch")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(int64, int64) error); ok {
+		r0 = returnFunc(id, at)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockStore_BotTokenTouch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BotTokenTouch'
+type MockStore_BotTokenTouch_Call struct {
+	*mock.Call
+}
+
+// BotTokenTouch is a helper method to define mock.On call
+//   - id int64
+//   - at int64
+func (_e *MockStore_Expecter) BotTokenTouch(id any, at any) *MockStore_BotTokenTouch_Call {
+	return &MockStore_BotTokenTouch_Call{Call: _e.mock.On("BotTokenTouch", id, at)}
+}
+
+func (_c *MockStore_BotTokenTouch_Call) Run(run func(id int64, at int64)) *MockStore_BotTokenTouch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_BotTokenTouch_Call) Return(err error) *MockStore_BotTokenTouch_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockStore_BotTokenTouch_Call) RunAndReturn(run func(id int64, at int64) error) *MockStore_BotTokenTouch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Close provides a mock function for the type MockStore
 func (_mock *MockStore) Close() error {
 	ret := _mock.Called()

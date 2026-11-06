@@ -237,6 +237,12 @@ ProxyPass /api/v2/ http://127.0.0.1:8000/api/v2/ timeout=1560 flushpackets=on
 ProxyPassReverse /api/v2/ http://127.0.0.1:8000/api/v2/
 ```
 
+[Bot tokens](../../20-usage/96-bot-tokens.md#behind-a-proxy) come in the `X-Stratim-Token` header: a proxy passes it unchanged on the requests under `/api/v2/`.
+
+### Trusted proxies
+
+The server takes the client's address, which the audit of [bot tokens](../../20-usage/96-bot-tokens.md#audit) records, from the connection. Behind a proxy, list the proxy's addresses or networks in `STRATIM_TRUSTED_PROXIES`, separated by commas, for example `STRATIM_TRUSTED_PROXIES=127.0.0.1,10.0.0.0/8`; each is an IP address or a CIDR network, blanks around it are ignored, and the server does not start with one that is neither: the address then comes from the `X-Forwarded-For` header the proxy sets. A request that does not come from one of them keeps the address of its connection, whatever its `X-Forwarded-For` says. The proxy sets the header, as `proxy_set_header X-Forwarded-For $remote_addr` does in the nginx example above.
+
 When the server stops, it ends the waits and streams first: a wait answers 204, as when its timeout passed, and a stream ends, to be reconnected. While the server restarts, the proxy answers 502 or 503; clients ask again after a backoff.
 
 ### Caddy

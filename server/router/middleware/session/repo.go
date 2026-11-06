@@ -118,12 +118,11 @@ func SetPerm() gin.HandlerFunc {
 			return
 		}
 
-		stored, err := LoadPerm(c, _store, func() (forge.Forge, error) { return _forge, nil }, user, repo, time.Now())
+		perm, err := PrincipalOf(c).Perm(c, _store, func() (forge.Forge, error) { return _forge, nil }, repo, time.Now())
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
-		perm := EffectivePerm(user, repo, stored)
 
 		if user != nil {
 			log.Debug().Msgf("%s granted %+v permission to %s",
@@ -162,18 +161,21 @@ func MustPull(c *gin.Context) {
 }
 
 func MustPush(c *gin.Context) {
-	user := User(c)
-	perm := Perm(c)
-
-	// if the user has push access, immediately proceed
-	// the middleware execution chain.
-	if perm.Push {
+	if CheckPush(c, Perm(c)) {
 		c.Next()
-		return
+	}
+}
+
+// CheckPush tells whether the user of the request may push by the
+// permission; if not, it answers the request: 404 to a user, 401 to a
+// guest.
+func CheckPush(c *gin.Context, perm *model.Perm) bool {
+	if perm.Push {
+		return true
 	}
 
 	// debugging
-	if user != nil {
+	if user := User(c); user != nil {
 		c.AbortWithStatus(http.StatusNotFound)
 		log.Debug().Msgf("user %s denied write access to %s",
 			user.Login, c.Request.URL.Path)
@@ -185,4 +187,5 @@ func MustPush(c *gin.Context) {
 			c.Request.URL.Path,
 		)
 	}
+	return false
 }

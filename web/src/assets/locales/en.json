@@ -525,6 +525,37 @@
         "reset_token": "Reset token",
         "swagger_ui": "Swagger UI"
       },
+      "bot_tokens": {
+        "bot_tokens": "Bot tokens",
+        "desc": "Tokens for programs and agents that watch or restart your pipelines over /api/v2, with only the scopes and repos you give them.",
+        "create": "Create token",
+        "name": "Name",
+        "scopes": "Scopes",
+        "scope_read": "Read events, wait for pipelines and read what their steps did",
+        "scope_restart": "Restart a pipeline, or its failed workflows",
+        "repos": "Repositories",
+        "repos_desc": "Restrict the token to these repositories; with none it may use all those you may.",
+        "repos_admin": "The token of an admin has to name its repositories.",
+        "expires_in": "Expires in",
+        "days": "{days} days",
+        "shown_once": "Copy the token now: it is not shown again.",
+        "copy": "Copy",
+        "done": "Done",
+        "created": "Bot token created",
+        "revoke": "Revoke",
+        "revoke_confirm": "Revoke the bot token {name}? Programs using it lose access.",
+        "revoked": "Bot token revoked",
+        "none": "There are no bot tokens yet.",
+        "all_repos": "all your repositories",
+        "expires": "expires {date}",
+        "last_used": "last used {date}",
+        "never_used": "never used",
+        "status": {
+          "active": "active",
+          "expired": "expired",
+          "revoked": "revoked"
+        }
+      },
       "agents": {
         "desc": "Agents registered to your account repos.",
         "require_user_agents": {

@@ -20,6 +20,7 @@ import (
 	"encoding/base32"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"runtime"
@@ -34,6 +35,7 @@ import (
 
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/server"
+	"go.woodpecker-ci.org/woodpecker/v3/server/bottoken"
 	"go.woodpecker-ci.org/woodpecker/v3/server/cache"
 	"go.woodpecker-ci.org/woodpecker/v3/server/events"
 	"go.woodpecker-ci.org/woodpecker/v3/server/explain"
@@ -129,6 +131,17 @@ func setupWorkflowEnd(s store.Store, registerer prometheus.Registerer) pipeline.
 		Statuses:  server.Config.Services.Statuses,
 		Metrics:   newWorkflowEndMetrics(registerer),
 	}
+}
+
+// startBotTokenAuditPurge deletes, now and every hour, the audit lines of
+// bot token calls older than their retention.
+func startBotTokenAuditPurge(ctx context.Context, c *cli.Command, s store.Store) error {
+	retention := c.Duration("bot-token-audit-retention")
+	if retention < time.Hour {
+		return fmt.Errorf("bot-token-audit-retention: want at least 1h, got %s", retention)
+	}
+	go bottoken.RunPurge(ctx, s, retention)
+	return nil
 }
 
 // startCanceledWorkflowsSweep kills, now and every minute, the workflows a
@@ -242,6 +255,10 @@ func setupEvilGlobals(ctx context.Context, c *cli.Command, s store.Store) (err e
 	server.Config.Pipeline.AuthenticatePublicRepos = c.Bool("authenticate-public-repos")
 	server.Config.Server.AsyncRepositoryUpdate = c.Bool("async-repository-update")
 	server.Config.Server.WebhookSyncTimeout = c.Duration("webhook-sync-timeout")
+	server.Config.Server.TrustedProxies, err = parseTrustedProxies(c.StringSlice("trusted-proxies"))
+	if err != nil {
+		return fmt.Errorf("trusted-proxies: %w", err)
+	}
 
 	// Pull requests
 	server.Config.Pipeline.DefaultAllowPullRequests = c.Bool("default-allow-pull-requests")
@@ -391,4 +408,22 @@ func jsonnetExtensionsProblem(extensions []string) string {
 		return fmt.Sprintf("pipeline config extensions include %s but not %s: jsonnet libraries are fetched but no config is read", jsonnet.LibExt, jsonnet.Ext)
 	}
 	return ""
+}
+
+// parseTrustedProxies reads the addresses and networks of the trusted
+// proxies: each an IP address or a CIDR network, blanks around it trimmed,
+// empty ones left out.
+func parseTrustedProxies(values []string) ([]string, error) {
+	var proxies []string
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, _, err := net.ParseCIDR(value); err != nil && net.ParseIP(value) == nil {
+			return nil, fmt.Errorf("%q is no IP address or CIDR network", value)
+		}
+		proxies = append(proxies, value)
+	}
+	return proxies, nil
 }

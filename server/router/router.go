@@ -35,8 +35,19 @@ import (
 
 // Load loads the router.
 func Load(noRouteHandler http.HandlerFunc, middleware ...gin.HandlerFunc) http.Handler {
+	e, _ := load(noRouteHandler, middleware...)
+	return e
+}
+
+// load loads the router, and tells the routes open to bot tokens.
+func load(noRouteHandler http.HandlerFunc, middleware ...gin.HandlerFunc) (*gin.Engine, *session.BotRoutes) {
 	e := gin.New()
 	e.UseRawPath = true
+	// the client's address comes from X-Forwarded-For only behind these
+	if err := e.SetTrustedProxies(server.Config.Server.TrustedProxies); err != nil {
+		log.Error().Err(err).Msg("trusted proxies: not trusting any")
+		_ = e.SetTrustedProxies(nil)
+	}
 	e.Use(gin.Recovery())
 
 	e.Use(func(c *gin.Context) {
@@ -49,6 +60,10 @@ func Load(noRouteHandler http.HandlerFunc, middleware ...gin.HandlerFunc) http.H
 	e.Use(header.Secure)
 	e.Use(middleware...)
 	e.Use(session.SetUser())
+	// the routes open to bot tokens, as apiRoutes registers them
+	bots := session.NewBotRoutes(server.Config.Server.RootPath)
+	e.Use(session.AuditBot(bots))
+	e.Use(session.GuardBot(bots))
 	e.Use(token.Refresh)
 
 	e.NoRoute(gin.WrapF(noRouteHandler))
@@ -70,12 +85,12 @@ func Load(noRouteHandler http.HandlerFunc, middleware ...gin.HandlerFunc) http.H
 		base.GET("/healthz", api.Health)
 	}
 
-	apiRoutes(base)
+	apiRoutes(base, bots)
 	if server.Config.WebUI.EnableSwagger {
 		setupSwaggerConfigAndRoutes(e)
 	}
 
-	return e
+	return e, bots
 }
 
 func setupSwaggerConfigAndRoutes(e *gin.Engine) {

@@ -144,3 +144,18 @@ func TestJsonnetExtensionsProblem(t *testing.T) {
 	assert.Contains(t, jsonnetExtensionsProblem([]string{".yaml", ".jsonnet"}), "cannot import their libraries")
 	assert.Contains(t, jsonnetExtensionsProblem([]string{".yaml", ".libsonnet"}), "no config is read")
 }
+
+func TestParseTrustedProxies(t *testing.T) {
+	proxies, err := parseTrustedProxies([]string{" 10.0.0.0/8 ", "127.0.0.1", "", "  ", "::1"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"10.0.0.0/8", "127.0.0.1", "::1"}, proxies)
+
+	proxies, err = parseTrustedProxies(nil)
+	require.NoError(t, err)
+	assert.Empty(t, proxies)
+
+	for _, invalid := range []string{"10.0.0.0/33", "proxy.example.com", "10.0.0"} {
+		_, err := parseTrustedProxies([]string{"127.0.0.1", invalid})
+		assert.Error(t, err, invalid)
+	}
+}

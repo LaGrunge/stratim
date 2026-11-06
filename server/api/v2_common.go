@@ -26,6 +26,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"go.woodpecker-ci.org/woodpecker/v3/server/bottoken"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware/session"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
@@ -62,11 +63,12 @@ func notFoundOr(err error) error {
 }
 
 // errUserGone ends a request or stream whose user does not exist any more,
-// or whose tokens were reset.
+// or whose tokens were reset, or whose bot token was revoked or expired.
 var errUserGone = &httpError{code: http.StatusUnauthorized, msg: "user not authorized"}
 
 // repoAccess tells the repos the user of a request or stream may read, by
-// session.CanReadStored, from the repos and permissions as they are now.
+// session.CanReadStored, from the repos and permissions as they are now;
+// with a bot token, only those of the repos it is restricted to.
 // What it found is trusted for v2AccessTTL; then the user and the repos
 // are looked up again.
 type repoAccess struct {
@@ -75,6 +77,9 @@ type repoAccess struct {
 	// hash is the user's hash when the request started; a new one, as a
 	// reset of the user's tokens makes, ends it.
 	hash string
+	// bot is the bot token of the request, if any; the user is then its
+	// owner as the token acts.
+	bot *model.BotToken
 
 	repos   map[int64]repoAccessEntry
 	checked time.Time
@@ -85,15 +90,36 @@ type repoAccessEntry struct {
 	until   time.Time
 }
 
-func newRepoAccess(s store.Store, user *model.User) *repoAccess {
-	return &repoAccess{store: s, user: user, hash: user.Hash, repos: make(map[int64]repoAccessEntry), checked: time.Now()}
+func newRepoAccess(s store.Store, p session.Principal) *repoAccess {
+	return &repoAccess{store: s, user: p.User, hash: p.User.Hash, bot: p.Bot, repos: make(map[int64]repoAccessEntry), checked: time.Now()}
 }
 
-// refresh looks the user up again once v2AccessTTL passed, and forgets
-// the repos looked up. It returns errUserGone once the user is gone or has
-// another hash.
+func (a *repoAccess) principal() session.Principal {
+	return session.Principal{User: a.user, Bot: a.bot}
+}
+
+// refresh looks the user, and the bot token, up again once v2AccessTTL
+// passed, and forgets the repos looked up. It returns errUserGone once the
+// user is gone or has another hash, or the bot token is not active any
+// more. A bot token does not depend on the hash of its owner.
 func (a *repoAccess) refresh() error {
-	if time.Since(a.checked) < v2AccessTTL {
+	now := time.Now()
+	if now.Sub(a.checked) < v2AccessTTL {
+		return nil
+	}
+	if a.bot != nil {
+		owner, err := bottoken.Recheck(a.store, a.bot, now)
+		if _, refused := errors.AsType[*bottoken.RefusedError](err); refused {
+			return errUserGone
+		}
+		if err != nil {
+			log.Error().Err(err).Int64("bot_token", a.bot.ID).Msg("api v2: cannot look up a bot token")
+			a.checked = now.Add(v2AccessBackoff - v2AccessTTL) // again after the backoff
+			return nil
+		}
+		a.user = owner
+		a.checked = now
+		clear(a.repos)
 		return nil
 	}
 	user, err := a.store.GetUser(a.user.ID)
@@ -135,7 +161,7 @@ func (a *repoAccess) allowed(repoID int64) (bool, error) {
 // canRead tells whether the user may read the repo, from the stored
 // permission: a stream never asks the forge.
 func (a *repoAccess) canRead(repo *model.Repo) bool {
-	allowed, err := session.CanReadStored(a.store, a.user, repo)
+	allowed, err := a.principal().CanReadStored(a.store, repo)
 	if err != nil {
 		log.Error().Err(err).Int64("repo", repo.ID).Msg("api v2: cannot look up a permission")
 		a.deny(repo.ID)

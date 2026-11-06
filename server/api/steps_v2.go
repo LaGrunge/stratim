@@ -24,9 +24,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 
-	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/explain"
-	"go.woodpecker-ci.org/woodpecker/v3/server/forge"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware"
 	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware/session"
@@ -189,9 +187,6 @@ func parseWindowQuery(c *gin.Context) (explain.WindowQuery, error) {
 	return q, nil
 }
 
-// errNoForge is the forge of a repo when the server has none to ask.
-var errNoForge = errors.New("no forge to ask")
-
 // readableStep loads the step of the path that the user may read, by the
 // permission as the rest of the API checks it: stored, and synced from the
 // forge once it is old. A step that does not exist or that the user may not
@@ -223,18 +218,11 @@ func readableStep(c *gin.Context) (*model.Step, bool) {
 	if err != nil {
 		return fail(err)
 	}
-	user := session.User(c)
-	getForge := func() (forge.Forge, error) {
-		if server.Config.Services.Manager == nil {
-			return nil, errNoForge
-		}
-		return server.Config.Services.Manager.ForgeFromRepo(repo)
-	}
-	perm, err := session.LoadPerm(c, s, getForge, user, repo, time.Now())
+	perm, err := session.PrincipalOf(c).Perm(c, s, session.RepoForge(repo), repo, time.Now())
 	if err != nil {
 		return fail(err)
 	}
-	if !session.CanRead(user, repo, perm) {
+	if !perm.Pull {
 		return fail(types.ErrRecordNotExist)
 	}
 	return step, true

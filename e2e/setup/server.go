@@ -93,6 +93,9 @@ type ServerEnv struct {
 
 	eventsV2Once sync.Once
 	eventsV2Base string
+
+	apiOnce sync.Once
+	apiBase string
 }
 
 func (env *ServerEnv) DummyPipeline(event model.WebhookEvent) *model.Pipeline {
