@@ -1,0 +1,11 @@
+# want: exit
+# exit: 1
+# state: failure
+---
++ npm run lint
+> web@0.0.0 lint
+> eslint . --max-warnings 0
+✔ 0 errors, 0 warnings
++ npm run build
+npm ERR! Missing script: "build"
+npm ERR! A complete log of this run can be found in: /root/.npm/_logs/2026-11-05T12_00_00_000Z-debug-0.log

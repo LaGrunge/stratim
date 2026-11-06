@@ -1,0 +1,19 @@
+# want: ninja
+# exit: 1
+# state: failure
+---
+-- The C compiler identification is GNU 12.2.0
+-- The CXX compiler identification is GNU 12.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Running cmake version 3.25.1
+-- MariaDB 11.8.2
+-- Found Threads: TRUE
+-- Looking for include file pthread.h - found
+-- Performing Test HAVE_IB_GCC_ATOMIC_BUILTINS - Success
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/buildbot/build
++ ninja -j16 columnstore
+ninja: error: 'storage/columnstore/columnstore/utils/libmarias3/libmarias3.so', needed by 'storage/columnstore/columnstore/storage-manager/libstoragemanager.so', missing and no known rule to make it

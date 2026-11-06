@@ -1,0 +1,9 @@
+# want: crash
+# exit: 139
+# state: failure
+---
++ ./run_unit_tests.sh
+running bytestream
+bytestream: 120 checks passed
+running lbidlist
+./run_unit_tests.sh: line 12:  4242 Segmentation fault      (core dumped) ./bin/lbidlist_test

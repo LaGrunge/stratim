@@ -1,0 +1,6 @@
+# want: gtest
+---
+[ RUN      ] Status.ToHaErr
+C:\src\tests\status_test.cpp(31): error: Expected equality of these values:
+[  FAILED  ] Status.ToHaErr (0 ms)
+[==========] 1 test from 1 test suite ran.

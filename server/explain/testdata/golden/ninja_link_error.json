@@ -1,0 +1,62 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "ninja",
+      "title": "ninja: clearShm failed: main.cpp:120: undefined reference to `BRM::ShmKeys::ShmKeys()'",
+      "line": 23,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 20,
+          "text": "FAILED: storage/columnstore/columnstore/tools/clearShm/clearShm"
+        },
+        {
+          "n": 23,
+          "text": "/home/buildbot/server/storage/columnstore/columnstore/tools/clearShm/main.cpp:120: undefined reference to `BRM::ShmKeys::ShmKeys()'"
+        },
+        {
+          "n": 24,
+          "text": "/usr/bin/ld: /home/buildbot/server/storage/columnstore/columnstore/tools/clearShm/main.cpp:121: undefined reference to `BRM::ShmKeys::keyRangeSize'"
+        },
+        {
+          "n": 25,
+          "text": "collect2: error: ld returned 1 exit status"
+        }
+      ]
+    },
+    {
+      "kind": "compile",
+      "title": "link error: main.cpp:120: undefined reference to `BRM::ShmKeys::ShmKeys()'",
+      "line": 23,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 22,
+          "text": "/usr/bin/ld: storage/columnstore/columnstore/tools/clearShm/CMakeFiles/clearShm.dir/main.cpp.o: in function `main':"
+        },
+        {
+          "n": 23,
+          "text": "/home/buildbot/server/storage/columnstore/columnstore/tools/clearShm/main.cpp:120: undefined reference to `BRM::ShmKeys::ShmKeys()'"
+        },
+        {
+          "n": 24,
+          "text": "/usr/bin/ld: /home/buildbot/server/storage/columnstore/columnstore/tools/clearShm/main.cpp:121: undefined reference to `BRM::ShmKeys::keyRangeSize'"
+        },
+        {
+          "n": 25,
+          "text": "collect2: error: ld returned 1 exit status"
+        },
+        {
+          "n": 26,
+          "text": "ninja: build stopped: subcommand failed."
+        }
+      ]
+    }
+  ],
+  "lines": 26,
+  "from": 1,
+  "untrusted": true
+}

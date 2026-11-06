@@ -1,0 +1,34 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "cmake",
+      "title": "cmake: Could not find the snappy library: install libsnappy-dev (at storage/columnstore/columnstore/cmake/ColumnstoreLibrary.cmake:77 (message))",
+      "line": 11,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 11,
+          "text": "CMake Error at storage/columnstore/columnstore/cmake/ColumnstoreLibrary.cmake:77 (message):"
+        },
+        {
+          "n": 12,
+          "text": "  Could not find the snappy library: install libsnappy-dev"
+        },
+        {
+          "n": 13,
+          "text": "Call Stack (most recent call first):"
+        },
+        {
+          "n": 14,
+          "text": "  storage/columnstore/columnstore/CMakeLists.txt:112 (include)"
+        }
+      ]
+    }
+  ],
+  "lines": 18,
+  "from": 1,
+  "untrusted": true
+}

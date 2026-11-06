@@ -1,0 +1,15 @@
+{
+  "step_id": 1,
+  "status": "error",
+  "exit_code": 0,
+  "causes": [
+    {
+      "kind": "error",
+      "title": "the step could not run: Error response from daemon: pull access denied for mariadb/columnstore-build, repository does not exist or may require 'docker login'",
+      "confidence": "high",
+      "excerpt": []
+    }
+  ],
+  "lines": 0,
+  "untrusted": true
+}

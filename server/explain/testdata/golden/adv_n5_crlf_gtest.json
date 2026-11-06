@@ -1,0 +1,26 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "gtest",
+      "title": "gtest: Status.ToHaErr failed",
+      "line": 2,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 2,
+          "text": "C:\\src\\tests\\status_test.cpp(31): error: Expected equality of these values:"
+        },
+        {
+          "n": 3,
+          "text": "[  FAILED  ] Status.ToHaErr (0 ms)"
+        }
+      ]
+    }
+  ],
+  "lines": 4,
+  "from": 1,
+  "untrusted": true
+}

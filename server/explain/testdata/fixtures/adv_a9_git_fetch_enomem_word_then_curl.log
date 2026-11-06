@@ -1,0 +1,5 @@
+# want: exit
+---
++ ./run_tests.sh
+checking ulimit -v ... ok (test: "Cannot allocate memory" expected on 2G limit)
+curl: (22) The requested URL returned error: 503

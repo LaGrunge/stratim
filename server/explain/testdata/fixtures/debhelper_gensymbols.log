@@ -1,0 +1,42 @@
+# want: debhelper
+# exit: 2
+# state: failure
+---
++ dpkg-buildpackage -us -uc -b
+dpkg-buildpackage: info: source package mariadb
+dpkg-buildpackage: info: source version 1:11.8.2+maria~deb12
+dpkg-buildpackage: info: source distribution bookworm
+dpkg-buildpackage: info: source changed by MariaDB Team <buildbot@mariadb.org>
+ dpkg-source --before-build .
+dpkg-buildpackage: info: host architecture amd64
+ fakeroot debian/rules clean
+dh clean --parallel --with systemd --without autoreconf
+   dh_auto_clean -O--parallel
+   dh_clean -O--parallel
+ debian/rules binary
+dh binary --parallel --with systemd --without autoreconf
+   dh_testroot -O--parallel
+   dh_prep -O--parallel
+   debian/rules override_dh_auto_install
+make[1]: Entering directory '/home/buildbot/mariadb'
+dh_testdir
+dh_prep
+cd builddir && DESTDIR=../debian/tmp cmake --install .
+-- Install configuration: "RelWithDebInfo"
+-- Installing: /home/buildbot/mariadb/debian/tmp/usr/bin/mariadb
+-- Installing: /home/buildbot/mariadb/debian/tmp/usr/sbin/mariadbd
+-- Installing: /home/buildbot/mariadb/debian/tmp/usr/lib/mysql/plugin/ha_rocksdb.so
+make[1]: Leaving directory '/home/buildbot/mariadb'
+   dh_install -O--parallel
+   dh_makeshlibs -O--parallel
+dpkg-gensymbols: warning: some symbols or patterns disappeared in the symbols file: see diff output below
+dpkg-gensymbols: warning: debian/libmariadb3/DEBIAN/symbols doesn't match completely debian/libmariadb3.symbols
+--- debian/libmariadb3.symbols (libmariadb3_1:11.8.2_amd64)
++++ dpkg-gensymbolsXa1b2c (libmariadb3_1:11.8.2_amd64)
+@@ -12,7 +12,6 @@
+  mariadb_field_attr@libmariadb.so.3 3.1.8
+- mariadb_get_charset_by_name@libmariadb.so.3 3.0.0
+dpkg-gensymbols: error: some symbols or patterns disappeared in the symbols file
+dh_makeshlibs: error: failing due to earlier errors
+make: *** [debian/rules:205: binary] Error 25
+dpkg-buildpackage: error: debian/rules binary subprocess returned exit status 2

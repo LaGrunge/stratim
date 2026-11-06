@@ -1,0 +1,46 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 2,
+  "causes": [
+    {
+      "kind": "compile",
+      "title": "compile error: func_add_time.cpp:154: 'dataconvert' has not been declared",
+      "line": 5,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 4,
+          "text": "[  5%] Building CXX object storage/columnstore/columnstore/utils/funcexp/CMakeFiles/funcexp.dir/func_add_time.cpp.o"
+        },
+        {
+          "n": 5,
+          "text": "/src/storage/columnstore/columnstore/utils/funcexp/func_add_time.cpp:154:7: error: 'dataconvert' has not been declared"
+        },
+        {
+          "n": 6,
+          "text": "  154 |       dataconvert::DataConvert::timeToInt(val);"
+        },
+        {
+          "n": 7,
+          "text": "      |       ^~~~~~~~~~~"
+        },
+        {
+          "n": 8,
+          "text": "make[2]: *** [storage/columnstore/columnstore/utils/funcexp/CMakeFiles/funcexp.dir/build.make:76: storage/columnstore/columnstore/utils/funcexp/CMakeFiles/funcexp.dir/func_add_time.cpp.o] Error 1"
+        },
+        {
+          "n": 9,
+          "text": "make[1]: *** [CMakeFiles/Makefile2:9210: storage/columnstore/columnstore/utils/funcexp/CMakeFiles/funcexp.dir/all] Error 2"
+        },
+        {
+          "n": 10,
+          "text": "make: *** [Makefile:166: all] Error 2"
+        }
+      ]
+    }
+  ],
+  "lines": 10,
+  "from": 1,
+  "untrusted": true
+}

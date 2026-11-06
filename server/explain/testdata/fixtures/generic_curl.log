@@ -1,0 +1,6 @@
+# want: exit
+# exit: 22
+# state: failure
+---
++ curl -fsSL https://downloads.example.com/mariadb/11.8.2/SHA256SUMS -o SHA256SUMS
+curl: (22) The requested URL returned error: 404

@@ -1,0 +1,58 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "mtr",
+      "title": "MTR: columnstore/basic.mcs76_having failed: At line 47: query 'SELECT col1, SUM(col2) FROM t1 GROUP BY col1 HAVING SUM(col2) \u003e 10' failed: ER_INTERNAL_ERROR (1…",
+      "line": 26,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 26,
+          "text": "columnstore/basic.mcs76_having           w4 [ fail ]"
+        },
+        {
+          "n": 27,
+          "text": "        Test ended at 2026-11-05 12:04:11"
+        },
+        {
+          "n": 29,
+          "text": "CURRENT_TEST: columnstore/basic.mcs76_having"
+        },
+        {
+          "n": 30,
+          "text": "mysqltest: At line 47: query 'SELECT col1, SUM(col2) FROM t1 GROUP BY col1 HAVING SUM(col2) \u003e 10' failed: ER_INTERNAL_ERROR (1815): Internal error: MCS-2021: 'HAVING' is not supported in this context."
+        },
+        {
+          "n": 32,
+          "text": "The result from queries just before the failure was:"
+        },
+        {
+          "n": 33,
+          "text": "\u003c snip \u003e"
+        },
+        {
+          "n": 34,
+          "text": "DROP TABLE IF EXISTS t1;"
+        },
+        {
+          "n": 35,
+          "text": "CREATE TABLE t1 (col1 INT, col2 INT) ENGINE=Columnstore;"
+        },
+        {
+          "n": 36,
+          "text": "INSERT INTO t1 VALUES (1,5),(1,7),(2,3);"
+        },
+        {
+          "n": 38,
+          "text": " - saving '/home/buildbot/build/mysql-test/var/4/log/columnstore/basic.mcs76_having/' to '/home/buildbot/build/mysql-test/var/log/columnstore/basic.mcs76_having/'"
+        }
+      ]
+    }
+  ],
+  "lines": 56,
+  "from": 1,
+  "untrusted": true
+}

@@ -1,0 +1,30 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 8,
+  "causes": [
+    {
+      "kind": "ctest",
+      "title": "ctest: No tests were found!!!",
+      "line": 3,
+      "confidence": "medium",
+      "excerpt": [
+        {
+          "n": 1,
+          "text": "+ ctest --test-dir build --no-tests=error"
+        },
+        {
+          "n": 2,
+          "text": "Test project /home/buildbot/build"
+        },
+        {
+          "n": 3,
+          "text": "No tests were found!!!"
+        }
+      ]
+    }
+  ],
+  "lines": 3,
+  "from": 1,
+  "untrusted": true
+}

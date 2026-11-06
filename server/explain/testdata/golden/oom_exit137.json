@@ -1,0 +1,38 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 137,
+  "causes": [
+    {
+      "kind": "oom",
+      "title": "the step was killed by SIGKILL (exit code 137), most likely for running out of memory",
+      "line": 30,
+      "confidence": "medium",
+      "excerpt": [
+        {
+          "n": 26,
+          "text": "[1025/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1025.cpp.o"
+        },
+        {
+          "n": 27,
+          "text": "[1026/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1026.cpp.o"
+        },
+        {
+          "n": 28,
+          "text": "[1027/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1027.cpp.o"
+        },
+        {
+          "n": 29,
+          "text": "[1028/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1028.cpp.o"
+        },
+        {
+          "n": 30,
+          "text": "[1029/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1029.cpp.o"
+        }
+      ]
+    }
+  ],
+  "lines": 30,
+  "from": 1,
+  "untrusted": true
+}

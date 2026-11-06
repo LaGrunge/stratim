@@ -1,0 +1,38 @@
+{
+  "step_id": 1,
+  "status": "timeout",
+  "exit_code": 124,
+  "causes": [
+    {
+      "kind": "timeout",
+      "title": "the step ran into its timeout of 1h0m0s",
+      "line": 20,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 16,
+          "text": "[25/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj25.cpp.o"
+        },
+        {
+          "n": 17,
+          "text": "[26/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj26.cpp.o"
+        },
+        {
+          "n": 18,
+          "text": "[27/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj27.cpp.o"
+        },
+        {
+          "n": 19,
+          "text": "[28/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj28.cpp.o"
+        },
+        {
+          "n": 20,
+          "text": "[29/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj29.cpp.o"
+        }
+      ]
+    }
+  ],
+  "lines": 20,
+  "from": 1,
+  "untrusted": true
+}

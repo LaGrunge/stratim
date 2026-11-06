@@ -1,0 +1,38 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 137,
+  "causes": [
+    {
+      "kind": "oom",
+      "title": "the step was killed for running out of memory (OOM)",
+      "line": 12,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 8,
+          "text": "[1507/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1507.cpp.o"
+        },
+        {
+          "n": 9,
+          "text": "[1508/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1508.cpp.o"
+        },
+        {
+          "n": 10,
+          "text": "[1509/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1509.cpp.o"
+        },
+        {
+          "n": 11,
+          "text": "[1510/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1510.cpp.o"
+        },
+        {
+          "n": 12,
+          "text": "[1511/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1511.cpp.o"
+        }
+      ]
+    }
+  ],
+  "lines": 12,
+  "from": 1,
+  "untrusted": true
+}

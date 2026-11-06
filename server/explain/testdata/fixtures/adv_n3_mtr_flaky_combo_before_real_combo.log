@@ -1,0 +1,14 @@
+# want: mtr
+---
+Logging: ./mysql-test-run.pl  --force --retry=2 --suite=orthus
+orthus.dml 'myisam'                      w2 [ fail ]
+        Test ended at 2026-11-06 10:00:01
+mysqltest: At line 7: query 'SELECT SLEEP(0)' failed: 2013: Lost connection
+orthus.dml 'myisam'                      w2 [ retry-pass ]    120
+orthus.dml 'innodb'                      w1 [ fail ]
+        Test ended at 2026-11-06 10:00:03
+mysqltest: At line 42: query 'SELECT * FROM t1' failed: 1030: Got error 168 from storage engine
+orthus.dml 'innodb'                      w1 [ retry-fail ]
+orthus.dml 'innodb'                      w1 [ retry-fail ]
+Completed: Failed 1/4 tests, 75.00% were successful.
+Failing test(s): orthus.dml

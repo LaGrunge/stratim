@@ -1,0 +1,50 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 8,
+  "causes": [
+    {
+      "kind": "ctest",
+      "title": "ctest: dataconvert_tests failed (SEGFAULT)",
+      "line": 6,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 6,
+          "text": "2/4 Test #2: dataconvert_tests ................***Exception: SegFault  0.02 sec"
+        },
+        {
+          "n": 7,
+          "text": "Running dataconvert tests"
+        },
+        {
+          "n": 8,
+          "text": "loading fixtures from /src/tests/fixtures/dataconvert"
+        },
+        {
+          "n": 9,
+          "text": ""
+        },
+        {
+          "n": 10,
+          "text": "    Start 3: idbdatafile_tests"
+        },
+        {
+          "n": 11,
+          "text": "3/4 Test #3: idbdatafile_tests ................   Passed    0.11 sec"
+        },
+        {
+          "n": 12,
+          "text": "    Start 4: joblist_tests"
+        },
+        {
+          "n": 13,
+          "text": "4/4 Test #4: joblist_tests ....................   Passed    1.20 sec"
+        }
+      ]
+    }
+  ],
+  "lines": 23,
+  "from": 1,
+  "untrusted": true
+}

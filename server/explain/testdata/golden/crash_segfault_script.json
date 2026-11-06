@@ -1,0 +1,26 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 139,
+  "causes": [
+    {
+      "kind": "crash",
+      "title": "crash: ./run_unit_tests.sh: line 12:  4242 Segmentation fault      (core dumped) ./bin/lbidlist_test",
+      "line": 5,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 4,
+          "text": "running lbidlist"
+        },
+        {
+          "n": 5,
+          "text": "./run_unit_tests.sh: line 12:  4242 Segmentation fault      (core dumped) ./bin/lbidlist_test"
+        }
+      ]
+    }
+  ],
+  "lines": 5,
+  "from": 1,
+  "untrusted": true
+}

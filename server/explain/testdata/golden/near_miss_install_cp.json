@@ -1,0 +1,26 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 2,
+  "causes": [
+    {
+      "kind": "exit",
+      "title": "exit code 2: cp: cannot stat 'build/storage/columnstore/columnstore/oam/etc/Columnstore.xml': No such file or directory",
+      "line": 5,
+      "confidence": "low",
+      "excerpt": [
+        {
+          "n": 4,
+          "text": "cp: cannot stat 'build/storage/columnstore/columnstore/oam/etc/Columnstore.xml': No such file or directory"
+        },
+        {
+          "n": 5,
+          "text": "make: *** [Makefile:12: install] Error 1"
+        }
+      ]
+    }
+  ],
+  "lines": 5,
+  "from": 1,
+  "untrusted": true
+}

@@ -1,0 +1,7 @@
+# want: cmake
+# exit: 1
+# state: failure
+---
++ cmake -S /src/server -B /build
+CMake Error: The source directory "/src/server" does not appear to contain CMakeLists.txt.
+Specify --help for usage, or press the help button on the CMake GUI.

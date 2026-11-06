@@ -1,0 +1,16 @@
+# want: gtest
+---
+3: [==========] Running 2 tests from 1 test suite.
+3: [ RUN      ] RowGroup.Nulls
+3: /src/tests/rowgroup-tests.cpp:211: Failure
+3: Expected equality of these values:
+3: [  FAILED  ] RowGroup.Nulls (1 ms)
+3: [  FAILED  ] 1 test, listed below:
+3: [  FAILED  ] RowGroup.Nulls
+3/3 Test #3: rowgroup_tests ...................***Failed    0.05 sec
+
+67% tests passed, 1 tests failed out of 3
+
+The following tests FAILED:
+	  3 - rowgroup_tests (Failed)
+Errors while running CTest

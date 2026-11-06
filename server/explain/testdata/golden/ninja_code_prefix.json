@@ -1,0 +1,70 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "ninja",
+      "title": "ninja: sql_select.cc.o failed: sql_select.cc:30211: use of undeclared identifier 'join_tab_cmp'",
+      "line": 7,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 5,
+          "text": "FAILED: [code=1] sql/CMakeFiles/sql.dir/sql_select.cc.o"
+        },
+        {
+          "n": 7,
+          "text": "/src/sql/sql_select.cc:30211:10: error: use of undeclared identifier 'join_tab_cmp'"
+        },
+        {
+          "n": 8,
+          "text": "  return join_tab_cmp(jt1, jt2);"
+        },
+        {
+          "n": 9,
+          "text": "         ^"
+        },
+        {
+          "n": 10,
+          "text": "1 error generated."
+        }
+      ]
+    },
+    {
+      "kind": "compile",
+      "title": "compile error: sql_select.cc:30211: use of undeclared identifier 'join_tab_cmp'",
+      "line": 7,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 6,
+          "text": "/usr/bin/clang++ -DHAVE_CONFIG_H -I/src/include -O2 -g -std=c++17 -c /src/sql/sql_select.cc -o sql/CMakeFiles/sql.dir/sql_select.cc.o"
+        },
+        {
+          "n": 7,
+          "text": "/src/sql/sql_select.cc:30211:10: error: use of undeclared identifier 'join_tab_cmp'"
+        },
+        {
+          "n": 8,
+          "text": "  return join_tab_cmp(jt1, jt2);"
+        },
+        {
+          "n": 9,
+          "text": "         ^"
+        },
+        {
+          "n": 10,
+          "text": "1 error generated."
+        },
+        {
+          "n": 11,
+          "text": "ninja: build stopped: subcommand failed."
+        }
+      ]
+    }
+  ],
+  "lines": 11,
+  "from": 1,
+  "untrusted": true
+}

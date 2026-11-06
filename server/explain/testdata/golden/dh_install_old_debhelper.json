@@ -1,0 +1,42 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 2,
+  "causes": [
+    {
+      "kind": "dh_install",
+      "title": "dh_install: missing files, aborting",
+      "line": 28,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 26,
+          "text": "   dh_install -O--parallel"
+        },
+        {
+          "n": 27,
+          "text": "dh_install: mariadb-plugin-columnstore missing files: usr/lib/mysql/plugin/ha_columnstore.so"
+        },
+        {
+          "n": 28,
+          "text": "dh_install: missing files, aborting"
+        },
+        {
+          "n": 29,
+          "text": "debian/rules:171: recipe for target 'binary' failed"
+        },
+        {
+          "n": 30,
+          "text": "make: *** [binary] Error 2"
+        },
+        {
+          "n": 31,
+          "text": "dpkg-buildpackage: error: fakeroot debian/rules binary subprocess returned exit status 2"
+        }
+      ]
+    }
+  ],
+  "lines": 31,
+  "from": 1,
+  "untrusted": true
+}

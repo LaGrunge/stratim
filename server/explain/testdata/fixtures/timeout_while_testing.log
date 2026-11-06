@@ -1,0 +1,13 @@
+# want: timeout
+# exit: 124
+# state: timeout
+# error: uuid=01J9ZP3Q9X: step timed out after 30m0s
+---
+[==========] Running 42 tests from 6 test suites.
+[----------] Global test environment set-up.
+[----------] 8 tests from ColumnstoreRowgroup
+[ RUN      ] ColumnstoreRowgroup.InitRows
+[       OK ] ColumnstoreRowgroup.InitRows (1 ms)
+[ RUN      ] ColumnstoreRowgroup.Append
+[       OK ] ColumnstoreRowgroup.Append (0 ms)
+[ RUN      ] ThreadPoolTest.Drain

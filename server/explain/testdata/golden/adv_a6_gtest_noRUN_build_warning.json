@@ -1,0 +1,22 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "gtest",
+      "title": "gtest: RowGroup.Nulls failed",
+      "line": 5,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 5,
+          "text": "[  FAILED  ] RowGroup.Nulls"
+        }
+      ]
+    }
+  ],
+  "lines": 5,
+  "from": 1,
+  "untrusted": true
+}

@@ -1,0 +1,62 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "oom",
+      "title": "out of memory: c++: fatal error: Killed signal terminated program cc1plus",
+      "line": 9,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 7,
+          "text": "FAILED: storage/columnstore/columnstore/dbcon/joblist/CMakeFiles/joblist.dir/jlf_tuplejoblist.cpp.o"
+        },
+        {
+          "n": 8,
+          "text": "/usr/bin/c++ -O2 -g -std=gnu++20 -c /src/storage/columnstore/columnstore/dbcon/joblist/jlf_tuplejoblist.cpp"
+        },
+        {
+          "n": 9,
+          "text": "c++: fatal error: Killed signal terminated program cc1plus"
+        },
+        {
+          "n": 10,
+          "text": "compilation terminated."
+        },
+        {
+          "n": 11,
+          "text": "[706/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj706.cpp.o"
+        },
+        {
+          "n": 12,
+          "text": "[707/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj707.cpp.o"
+        }
+      ]
+    },
+    {
+      "kind": "ninja",
+      "title": "ninja: jlf_tuplejoblist.cpp.o failed: c++: fatal error: Killed signal terminated program cc1plus",
+      "line": 9,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 7,
+          "text": "FAILED: storage/columnstore/columnstore/dbcon/joblist/CMakeFiles/joblist.dir/jlf_tuplejoblist.cpp.o"
+        },
+        {
+          "n": 9,
+          "text": "c++: fatal error: Killed signal terminated program cc1plus"
+        },
+        {
+          "n": 10,
+          "text": "compilation terminated."
+        }
+      ]
+    }
+  ],
+  "lines": 13,
+  "from": 1,
+  "untrusted": true
+}

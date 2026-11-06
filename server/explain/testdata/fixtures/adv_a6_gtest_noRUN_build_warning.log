@@ -1,0 +1,7 @@
+# want: gtest
+---
+/src/a.cc:10:3: warning: unused variable 'x' [-Wunused-variable]
+[1/1] Linking CXX executable tests/t
+In file included from x.h: note: see error: previous definition
+[==========] Running 1 test from 1 test suite.
+[  FAILED  ] RowGroup.Nulls

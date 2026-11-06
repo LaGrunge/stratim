@@ -1,0 +1,35 @@
+# want: dh_install
+# exit: 2
+# state: failure
+---
++ dpkg-buildpackage -us -uc -b
+dpkg-buildpackage: info: source package mariadb
+dpkg-buildpackage: info: source version 1:11.8.2+maria~deb12
+dpkg-buildpackage: info: source distribution bookworm
+dpkg-buildpackage: info: source changed by MariaDB Team <buildbot@mariadb.org>
+ dpkg-source --before-build .
+dpkg-buildpackage: info: host architecture amd64
+ fakeroot debian/rules clean
+dh clean --parallel --with systemd --without autoreconf
+   dh_auto_clean -O--parallel
+   dh_clean -O--parallel
+ debian/rules binary
+dh binary --parallel --with systemd --without autoreconf
+   dh_testroot -O--parallel
+   dh_prep -O--parallel
+   debian/rules override_dh_auto_install
+make[1]: Entering directory '/home/buildbot/mariadb'
+dh_testdir
+dh_prep
+cd builddir && DESTDIR=../debian/tmp cmake --install .
+-- Install configuration: "RelWithDebInfo"
+-- Installing: /home/buildbot/mariadb/debian/tmp/usr/bin/mariadb
+-- Installing: /home/buildbot/mariadb/debian/tmp/usr/sbin/mariadbd
+-- Installing: /home/buildbot/mariadb/debian/tmp/usr/lib/mysql/plugin/ha_rocksdb.so
+make[1]: Leaving directory '/home/buildbot/mariadb'
+   dh_install -O--parallel
+dh_install: mariadb-plugin-columnstore missing files: usr/lib/mysql/plugin/ha_columnstore.so
+dh_install: missing files, aborting
+debian/rules:171: recipe for target 'binary' failed
+make: *** [binary] Error 2
+dpkg-buildpackage: error: fakeroot debian/rules binary subprocess returned exit status 2

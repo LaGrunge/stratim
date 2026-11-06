@@ -1,0 +1,8 @@
+# want: exit
+# exit: 1
+# state: failure
+---
++ ./scripts/upload.sh
+uploading mariadb-plugin-columnstore_11.8.2_amd64.deb
+uploading the package FAILED: 0 of 1 retries left
+upload: permission denied for the repository

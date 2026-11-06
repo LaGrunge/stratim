@@ -1,0 +1,114 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 2,
+  "causes": [
+    {
+      "kind": "ninja",
+      "title": "ninja: column.cpp.o failed: simd_sse.h:27: emmintrin.h: No such file or directory",
+      "line": 41,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 38,
+          "text": "FAILED: storage/columnstore/columnstore/primitives/linux-port/CMakeFiles/processor.dir/column.cpp.o"
+        },
+        {
+          "n": 41,
+          "text": "/home/buildbot/mariadb/storage/columnstore/columnstore/utils/common/simd_sse.h:27:10: fatal error: emmintrin.h: No such file or directory"
+        },
+        {
+          "n": 42,
+          "text": "   27 | #include \u003cemmintrin.h\u003e"
+        },
+        {
+          "n": 43,
+          "text": "      |          ^~~~~~~~~~~~~"
+        },
+        {
+          "n": 44,
+          "text": "compilation terminated."
+        }
+      ]
+    },
+    {
+      "kind": "compile",
+      "title": "compile error: simd_sse.h:27: emmintrin.h: No such file or directory",
+      "line": 41,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 40,
+          "text": "In file included from /home/buildbot/mariadb/storage/columnstore/columnstore/primitives/linux-port/column.cpp:38:"
+        },
+        {
+          "n": 41,
+          "text": "/home/buildbot/mariadb/storage/columnstore/columnstore/utils/common/simd_sse.h:27:10: fatal error: emmintrin.h: No such file or directory"
+        },
+        {
+          "n": 42,
+          "text": "   27 | #include \u003cemmintrin.h\u003e"
+        },
+        {
+          "n": 43,
+          "text": "      |          ^~~~~~~~~~~~~"
+        },
+        {
+          "n": 44,
+          "text": "compilation terminated."
+        },
+        {
+          "n": 45,
+          "text": "ninja: build stopped: subcommand failed."
+        },
+        {
+          "n": 46,
+          "text": "dh_auto_build: error: cd builddir \u0026\u0026 LC_ALL=C.UTF-8 ninja -j8 -v returned exit code 1"
+        },
+        {
+          "n": 47,
+          "text": "make[1]: *** [debian/rules:97: override_dh_auto_build] Error 25"
+        },
+        {
+          "n": 48,
+          "text": "make[1]: Leaving directory '/home/buildbot/mariadb'"
+        }
+      ]
+    },
+    {
+      "kind": "debhelper",
+      "title": "dh_auto_build: error: cd builddir \u0026\u0026 LC_ALL=C.UTF-8 ninja -j8 -v returned exit code 1",
+      "line": 46,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 44,
+          "text": "compilation terminated."
+        },
+        {
+          "n": 45,
+          "text": "ninja: build stopped: subcommand failed."
+        },
+        {
+          "n": 46,
+          "text": "dh_auto_build: error: cd builddir \u0026\u0026 LC_ALL=C.UTF-8 ninja -j8 -v returned exit code 1"
+        },
+        {
+          "n": 47,
+          "text": "make[1]: *** [debian/rules:97: override_dh_auto_build] Error 25"
+        },
+        {
+          "n": 48,
+          "text": "make[1]: Leaving directory '/home/buildbot/mariadb'"
+        },
+        {
+          "n": 49,
+          "text": "make: *** [debian/rules:205: binary] Error 2"
+        }
+      ]
+    }
+  ],
+  "lines": 50,
+  "from": 1,
+  "untrusted": true
+}

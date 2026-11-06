@@ -1,0 +1,40 @@
+# want: ctest
+# exit: 8
+# state: failure
+---
++ ./mtr --force --parallel=4 --suite=main,innodb,columnstore/basic
+Logging: ./mariadb-test-run.pl  --force --parallel=4 --suite=main,innodb,columnstore/basic
+VS config:
+vardir: /home/buildbot/build/mysql-test/var
+Checking leftover processes...
+Removing old var directory...
+Creating var directory '/home/buildbot/build/mysql-test/var'...
+Checking supported features...
+MariaDB Version 11.8.2-MariaDB
+ - SSL connections supported
+ - binaries built with wsrep patch
+Collecting tests...
+Installing system database...
+
+==============================================================================
+
+TEST                                  WORKER RESULT   TIME (ms) or COMMENT
+--------------------------------------------------------------------------
+
+worker[01] Using MTR_BUILD_THREAD 300, with reserved ports 16000..16019
+worker[02] Using MTR_BUILD_THREAD 301, with reserved ports 16020..16039
+main.alias                               w1 [ pass ]    132
+main.alter_table_online                  w2 [ pass ]   4012
+innodb.alter_algorithm                   w3 [ pass ]    810
+main.view                                w2 [ pass ]   1520
+--------------------------------------------------------------------------
+Completed: All 1834 tests were successful.
++ ctest --test-dir build
+    Start 1: unit_lru
+1/1 Test #1: unit_lru .........................***Failed    0.01 sec
+
+0% tests passed, 1 tests failed out of 1
+
+The following tests FAILED:
+	  1 - unit_lru (Failed)
+Errors while running CTest

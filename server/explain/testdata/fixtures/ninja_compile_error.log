@@ -1,0 +1,38 @@
+# want: ninja
+# exit: 1
+# state: failure
+---
+-- The C compiler identification is GNU 12.2.0
+-- The CXX compiler identification is GNU 12.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Running cmake version 3.25.1
+-- MariaDB 11.8.2
+-- Found Threads: TRUE
+-- Looking for include file pthread.h - found
+-- Performing Test HAVE_IB_GCC_ATOMIC_BUILTINS - Success
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/buildbot/build
++ ninja -j16
+[1/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1.cpp.o
+[2/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj2.cpp.o
+[3/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj3.cpp.o
+[4/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj4.cpp.o
+[5/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj5.cpp.o
+[6/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj6.cpp.o
+[7/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj7.cpp.o
+[8/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj8.cpp.o
+FAILED: storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/calpontsystemcatalog.cpp.o
+/usr/bin/c++ -DBOOST_NO_AUTO_PTR -DHAVE_CONFIG_H -I/home/buildbot/server/include -O2 -g -DNDEBUG -fPIC -std=gnu++20 -MD -MT storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/calpontsystemcatalog.cpp.o -MF storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/calpontsystemcatalog.cpp.o.d -o storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/calpontsystemcatalog.cpp.o -c /home/buildbot/server/storage/columnstore/columnstore/dbcon/execplan/calpontsystemcatalog.cpp
+/home/buildbot/server/storage/columnstore/columnstore/dbcon/execplan/calpontsystemcatalog.cpp: In member function 'void execplan::CalpontSystemCatalog::getSysData(execplan::CalpontSelectExecutionPlan&, execplan::NJLSysDataList&, const std::string&)':
+/home/buildbot/server/storage/columnstore/columnstore/dbcon/execplan/calpontsystemcatalog.cpp:812:22: error: 'class execplan::CalpontSelectExecutionPlan' has no member named 'sessionID_'; did you mean 'sessionID'?
+  812 |   csep.sessionID_ = fSessionID;
+      |        ^~~~~~~~~~
+      |        sessionID
+/home/buildbot/server/storage/columnstore/columnstore/dbcon/execplan/calpontsystemcatalog.cpp:845:3: warning: unused variable 'rc' [-Wunused-variable]
+[9/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj9.cpp.o
+[10/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj10.cpp.o
+[11/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj11.cpp.o
+ninja: build stopped: subcommand failed.

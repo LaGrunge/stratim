@@ -1,0 +1,8 @@
+# want: compile
+---
+-- Performing Test HAVE_C__fsanitize_address - Success
+-- WITH_ASAN: AddressSanitizer enabled for the build
+-- Configuring done
+make[2]: Entering directory '/src/build'
+/src/sql/item.cc:42:7: error: expected ';' before '}' token
+make[2]: *** [sql/CMakeFiles/sql.dir/build.make:76: item.cc.o] Error 1

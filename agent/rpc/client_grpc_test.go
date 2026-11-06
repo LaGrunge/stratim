@@ -186,3 +186,42 @@ func TestFinalizeLeft(t *testing.T) {
 	now := time.Now()
 	assert.Equal(t, int64(-5_000), finalizeLeft(now.Add(-5*time.Second), now), "ended: negative")
 }
+
+// The end of a step sends the log lines queued before it, so the server has
+// the whole log of a step once it learns the step exited.
+func TestFlushLogsSendsWhatIsQueued(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancelCause(t.Context())
+		defer cancel(nil)
+
+		recorder := &logRecorderClient{}
+		c := &client{
+			client:  recorder,
+			logs:    make(chan *proto.LogEntry, 10),
+			flushes: make(chan chan struct{}),
+		}
+		go c.processLogs(ctx)
+
+		for i := range 5 {
+			c.EnqueueLog(&rpc.LogEntry{StepUUID: "step", Line: i, Data: []byte("line")})
+		}
+		start := time.Now()
+		c.flushLogs(t.Context())
+		_, entries := recorder.sent()
+		assert.Equal(t, 5, entries, "sent before the flush returns")
+		assert.Less(t, time.Since(start), maxLogFlushPeriod, "without waiting for the next periodic flush")
+
+		cancel(nil)
+		synctest.Wait()
+	})
+}
+
+// A flush gives up after maxLogFlushWait when nothing sends the logs.
+func TestFlushLogsIsBounded(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := &client{logs: make(chan *proto.LogEntry, 10), flushes: make(chan chan struct{})}
+		start := time.Now()
+		c.flushLogs(t.Context())
+		assert.Equal(t, maxLogFlushWait, time.Since(start))
+	})
+}

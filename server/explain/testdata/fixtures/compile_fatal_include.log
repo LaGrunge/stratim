@@ -1,0 +1,11 @@
+# want: compile
+# exit: 2
+# state: failure
+---
++ make
+gcc -O2 -Wall -Werror -c -o mysql_conn.o mysql_conn.c
+mysql_conn.c:3:10: fatal error: mysql.h: No such file or directory
+    3 | #include <mysql.h>
+      |          ^~~~~~~~~
+compilation terminated.
+make: *** [<builtin>: mysql_conn.o] Error 1

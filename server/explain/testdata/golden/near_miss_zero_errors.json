@@ -1,0 +1,26 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "exit",
+      "title": "exit code 1: npm ERR! Missing script: \"build\"",
+      "line": 7,
+      "confidence": "low",
+      "excerpt": [
+        {
+          "n": 6,
+          "text": "npm ERR! Missing script: \"build\""
+        },
+        {
+          "n": 7,
+          "text": "npm ERR! A complete log of this run can be found in: /root/.npm/_logs/2026-11-05T12_00_00_000Z-debug-0.log"
+        }
+      ]
+    }
+  ],
+  "lines": 7,
+  "from": 1,
+  "untrusted": true
+}

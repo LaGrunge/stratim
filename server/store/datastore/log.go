@@ -37,8 +37,11 @@ func (s storage) LogFind(ctx context.Context, step *model.Step) ([]*model.LogEnt
 
 // LogStream sizes logStreamPage lines per query and loads their data in
 // batches of at most logStreamBatchBytes; a single longer line is loaded alone.
+// LogStreamFrom starts with pages of logStreamFirstPage lines and doubles
+// them up to logStreamPage, so a window of a few lines loads about those.
 const (
 	logStreamPage       = 1000
+	logStreamFirstPage  = 64
 	logStreamBatchBytes = 8 << 20
 )
 
@@ -58,29 +61,46 @@ type logLineSize struct {
 // twice; accepted, as production keeps logs in files. A LogDelete while the
 // stream runs ends it early, without an error.
 func (s storage) LogStream(ctx context.Context, step *model.Step, fn func(*model.LogEntry) error) error {
-	return s.logStream(ctx, step, fn, logStreamPage, logStreamBatchBytes, nil)
+	return s.logStream(ctx, step, 0, fn, logStreamPage, logStreamPage, logStreamBatchBytes, nil)
 }
 
-// logStream is LogStream with its page and batch sizes; onBatch, if set, sees
-// the first and last line of each batch before it is loaded.
-func (s storage) logStream(ctx context.Context, step *model.Step, fn func(*model.LogEntry) error,
-	pageLines int, batchBytes int64, onBatch func(first, last int),
-) error {
+// LogStreamFrom is LogStream from the line from on; the pages start there and
+// grow from logStreamFirstPage lines.
+func (s storage) LogStreamFrom(ctx context.Context, step *model.Step, from int, fn func(*model.LogEntry) error) error {
+	return s.logStream(ctx, step, from, fn, logStreamFirstPage, logStreamPage, logStreamBatchBytes, nil)
+}
+
+// LogLastLine gives the step's last line from the index of the lines, -1
+// when it has none.
+func (s storage) LogLastLine(ctx context.Context, step *model.Step) (int, error) {
 	top := new(model.LogEntry)
 	has, err := s.engine.Context(ctx).Cols("line").Where("step_id = ?", step.ID).Desc("line").Get(top)
 	if err != nil || !has {
+		return -1, err
+	}
+	return top.Line, nil
+}
+
+// logStream is LogStreamFrom with its page and batch sizes: pages of
+// firstPage lines, doubled up to pageLines; onBatch, if set, sees the first
+// and last line of each batch before it is loaded.
+func (s storage) logStream(ctx context.Context, step *model.Step, from int, fn func(*model.LogEntry) error,
+	firstPage, pageLines int, batchBytes int64, onBatch func(first, last int),
+) error {
+	top, err := s.LogLastLine(ctx, step)
+	if err != nil || top < from {
 		return err
 	}
 
 	sizes := make([]logLineSize, 0, pageLines)
 	var batch []*model.LogEntry
-	last := -1
-	for {
+	last := from - 1
+	for page := firstPage; ; page = min(page<<1, pageLines) {
 		sizes = sizes[:0]
 		err := s.engine.Context(ctx).Table(new(model.LogEntry)).
 			Select("line, COALESCE(LENGTH(data), 0) AS data_size").
-			Where("step_id = ? AND line > ? AND line <= ?", step.ID, last, top.Line).
-			Asc("line").Limit(pageLines).Find(&sizes)
+			Where("step_id = ? AND line > ? AND line <= ?", step.ID, last, top).
+			Asc("line").Limit(page).Find(&sizes)
 		if err != nil {
 			return err
 		}
@@ -110,7 +130,7 @@ func (s storage) logStream(ctx context.Context, step *model.Step, fn func(*model
 			start = end
 		}
 
-		if len(sizes) < pageLines {
+		if len(sizes) < page {
 			return nil
 		}
 		last = sizes[len(sizes)-1].Line

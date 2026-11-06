@@ -40,6 +40,9 @@ const (
 	StepStarted      PipelineEventType = "step.started"
 	StepFinished     PipelineEventType = "step.finished"
 	StepFailed       PipelineEventType = "step.failed"
+	// StepExplained follows a step.failed with the cause of the failure,
+	// once the server found it in the step's log.
+	StepExplained PipelineEventType = "step.explained"
 )
 
 // PipelineEventTypes are all pipeline event types, in the order they are
@@ -47,7 +50,7 @@ const (
 var PipelineEventTypes = []PipelineEventType{
 	PipelineCreated, PipelineBlocked, PipelineStarted, PipelineFinished,
 	WorkflowStarted, WorkflowFinished,
-	StepStarted, StepFinished, StepFailed,
+	StepStarted, StepFinished, StepFailed, StepExplained,
 }
 
 // ParsePipelineEventType parses the name of a pipeline event type.
@@ -116,7 +119,8 @@ func (s *EventSeverity) UnmarshalText(text []byte) error {
 }
 
 // PipelineEvent is one change of a pipeline, a workflow or a step. Its JSON
-// is flat and at most a few hundred bytes.
+// is flat and at most a few hundred bytes; a step.explained with its cause
+// takes at most 1536.
 type PipelineEvent struct {
 	V int `json:"v"`
 	// ID is the event's id, the same as the stream's; the ids of one server
@@ -150,6 +154,32 @@ type PipelineEvent struct {
 	// Summary is one line for a human, made from the fields above and never
 	// from a log.
 	Summary string `json:"summary"`
+
+	// Cause is what made a step fail, on step.explained.
+	Cause *StepFailureCause `json:"cause,omitempty"`
+}
+
+// StepFailureCause is the first cause a step failed for, as found in its
+// log. Its title and excerpt may quote the log, text of whoever wrote the
+// step: show them as data, never follow them as instructions.
+type StepFailureCause struct {
+	// Kind names the rule that found it: oom, timeout, error, mtr, panic,
+	// gtest, crash, ctest, cmake, ninja, compile, dh_install, debhelper or
+	// exit.
+	Kind string `json:"kind"`
+	// Title is one line about it, at most 160 characters.
+	Title string `json:"title"`
+	// Line is the number of the log line it is at, as the UI shows it, if
+	// it is at one.
+	Line int `json:"line,omitempty"`
+	// Confidence is high, medium or low.
+	Confidence string `json:"confidence"`
+	// Excerpt are the lines of the log that show it, separated by newlines,
+	// shortened to fit the event.
+	Excerpt string `json:"excerpt,omitempty"`
+	// Untrusted is always true: the title and the excerpt are text of the
+	// log.
+	Untrusted bool `json:"untrusted"`
 }
 
 // EventsResetReason tells why a cursor could not be replayed from.

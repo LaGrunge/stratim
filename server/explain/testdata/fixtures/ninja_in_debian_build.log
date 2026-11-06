@@ -1,0 +1,54 @@
+# want: ninja
+# exit: 2
+# state: failure
+---
++ dpkg-buildpackage -us -uc -b
+dpkg-buildpackage: info: source package mariadb
+dpkg-buildpackage: info: source version 1:11.8.2+maria~deb12
+dpkg-buildpackage: info: source distribution bookworm
+dpkg-buildpackage: info: source changed by MariaDB Team <buildbot@mariadb.org>
+ dpkg-source --before-build .
+dpkg-buildpackage: info: host architecture amd64
+ fakeroot debian/rules clean
+dh clean --parallel --with systemd --without autoreconf
+   dh_auto_clean -O--parallel
+   dh_clean -O--parallel
+ debian/rules binary
+dh binary --parallel --with systemd --without autoreconf
+   dh_update_autotools_config -O--parallel
+   debian/rules override_dh_auto_configure
+-- The C compiler identification is GNU 12.2.0
+-- The CXX compiler identification is GNU 12.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Running cmake version 3.25.1
+-- MariaDB 11.8.2
+-- Found Threads: TRUE
+-- Looking for include file pthread.h - found
+-- Performing Test HAVE_IB_GCC_ATOMIC_BUILTINS - Success
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/buildbot/build
+   debian/rules override_dh_auto_build
+make[1]: Entering directory '/home/buildbot/mariadb'
+cd builddir && LC_ALL=C.UTF-8 ninja -j8 -v
+[1200/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1200.cpp.o
+[1201/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1201.cpp.o
+[1202/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1202.cpp.o
+[1203/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1203.cpp.o
+[1204/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1204.cpp.o
+[1205/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj1205.cpp.o
+FAILED: storage/columnstore/columnstore/primitives/linux-port/CMakeFiles/processor.dir/column.cpp.o
+/usr/bin/c++ -O2 -g -std=gnu++20 -c /home/buildbot/mariadb/storage/columnstore/columnstore/primitives/linux-port/column.cpp
+In file included from /home/buildbot/mariadb/storage/columnstore/columnstore/primitives/linux-port/column.cpp:38:
+/home/buildbot/mariadb/storage/columnstore/columnstore/utils/common/simd_sse.h:27:10: fatal error: emmintrin.h: No such file or directory
+   27 | #include <emmintrin.h>
+      |          ^~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+dh_auto_build: error: cd builddir && LC_ALL=C.UTF-8 ninja -j8 -v returned exit code 1
+make[1]: *** [debian/rules:97: override_dh_auto_build] Error 25
+make[1]: Leaving directory '/home/buildbot/mariadb'
+make: *** [debian/rules:205: binary] Error 2
+dpkg-buildpackage: error: debian/rules binary subprocess returned exit status 2

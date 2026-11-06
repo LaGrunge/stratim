@@ -1,0 +1,70 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "ninja",
+      "title": "ninja: rowgroup.cpp.o failed: rowgroup.cpp:301: no matching function for call to 'logAlloc(std::bad_alloc\u0026)'",
+      "line": 6,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 3,
+          "text": "FAILED: storage/columnstore/columnstore/utils/rowgroup/CMakeFiles/rowgroup.dir/rowgroup.cpp.o"
+        },
+        {
+          "n": 6,
+          "text": "/src/storage/columnstore/columnstore/utils/rowgroup/rowgroup.cpp:301:13: error: no matching function for call to 'logAlloc(std::bad_alloc\u0026)'"
+        },
+        {
+          "n": 7,
+          "text": "  301 |     logAlloc(e);"
+        },
+        {
+          "n": 8,
+          "text": "      |     ~~~~~~~~^~~"
+        },
+        {
+          "n": 9,
+          "text": "/src/storage/columnstore/columnstore/utils/common/allocator.h:44:6: note: candidate: 'void logAlloc(const std::exception_ptr\u0026)'"
+        }
+      ]
+    },
+    {
+      "kind": "compile",
+      "title": "compile error: rowgroup.cpp:301: no matching function for call to 'logAlloc(std::bad_alloc\u0026)'",
+      "line": 6,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 5,
+          "text": "/src/storage/columnstore/columnstore/utils/rowgroup/rowgroup.cpp: In member function 'void rowgroup::RGData::reinit(const RowGroup\u0026)':"
+        },
+        {
+          "n": 6,
+          "text": "/src/storage/columnstore/columnstore/utils/rowgroup/rowgroup.cpp:301:13: error: no matching function for call to 'logAlloc(std::bad_alloc\u0026)'"
+        },
+        {
+          "n": 7,
+          "text": "  301 |     logAlloc(e);"
+        },
+        {
+          "n": 8,
+          "text": "      |     ~~~~~~~~^~~"
+        },
+        {
+          "n": 9,
+          "text": "/src/storage/columnstore/columnstore/utils/common/allocator.h:44:6: note: candidate: 'void logAlloc(const std::exception_ptr\u0026)'"
+        },
+        {
+          "n": 10,
+          "text": "ninja: build stopped: subcommand failed."
+        }
+      ]
+    }
+  ],
+  "lines": 10,
+  "from": 1,
+  "untrusted": true
+}

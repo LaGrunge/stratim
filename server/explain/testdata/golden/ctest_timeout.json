@@ -1,0 +1,50 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 8,
+  "causes": [
+    {
+      "kind": "ctest",
+      "title": "ctest: unit_threadpool failed (Timeout)",
+      "line": 6,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 6,
+          "text": "2/3 Test #2: unit_threadpool ..................***Timeout  60.01 sec"
+        },
+        {
+          "n": 7,
+          "text": "    Start 3: unit_lru"
+        },
+        {
+          "n": 8,
+          "text": "3/3 Test #3: unit_lru .........................   Passed    0.01 sec"
+        },
+        {
+          "n": 9,
+          "text": ""
+        },
+        {
+          "n": 10,
+          "text": "67% tests passed, 1 tests failed out of 3"
+        },
+        {
+          "n": 11,
+          "text": ""
+        },
+        {
+          "n": 12,
+          "text": "Label Time Summary:"
+        },
+        {
+          "n": 13,
+          "text": "unit    =  60.06 sec*proc (3 tests)"
+        }
+      ]
+    }
+  ],
+  "lines": 19,
+  "from": 1,
+  "untrusted": true
+}

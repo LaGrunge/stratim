@@ -1,0 +1,43 @@
+# want: debhelper
+# exit: 2
+# state: failure
+---
++ dpkg-buildpackage -us -uc -b
+dpkg-buildpackage: info: source package mariadb
+dpkg-buildpackage: info: source version 1:11.8.2+maria~deb12
+dpkg-buildpackage: info: source distribution bookworm
+dpkg-buildpackage: info: source changed by MariaDB Team <buildbot@mariadb.org>
+ dpkg-source --before-build .
+dpkg-buildpackage: info: host architecture amd64
+ fakeroot debian/rules clean
+dh clean --parallel --with systemd --without autoreconf
+   dh_auto_clean -O--parallel
+   dh_clean -O--parallel
+ debian/rules binary
+dh binary --parallel --with systemd --without autoreconf
+   dh_testroot -O--parallel
+   dh_prep -O--parallel
+   debian/rules override_dh_auto_install
+make[1]: Entering directory '/home/buildbot/mariadb'
+dh_testdir
+dh_prep
+cd builddir && DESTDIR=../debian/tmp cmake --install .
+-- Install configuration: "RelWithDebInfo"
+-- Installing: /home/buildbot/mariadb/debian/tmp/usr/bin/mariadb
+-- Installing: /home/buildbot/mariadb/debian/tmp/usr/sbin/mariadbd
+-- Installing: /home/buildbot/mariadb/debian/tmp/usr/lib/mysql/plugin/ha_rocksdb.so
+make[1]: Leaving directory '/home/buildbot/mariadb'
+   dh_install -O--parallel
+dh_install: warning: Cannot find (any matches for) "usr/share/doc/mariadb/README" (tried in ., debian/tmp)
+
+   dh_installdocs -O--parallel
+   dh_strip -O--parallel
+   dh_shlibdeps -O--parallel
+dpkg-shlibdeps: error: cannot find library libcolumnstore_common.so.11 needed by debian/mariadb-plugin-columnstore/usr/lib/mysql/plugin/ha_columnstore.so (ELF format: 'elf64-x86-64' abi: '0201003e00000000'; RPATH: '')
+dpkg-shlibdeps: error: cannot continue due to the error above
+Note: libraries are not searched in other binary packages that do not have any shlibs or symbols file.
+To help dpkg-shlibdeps find private libraries, you might need to use -l.
+dh_shlibdeps: error: dpkg-shlibdeps -Tdebian/mariadb-plugin-columnstore.substvars debian/mariadb-plugin-columnstore/usr/lib/mysql/plugin/ha_columnstore.so returned exit code 2
+dh_shlibdeps: error: Aborting due to earlier error
+make: *** [debian/rules:205: binary] Error 2
+dpkg-buildpackage: error: debian/rules binary subprocess returned exit status 2

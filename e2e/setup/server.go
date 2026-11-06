@@ -28,6 +28,8 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/cache"
 	"go.woodpecker-ci.org/woodpecker/v3/server/events"
+	"go.woodpecker-ci.org/woodpecker/v3/server/explain"
+	"go.woodpecker-ci.org/woodpecker/v3/server/explain/worker"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge"
 	forge_mocks "go.woodpecker-ci.org/woodpecker/v3/server/forge/mocks"
 	forge_types "go.woodpecker-ci.org/woodpecker/v3/server/forge/types"
@@ -80,6 +82,10 @@ type ServerEnv struct {
 	Events *events.Hub
 	// Durations are the typical runs of the summaries of /api/v2.
 	Durations *summary.Durations
+	// Explain explains the steps for the events and /api/v2; see GetV2.
+	Explain *explain.Explainer
+	// LogWindows gives windows of the steps' logs for /api/v2; see GetV2.
+	LogWindows *explain.Windows
 	// WorkflowEnd is the server's end of workflows, what a cancel takes.
 	WorkflowEnd pipeline.WorkflowEnd
 
@@ -141,15 +147,21 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 
 	server.Config.Services.Logs = logging.New()
 	ps := memory.New()
+	explainer := explain.New(memStore, explain.Options{})
 	hub := events.NewHub(events.Options{})
+	// as the server does (cmd/server): failed steps explained in the
+	// background
+	worker.New(hub, explainer, memStore, worker.Options{}).Start(t.Context()) //nolint:contextcheck
 	server.Config.Services.Events = hub
 	durations := summary.NewDurations(0)
 	server.Config.Services.Durations = durations
 	server.Config.Services.Scheduler = scheduler.NewScheduler(t.Context(), memStore, memQueue, ps, //nolint:contextcheck
 		scheduler.WithPipelineObserver(hub), scheduler.WithPipelineObserver(durations))
+	server.Config.Services.Explain = explainer
 	server.Config.Services.Membership = cache.NewMembershipService(memStore)
 	server.Config.Services.Manager = mgr
-	server.Config.Services.LogStore = memStore
+	server.Config.Services.LogStore = explain.ForgetDeleted(memStore, explainer)
+	server.Config.Services.LogWindows = explain.NewWindows(memStore)
 	statusCtx, stopStatuses := context.WithCancelCause(ctx)
 	server.Config.Services.Statuses = newStatusSender(statusCtx, memStore, mgr)
 	server.Config.Services.Statuses.Resend(statusCtx)
@@ -182,17 +194,19 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	grpcAddr := startGRPCServer(ctx, t, memStore, end)
 
 	return &ServerEnv{
-		GRPCAddr:  grpcAddr,
-		Store:     memStore,
-		Queue:     memQueue,
-		Fixtures:  fixtures,
-		Forge:     mockForge,
-		Files:     served,
-		Statuses:  statuses,
-		Manager:   mgr,
-		PubSub:    ps,
-		Events:    hub,
-		Durations: durations,
+		GRPCAddr:   grpcAddr,
+		Store:      memStore,
+		Queue:      memQueue,
+		Fixtures:   fixtures,
+		Forge:      mockForge,
+		Files:      served,
+		Statuses:   statuses,
+		Manager:    mgr,
+		PubSub:     ps,
+		Events:     hub,
+		Durations:  durations,
+		Explain:    explainer,
+		LogWindows: server.Config.Services.LogWindows,
 
 		WorkflowEnd: end,
 

@@ -1,0 +1,9 @@
+# want: exit
+# exit: 2
+# state: failure
+---
++ ctest --test-dir build
+100% tests passed, 0 tests failed out of 12
++ make install DESTDIR=/tmp/pkg
+cp: cannot stat 'build/storage/columnstore/columnstore/oam/etc/Columnstore.xml': No such file or directory
+make: *** [Makefile:12: install] Error 1

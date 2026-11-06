@@ -1,0 +1,62 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "ninja",
+      "title": "ninja: ha_mcs_execplan.cpp.o failed: ha_mcs_execplan.cpp:4411: invalid conversion from 'const Item*' to 'Item*' [-fpermissive]",
+      "line": 16,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 14,
+          "text": "FAILED: storage/columnstore/columnstore/dbcon/mysql/CMakeFiles/ha_columnstore.dir/ha_mcs_execplan.cpp.o"
+        },
+        {
+          "n": 16,
+          "text": "/src/storage/columnstore/columnstore/dbcon/mysql/ha_mcs_execplan.cpp:4411:46: error: invalid conversion from 'const Item*' to 'Item*' [-fpermissive]"
+        },
+        {
+          "n": 17,
+          "text": " 4411 |   Item* item = ifp-\u003earguments()[0];"
+        },
+        {
+          "n": 18,
+          "text": "      |                                              ^"
+        }
+      ]
+    },
+    {
+      "kind": "compile",
+      "title": "compile error: ha_mcs_execplan.cpp:4411: invalid conversion from 'const Item*' to 'Item*' [-fpermissive]",
+      "line": 16,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 15,
+          "text": "/usr/bin/c++ -O2 -g -c /src/storage/columnstore/columnstore/dbcon/mysql/ha_mcs_execplan.cpp"
+        },
+        {
+          "n": 16,
+          "text": "/src/storage/columnstore/columnstore/dbcon/mysql/ha_mcs_execplan.cpp:4411:46: error: invalid conversion from 'const Item*' to 'Item*' [-fpermissive]"
+        },
+        {
+          "n": 17,
+          "text": " 4411 |   Item* item = ifp-\u003earguments()[0];"
+        },
+        {
+          "n": 18,
+          "text": "      |                                              ^"
+        },
+        {
+          "n": 19,
+          "text": "ninja: build stopped: subcommand failed."
+        }
+      ]
+    }
+  ],
+  "lines": 19,
+  "from": 1,
+  "untrusted": true
+}

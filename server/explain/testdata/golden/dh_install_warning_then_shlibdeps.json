@@ -1,0 +1,42 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 2,
+  "causes": [
+    {
+      "kind": "debhelper",
+      "title": "dpkg-shlibdeps: error: cannot find library libcolumnstore_common.so.11 needed by debian/mariadb-plugin-columnstore/usr/lib/mysql/plugin/ha_columnstore.so (ELF …",
+      "line": 32,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 30,
+          "text": "   dh_strip -O--parallel"
+        },
+        {
+          "n": 31,
+          "text": "   dh_shlibdeps -O--parallel"
+        },
+        {
+          "n": 32,
+          "text": "dpkg-shlibdeps: error: cannot find library libcolumnstore_common.so.11 needed by debian/mariadb-plugin-columnstore/usr/lib/mysql/plugin/ha_columnstore.so (ELF format: 'elf64-x86-64' abi: '0201003e00000000'; RPATH: '')"
+        },
+        {
+          "n": 33,
+          "text": "dpkg-shlibdeps: error: cannot continue due to the error above"
+        },
+        {
+          "n": 34,
+          "text": "Note: libraries are not searched in other binary packages that do not have any shlibs or symbols file."
+        },
+        {
+          "n": 35,
+          "text": "To help dpkg-shlibdeps find private libraries, you might need to use -l."
+        }
+      ]
+    }
+  ],
+  "lines": 39,
+  "from": 1,
+  "untrusted": true
+}

@@ -1,0 +1,31 @@
+# want: gtest
+# exit: 1
+# state: failure
+---
++ ./build/storage/columnstore/columnstore/tests/rowgroup_tests
+[==========] Running 42 tests from 6 test suites.
+[----------] Global test environment set-up.
+[----------] 8 tests from ColumnstoreRowgroup
+[ RUN      ] ColumnstoreRowgroup.InitRows
+[       OK ] ColumnstoreRowgroup.InitRows (1 ms)
+[ RUN      ] ColumnstoreRowgroup.Append
+[       OK ] ColumnstoreRowgroup.Append (0 ms)
+[ RUN      ] ColumnstoreRowgroup.SerializeNulls
+/src/storage/columnstore/columnstore/tests/rowgroup-tests.cpp:211: Failure
+Expected equality of these values:
+  rg.getRowCount()
+    Which is: 7
+  8U
+    Which is: 8
+[  FAILED  ] ColumnstoreRowgroup.SerializeNulls (3 ms)
+[ RUN      ] ColumnstoreRowgroup.Resize
+[       OK ] ColumnstoreRowgroup.Resize (0 ms)
+[----------] 8 tests from ColumnstoreRowgroup (12 ms total)
+
+[----------] Global test environment tear-down
+[==========] 42 tests from 6 test suites ran. (88 ms total)
+[  PASSED  ] 41 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] ColumnstoreRowgroup.SerializeNulls
+
+ 1 FAILED TEST

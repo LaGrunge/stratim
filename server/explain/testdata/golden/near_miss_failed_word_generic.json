@@ -1,0 +1,26 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "exit",
+      "title": "exit code 1: uploading the package FAILED: 0 of 1 retries left",
+      "line": 4,
+      "confidence": "low",
+      "excerpt": [
+        {
+          "n": 3,
+          "text": "uploading the package FAILED: 0 of 1 retries left"
+        },
+        {
+          "n": 4,
+          "text": "upload: permission denied for the repository"
+        }
+      ]
+    }
+  ],
+  "lines": 4,
+  "from": 1,
+  "untrusted": true
+}

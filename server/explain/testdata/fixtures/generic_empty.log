@@ -1,0 +1,4 @@
+# want: exit
+# exit: 1
+# state: failure
+---

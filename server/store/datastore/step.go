@@ -26,6 +26,11 @@ func (s storage) StepLoad(pipelineID, stepID int64) (*model.Step, error) {
 	return step, wrapGet(s.engine.ID(stepID).Where(builder.Eq{"pipeline_id": pipelineID}).Get(step))
 }
 
+func (s storage) StepGet(stepID int64) (*model.Step, error) {
+	step := new(model.Step)
+	return step, wrapGet(s.engine.ID(stepID).Get(step))
+}
+
 func (s storage) StepByUUID(uuid string) (*model.Step, error) {
 	step := new(model.Step)
 	return step, wrapGet(s.engine.Where(

@@ -1,0 +1,15 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "exit",
+      "title": "exit code 1, the log is empty",
+      "confidence": "low",
+      "excerpt": []
+    }
+  ],
+  "lines": 0,
+  "untrusted": true
+}

@@ -1,0 +1,30 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "mtr",
+      "title": "MTR: Could not find 'mariadbd' in '/build/sql /build/libexec /build/bin /build/sbin', used for 'mysqld'",
+      "line": 7,
+      "confidence": "medium",
+      "excerpt": [
+        {
+          "n": 5,
+          "text": "Removing old var directory..."
+        },
+        {
+          "n": 6,
+          "text": "Creating var directory '/build/mysql-test/var'..."
+        },
+        {
+          "n": 7,
+          "text": "mysql-test-run: *** ERROR: Could not find 'mariadbd' in '/build/sql /build/libexec /build/bin /build/sbin', used for 'mysqld'"
+        }
+      ]
+    }
+  ],
+  "lines": 7,
+  "from": 1,
+  "untrusted": true
+}

@@ -94,6 +94,7 @@ func TestEventsV2SyntheticPipeline(t *testing.T) {
 	snapshots := env.RecordEvents(t)
 	watching := env.StreamEventsV2(t, fmt.Sprintf("repo=%d", repo.ID), "")
 	everything := env.StreamEventsV2(t, fmt.Sprintf("repo=%d&min_severity=debug", repo.ID), "")
+	explained := env.StreamEventsV2(t, fmt.Sprintf("repo=%d&min_severity=debug&types=step.explained", repo.ID), "")
 
 	created, err := pipeline.Create(t.Context(), env.Store, repo, env.DummyPipeline(model.EventPush))
 	require.NoError(t, err)
@@ -105,7 +106,7 @@ func TestEventsV2SyntheticPipeline(t *testing.T) {
 		len(snapshots.Events()), len(all), len(got))
 
 	assert.GreaterOrEqual(t, len(got), 6)
-	assert.LessOrEqual(t, len(got), 10)
+	assert.LessOrEqual(t, len(got), 11)
 	assert.Less(t, len(got), len(snapshots.Events()), "fewer events than snapshots")
 
 	count := make(map[events.Type]int)
@@ -113,12 +114,16 @@ func TestEventsV2SyntheticPipeline(t *testing.T) {
 		count[e.Type]++
 		assert.GreaterOrEqual(t, e.Severity, events.Notice, "the default is notice and above")
 		assert.Equal(t, created.ID, e.PipelineID)
-		assert.LessOrEqual(t, len(frames[i].Data), events.MaxEventBytes, "%s", frames[i].Data)
+		assert.LessOrEqual(t, len(frames[i].Data), events.MaxBytes(e.Type), "%s", frames[i].Data)
 		assert.Equal(t, fmt.Sprint(e.ID), frames[i].ID)
 		if i > 0 {
 			assert.Greater(t, e.ID, got[i-1].ID, "ids grow")
 		}
 	}
+	// the failure is explained in the background: before the pipeline's end
+	// or after it
+	assert.LessOrEqual(t, count[events.StepExplained], 1)
+	delete(count, events.StepExplained)
 	assert.Equal(t, map[events.Type]int{
 		events.PipelineStarted:  1,
 		events.WorkflowFinished: 6,
@@ -137,7 +142,17 @@ func TestEventsV2SyntheticPipeline(t *testing.T) {
 			assert.Equal(t, string(model.StatusTimeout), e.Status)
 			assert.True(t, e.Ignored)
 			assert.Equal(t, events.Notice, e.Severity)
+			assert.Nil(t, e.Cause, "the cause comes with step.explained")
 		}
+	}
+	causes, causeFrames := explained.Until(t, 10*time.Second, func(e events.Event) bool { return e.Step == "hang" })
+	hang := causes[len(causes)-1]
+	assert.Equal(t, events.StepExplained, hang.Type)
+	assert.Equal(t, events.Notice, hang.Severity, "of its failure, which is ignored")
+	assert.LessOrEqual(t, len(causeFrames[len(causeFrames)-1].Data), events.MaxStepExplainedBytes)
+	if assert.NotNil(t, hang.Cause, "the failure's cause") {
+		assert.Equal(t, "timeout", hang.Cause.Kind)
+		assert.True(t, hang.Cause.Untrusted)
 	}
 
 	// reconnecting after the fourth event replays the others, and only them
@@ -166,6 +181,7 @@ func TestEventsV2WireTypes(t *testing.T) {
 		{events.Hello{}, woodpecker.EventsHello{}},
 		{events.Reset{}, woodpecker.EventsReset{}},
 		{events.ErrorFrame{}, woodpecker.EventsError{}},
+		{events.Cause{}, woodpecker.StepFailureCause{}},
 	} {
 		assert.Equal(t, jsonFields(reflect.TypeOf(pair.server)), jsonFields(reflect.TypeOf(pair.client)),
 			"%T and %T", pair.server, pair.client)

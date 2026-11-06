@@ -153,6 +153,27 @@ func TestStepByUUID(t *testing.T) {
 	assert.Empty(t, step)
 }
 
+func TestStepGet(t *testing.T) {
+	store, closer := newTestStore(t, new(model.Step), new(model.Pipeline))
+	defer closer()
+
+	sess := store.engine.NewSession()
+	steps := []*model.Step{
+		{UUID: "a", PipelineID: 1, PID: 1, Name: "build", State: "success"},
+		{UUID: "b", PipelineID: 4, PID: 1, Name: "test", State: "failure", ExitCode: 1},
+	}
+	assert.NoError(t, store.stepCreate(sess, steps))
+	_ = sess.Close()
+
+	step, err := store.StepGet(steps[1].ID)
+	assert.NoError(t, err)
+	assert.Equal(t, "b", step.UUID)
+	assert.EqualValues(t, 4, step.PipelineID, "of whatever pipeline")
+
+	_, err = store.StepGet(steps[1].ID + 1)
+	assert.ErrorIs(t, err, types.ErrRecordNotExist)
+}
+
 func TestStepLoad(t *testing.T) {
 	store, closer := newTestStore(t, new(model.Step))
 	defer closer()

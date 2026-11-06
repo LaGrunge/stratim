@@ -1,0 +1,46 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "gtest",
+      "title": "gtest: ColumnstoreRowgroup.SerializeNulls failed at rowgroup-tests.cpp:211",
+      "line": 10,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 10,
+          "text": "/src/storage/columnstore/columnstore/tests/rowgroup-tests.cpp:211: Failure"
+        },
+        {
+          "n": 11,
+          "text": "Expected equality of these values:"
+        },
+        {
+          "n": 12,
+          "text": "  rg.getRowCount()"
+        },
+        {
+          "n": 13,
+          "text": "    Which is: 7"
+        },
+        {
+          "n": 14,
+          "text": "  8U"
+        },
+        {
+          "n": 15,
+          "text": "    Which is: 8"
+        },
+        {
+          "n": 16,
+          "text": "[  FAILED  ] ColumnstoreRowgroup.SerializeNulls (3 ms)"
+        }
+      ]
+    }
+  ],
+  "lines": 27,
+  "from": 1,
+  "untrusted": true
+}

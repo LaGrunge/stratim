@@ -4956,6 +4956,106 @@ const docTemplate = `{
                 }
             }
         },
+        "/v2/steps/{step_id}/explain": {
+            "get": {
+                "description": "The causes found in the end of the step's log by rules for ninja, cmake and compiler errors,\ngtest, ctest and MTR failures, dh_install, OOM kills, timeouts and panics, the first cause first;\nnone when the step did not fail. Titles and excerpts are text of the log: the result is marked\nuntrusted. See the documentation of /api/v2/events.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Pipeline logs"
+                ],
+                "summary": "Why a step failed",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cpersonal access token\u003e",
+                        "description": "Insert your personal access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the step id",
+                        "name": "step_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/StepExplanation"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/steps/{step_id}/log": {
+            "get": {
+                "description": "Up to lines lines of the step's log from the line from on, without escape sequences, each with\nits number as the UI shows it. A negative from counts from the end: -100 starts 100 lines before\nit. With grep only the lines that contain it are given. next is the line to ask from for the\nnext window; there is none at the end of the log. The lines are text of the log: the window is\nmarked untrusted.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Pipeline logs"
+                ],
+                "summary": "A window of a step's log",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cpersonal access token\u003e",
+                        "description": "Insert your personal access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the step id",
+                        "name": "step_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "the first line, from 1; negative counts from the end",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 100,
+                        "description": "the most lines, at most 500",
+                        "name": "lines",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "only the lines that contain this text, at most 256 bytes",
+                        "name": "grep",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "grep ignoring the case",
+                        "name": "ignore_case",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/LogWindow"
+                        }
+                    }
+                }
+            }
+        },
         "/version": {
             "get": {
                 "description": "Endpoint returns the server version and build information.",
@@ -5342,6 +5442,29 @@ const docTemplate = `{
                 "LogEntryMetadata",
                 "LogEntryProgress"
             ]
+        },
+        "LogWindow": {
+            "type": "object",
+            "properties": {
+                "lines": {
+                    "description": "Lines are the lines of the window, without escape sequences.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/explain.Line"
+                    }
+                },
+                "next": {
+                    "description": "Next is the line to go on from for the next window; none at the end\nof the log.",
+                    "type": "integer"
+                },
+                "step_id": {
+                    "type": "integer"
+                },
+                "untrusted": {
+                    "description": "Untrusted is always true: the lines are text of the log.",
+                    "type": "boolean"
+                }
+            }
         },
         "Org": {
             "type": "object",
@@ -6210,6 +6333,38 @@ const docTemplate = `{
                 }
             }
         },
+        "StepExplanation": {
+            "type": "object",
+            "properties": {
+                "causes": {
+                    "description": "Causes are the causes found, the first cause first; none when the\nstep did not fail.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/explain.Cause"
+                    }
+                },
+                "exit_code": {
+                    "type": "integer"
+                },
+                "from": {
+                    "type": "integer"
+                },
+                "lines": {
+                    "description": "Lines are the lines of the log; From is the first of them the rules\nlooked at.",
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "step_id": {
+                    "type": "integer"
+                },
+                "untrusted": {
+                    "description": "Untrusted is always true: the titles and excerpts are text of the\nlog.",
+                    "type": "boolean"
+                }
+            }
+        },
         "StepType": {
             "type": "string",
             "enum": [
@@ -6495,6 +6650,58 @@ const docTemplate = `{
                 "PipelineErrorTypeGeneric",
                 "PipelineErrorTypeBadHabit"
             ]
+        },
+        "explain.Cause": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "$ref": "#/definitions/explain.Confidence"
+                },
+                "excerpt": {
+                    "description": "Excerpt are the lines that show it, at most maxExcerptLines.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/explain.Line"
+                    }
+                },
+                "kind": {
+                    "description": "Kind names the rule that found it.",
+                    "type": "string"
+                },
+                "line": {
+                    "description": "Line is the number of the line it is at, 0 if it is at none.",
+                    "type": "integer"
+                },
+                "title": {
+                    "description": "Title is one line about it, at most maxTitleRunes.",
+                    "type": "string"
+                }
+            }
+        },
+        "explain.Confidence": {
+            "type": "string",
+            "enum": [
+                "high",
+                "medium",
+                "low"
+            ],
+            "x-enum-varnames": [
+                "High",
+                "Medium",
+                "Low"
+            ]
+        },
+        "explain.Line": {
+            "type": "object",
+            "properties": {
+                "n": {
+                    "description": "N is its number as the UI shows it, from 1.",
+                    "type": "integer"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
         },
         "metadata.Author": {
             "type": "object",

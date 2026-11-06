@@ -1,0 +1,50 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "ctest",
+      "title": "ctest: unit_rowgroup failed (Failed)",
+      "line": 4,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 4,
+          "text": "13/40 Test #13: unit_rowgroup ....................***Failed    0.31 sec"
+        },
+        {
+          "n": 5,
+          "text": "mmap(1TB) failed as expected: Cannot allocate memory"
+        },
+        {
+          "n": 6,
+          "text": "expected 3 rows, got 2"
+        },
+        {
+          "n": 7,
+          "text": ""
+        },
+        {
+          "n": 8,
+          "text": "95% tests passed, 1 tests failed out of 40"
+        },
+        {
+          "n": 9,
+          "text": ""
+        },
+        {
+          "n": 10,
+          "text": "Total Test time (real) =  12.02 sec"
+        },
+        {
+          "n": 11,
+          "text": ""
+        }
+      ]
+    }
+  ],
+  "lines": 14,
+  "from": 1,
+  "untrusted": true
+}

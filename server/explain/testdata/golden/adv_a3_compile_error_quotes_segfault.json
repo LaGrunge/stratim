@@ -1,0 +1,62 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "ninja",
+      "title": "ninja: signal_handler.cc.o failed: signal_handler.cc:188: 'my_safe_printf_stderrr' was not declared in this scope; did you mean 'my_safe_printf_stderr'?",
+      "line": 5,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 2,
+          "text": "FAILED: sql/CMakeFiles/sql.dir/signal_handler.cc.o"
+        },
+        {
+          "n": 5,
+          "text": "/src/sql/signal_handler.cc:188:3: error: 'my_safe_printf_stderrr' was not declared in this scope; did you mean 'my_safe_printf_stderr'?"
+        },
+        {
+          "n": 6,
+          "text": "  188 |   my_safe_printf_stderrr(\"Segmentation fault: got signal 11 ;\\n\");"
+        },
+        {
+          "n": 7,
+          "text": "      |   ^~~~~~~~~~~~~~~~~~~~~~"
+        }
+      ]
+    },
+    {
+      "kind": "compile",
+      "title": "compile error: signal_handler.cc:188: 'my_safe_printf_stderrr' was not declared in this scope; did you mean 'my_safe_printf_stderr'?",
+      "line": 5,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 4,
+          "text": "/src/sql/signal_handler.cc: In function 'void handle_fatal_signal(int)':"
+        },
+        {
+          "n": 5,
+          "text": "/src/sql/signal_handler.cc:188:3: error: 'my_safe_printf_stderrr' was not declared in this scope; did you mean 'my_safe_printf_stderr'?"
+        },
+        {
+          "n": 6,
+          "text": "  188 |   my_safe_printf_stderrr(\"Segmentation fault: got signal 11 ;\\n\");"
+        },
+        {
+          "n": 7,
+          "text": "      |   ^~~~~~~~~~~~~~~~~~~~~~"
+        },
+        {
+          "n": 8,
+          "text": "ninja: build stopped: subcommand failed."
+        }
+      ]
+    }
+  ],
+  "lines": 8,
+  "from": 1,
+  "untrusted": true
+}

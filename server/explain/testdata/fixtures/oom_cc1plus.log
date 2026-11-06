@@ -1,0 +1,17 @@
+# want: oom
+# exit: 1
+# state: failure
+---
+[700/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj700.cpp.o
+[701/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj701.cpp.o
+[702/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj702.cpp.o
+[703/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj703.cpp.o
+[704/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj704.cpp.o
+[705/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj705.cpp.o
+FAILED: storage/columnstore/columnstore/dbcon/joblist/CMakeFiles/joblist.dir/jlf_tuplejoblist.cpp.o
+/usr/bin/c++ -O2 -g -std=gnu++20 -c /src/storage/columnstore/columnstore/dbcon/joblist/jlf_tuplejoblist.cpp
+c++: fatal error: Killed signal terminated program cc1plus
+compilation terminated.
+[706/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj706.cpp.o
+[707/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj707.cpp.o
+ninja: build stopped: subcommand failed.

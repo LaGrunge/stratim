@@ -1,0 +1,7 @@
+# want: ctest
+# exit: 8
+# state: failure
+---
++ ctest --test-dir build --no-tests=error
+Test project /home/buildbot/build
+No tests were found!!!

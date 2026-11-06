@@ -36,6 +36,8 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/cache"
 	"go.woodpecker-ci.org/woodpecker/v3/server/events"
+	"go.woodpecker-ci.org/woodpecker/v3/server/explain"
+	"go.woodpecker-ci.org/woodpecker/v3/server/explain/worker"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge/setup"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forgestatus"
@@ -203,8 +205,23 @@ func setupEvilGlobals(ctx context.Context, c *cli.Command, s store.Store) (err e
 		return fmt.Errorf("events-buffer-size: %w", err)
 	}
 	log.Info().Int("events", bufferSize).Msg("pipeline events: keeping the latest for replay")
+	server.Config.Services.LogStore, err = setupLogStore(c, s)
+	if err != nil {
+		return fmt.Errorf("could not setup log store: %w", err)
+	}
+	server.Config.Services.Explain = explain.New(server.Config.Services.LogStore, explain.Options{})
+	server.Config.Services.LogStore = explain.ForgetDeleted(server.Config.Services.LogStore, server.Config.Services.Explain)
+	server.Config.Services.LogWindows = explain.NewWindows(server.Config.Services.LogStore)
 	server.Config.Services.Events = events.NewHub(events.Options{BufferSize: bufferSize})
 	server.Config.Services.Durations = summary.NewDurations(0)
+	if workers := c.Int("explain-workers"); workers > 0 {
+		pool := worker.New(server.Config.Services.Events, server.Config.Services.Explain, s, worker.Options{
+			Workers: workers,
+			Timeout: c.Duration("explain-timeout"),
+		})
+		pool.Start(ctx)
+		log.Info().Int("workers", workers).Msg("failed steps: explaining them in the background")
+	}
 	server.Config.Services.Scheduler = scheduler.NewScheduler(ctx, s, queue, pubsub,
 		scheduler.WithPipelineObserver(server.Config.Services.Events),
 		scheduler.WithPipelineObserver(server.Config.Services.Durations))
@@ -217,10 +234,6 @@ func setupEvilGlobals(ctx context.Context, c *cli.Command, s store.Store) (err e
 	statusPolicy.ResendMax = c.Int("forge-status-resend-max")
 	server.Config.Services.Statuses = forgestatus.New(ctx, s, server.Config.Services.Manager.ForgeFromRepo,
 		func(ctx context.Context, f forge.Forge, u *model.User) { forge.Refresh(ctx, f, s, u) }, statusPolicy)
-	server.Config.Services.LogStore, err = setupLogStore(c, s)
-	if err != nil {
-		return fmt.Errorf("could not setup log store: %w", err)
-	}
 
 	// agents
 	server.Config.Agent.DisableUserRegisteredAgentRegistration = c.Bool("disable-user-agent-registration")

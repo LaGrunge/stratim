@@ -1,0 +1,11 @@
+# want: ninja
+# exit: 1
+# state: failure
+---
+[1/50] Building CXX object plugin/dbcon/execplan/CMakeFiles/execplan.dir/obj1.cpp.o
+[2/50] Building CXX object plugin/dbcon/execplan/CMakeFiles/execplan.dir/obj2.cpp.o
+[3/50] Building CXX object plugin/dbcon/execplan/CMakeFiles/execplan.dir/obj3.cpp.o
+[31mFAILED: [0mplugin/auth_pam/CMakeFiles/auth_pam.dir/auth_pam.c.o
+/usr/bin/cc -O2 -c /src/plugin/auth_pam/auth_pam.c
+/src/plugin/auth_pam/auth_pam.c:21:10: [01;31m[Kfatal error: [m[Ksecurity/pam_appl.h: No such file or directory
+ninja: build stopped: subcommand failed.

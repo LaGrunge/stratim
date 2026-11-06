@@ -1,0 +1,62 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 2,
+  "causes": [
+    {
+      "kind": "dh_install",
+      "title": "dh_missing: 2 files installed by the build but in no package: usr/lib/mysql/plugin/ha_columnstore.so (+1 more)",
+      "line": 31,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 31,
+          "text": "dh_missing: warning: usr/lib/mysql/plugin/ha_columnstore.so exists in debian/tmp but is not installed to anywhere"
+        },
+        {
+          "n": 32,
+          "text": "dh_missing: warning: usr/share/columnstore/Columnstore.xml exists in debian/tmp but is not installed to anywhere"
+        },
+        {
+          "n": 33,
+          "text": "dh_missing: error: missing files, aborting"
+        }
+      ]
+    },
+    {
+      "kind": "debhelper",
+      "title": "dh_missing: error: missing files, aborting",
+      "line": 33,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 31,
+          "text": "dh_missing: warning: usr/lib/mysql/plugin/ha_columnstore.so exists in debian/tmp but is not installed to anywhere"
+        },
+        {
+          "n": 32,
+          "text": "dh_missing: warning: usr/share/columnstore/Columnstore.xml exists in debian/tmp but is not installed to anywhere"
+        },
+        {
+          "n": 33,
+          "text": "dh_missing: error: missing files, aborting"
+        },
+        {
+          "n": 34,
+          "text": "\tThe following debhelper tools have reported what they installed (with files per package)"
+        },
+        {
+          "n": 35,
+          "text": "\t * dh_install: mariadb-server (12), mariadb-client (31)"
+        },
+        {
+          "n": 36,
+          "text": "\tIf the missing files are installed by another tool, please file a bug against it."
+        }
+      ]
+    }
+  ],
+  "lines": 38,
+  "from": 1,
+  "untrusted": true
+}

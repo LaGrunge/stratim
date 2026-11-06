@@ -1,0 +1,30 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "mtr",
+      "title": "MTR: orthus.dml failed: At line 42: query 'SELECT * FROM t1' failed: 1030: Got error 168 from storage engine",
+      "line": 6,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 6,
+          "text": "orthus.dml 'innodb'                      w1 [ fail ]"
+        },
+        {
+          "n": 7,
+          "text": "        Test ended at 2026-11-06 10:00:03"
+        },
+        {
+          "n": 8,
+          "text": "mysqltest: At line 42: query 'SELECT * FROM t1' failed: 1030: Got error 168 from storage engine"
+        }
+      ]
+    }
+  ],
+  "lines": 12,
+  "from": 1,
+  "untrusted": true
+}

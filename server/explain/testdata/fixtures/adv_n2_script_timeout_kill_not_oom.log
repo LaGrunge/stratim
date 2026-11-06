@@ -1,0 +1,18 @@
+# want: ctest
+# exit: 8
+---
++ timeout -s KILL 600 ./build/tests/stress_runner --minutes 20
+./ci/run_stress.sh: line 14:  4242 Killed                  timeout -s KILL 600 ./build/tests/stress_runner --minutes 20
++ ctest --test-dir build --output-on-failure
+Test project /build
+    Start 1: unit_types
+1/2 Test #1: unit_types .......................   Passed    0.01 sec
+    Start 2: cluster_connectivity
+2/2 Test #2: cluster_connectivity .............***Failed    3.02 sec
+connect: Connection refused
+
+50% tests passed, 1 tests failed out of 2
+
+The following tests FAILED:
+	  2 - cluster_connectivity (Failed)
+Errors while running CTest

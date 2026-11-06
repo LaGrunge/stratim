@@ -1,0 +1,30 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "mtr",
+      "title": "MTR: main.xa failed: At line 3: query 'xa start' failed: 1399",
+      "line": 2,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 2,
+          "text": "main.xa 'innodb'                         w1 [ fail ]"
+        },
+        {
+          "n": 3,
+          "text": "        Test ended at 2026-11-01 10:00:01"
+        },
+        {
+          "n": 4,
+          "text": "mysqltest: At line 3: query 'xa start' failed: 1399"
+        }
+      ]
+    }
+  ],
+  "lines": 7,
+  "from": 1,
+  "untrusted": true
+}

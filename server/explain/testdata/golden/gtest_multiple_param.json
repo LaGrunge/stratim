@@ -1,0 +1,38 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "gtest",
+      "title": "gtest: SimdTypes/SimdFilterTest.Equal/3 failed at simd_processors.cpp:96 (+2 more)",
+      "line": 9,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 9,
+          "text": "/src/storage/columnstore/columnstore/tests/simd_processors.cpp:96: Failure"
+        },
+        {
+          "n": 10,
+          "text": "Value of: result == expected"
+        },
+        {
+          "n": 11,
+          "text": "  Actual: false"
+        },
+        {
+          "n": 12,
+          "text": "Expected: true"
+        },
+        {
+          "n": 13,
+          "text": "[  FAILED  ] SimdTypes/SimdFilterTest.Equal/3, where TypeParam = long (0 ms)"
+        }
+      ]
+    }
+  ],
+  "lines": 31,
+  "from": 1,
+  "untrusted": true
+}
