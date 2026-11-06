@@ -24,10 +24,13 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/backend/docker"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml"
 	yaml_types "go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/types"
@@ -81,7 +84,22 @@ func TestCheckSavedResponses(t *testing.T) {
 			"synthetic-tests":      "did not run: pending",
 			"synthetic-parallel-b": "missing",
 			"overlap [synthetic-parallel-a synthetic-parallel-b]": "synthetic-parallel-b did not run",
+			"synthetic-timeout":                  "missing",
+			"synthetic-timeout/hang state":       "missing",
+			"synthetic-timeout/hang ended after": "missing",
+			"synthetic-timeout/after":            "missing",
+			"synthetic-timeout/report":           "missing",
 		},
+		// the step that runs into its timeout ended 71s after it started,
+		// one second over its timeout and the kill's margin
+		"timeout_late": {"synthetic-timeout/hang ended after": "71s"},
+		// it failed by itself, long before its timeout, as if it had none
+		"timeout_wrong_state": {
+			"synthetic-timeout/hang state":       "failure",
+			"synthetic-timeout/hang ended after": "2s",
+		},
+		// no finalizer ran after it
+		"timeout_no_finalizer": {"synthetic-timeout/report": "missing"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			results := Check(saved(t, name), budgets(t))
@@ -153,6 +171,12 @@ func TestLoadBudgetsRejects(t *testing.T) {
 		"log of unknown":   `{"max_queue_wait_seconds":1,"max_pipeline_seconds":1,"workflows":{"a":{"state":"success","max_seconds":5}},"logs":[{"workflow":"z","step":"s","lines":1}]}`,
 		"log of no step":   `{"max_queue_wait_seconds":1,"max_pipeline_seconds":1,"workflows":{"a":{"state":"success","max_seconds":5}},"logs":[{"workflow":"a","lines":1}]}`,
 		"log of no lines":  `{"max_queue_wait_seconds":1,"max_pipeline_seconds":1,"workflows":{"a":{"state":"success","max_seconds":5}},"logs":[{"workflow":"a","step":"s"}]}`,
+		"timeout of unknown": `{"max_queue_wait_seconds":1,"max_pipeline_seconds":1,"workflows":{"a":{"state":"success","max_seconds":5}},` +
+			`"timeouts":[{"workflow":"z","step":"s","timeout_seconds":1,"max_kill_seconds":1,"after":"n","finalizer":"f","pipeline_status":"success"}]}`,
+		"timeout of no finalizer": `{"max_queue_wait_seconds":1,"max_pipeline_seconds":1,"workflows":{"a":{"state":"success","max_seconds":5}},` +
+			`"timeouts":[{"workflow":"a","step":"s","timeout_seconds":1,"max_kill_seconds":1,"after":"n","pipeline_status":"success"}]}`,
+		"timeout of no kill margin": `{"max_queue_wait_seconds":1,"max_pipeline_seconds":1,"workflows":{"a":{"state":"success","max_seconds":5}},` +
+			`"timeouts":[{"workflow":"a","step":"s","timeout_seconds":1,"after":"n","finalizer":"f","pipeline_status":"success"}]}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "budgets.json")
@@ -223,7 +247,7 @@ func TestAPISource(t *testing.T) {
 	p, err := get("secret", 100)
 	require.NoError(t, err)
 	assert.Equal(t, int64(100), p.Number)
-	assert.Len(t, p.Workflows, 5)
+	assert.Len(t, p.Workflows, 6)
 	assert.False(t, Failed(Check(p, budgets(t))), "the saved passing run passes through the API too")
 
 	for number, want := range map[int64]string{101: "invalid character", 102: "boom", 104: "404"} {
@@ -309,5 +333,55 @@ func TestSyntheticWorkflowsMatchBudgets(t *testing.T) {
 			}
 		}
 		assert.Truef(t, found, "%s has the step %s", l.Workflow, l.Step)
+	}
+
+	require.NotEmpty(t, budgets(t).Timeouts)
+	for _, b := range budgets(t).Timeouts {
+		w, ok := workflows[b.Workflow]
+		require.Truef(t, ok, "timeout budget of unknown workflow %s", b.Workflow)
+		steps := make(map[string]*yaml_types.Container)
+		var order []string
+		for _, step := range w.Steps.ContainerList {
+			steps[step.Name] = step
+			order = append(order, step.Name)
+		}
+		require.Containsf(t, steps, b.Step, "%s has the step %s", b.Workflow, b.Step)
+		require.Containsf(t, steps, b.After, "%s has the step %s", b.Workflow, b.After)
+		require.Containsf(t, steps, b.Finalizer, "%s has the step %s", b.Workflow, b.Finalizer)
+		hang, after, final := steps[b.Step], steps[b.After], steps[b.Finalizer]
+		assert.Equal(t, time.Duration(b.TimeoutSeconds)*time.Second, time.Duration(hang.Timeout), "the step's timeout is the budget's")
+		assert.Equal(t, "ignore", hang.Failure, "its timeout must not fail the workflow, or the pipeline")
+		assert.False(t, hang.OnFinish || after.OnFinish, "only the finalizer is one")
+		assert.True(t, final.OnFinish, "the finalizer is one")
+		assert.Less(t, slices.Index(order, b.Step), slices.Index(order, b.After), "the after step comes after it")
+		assert.Empty(t, after.DependsOn, "the after step runs after it, without depending on it")
+		assert.Empty(t, final.When.Constraints, "the finalizer runs whatever the outcome")
+		// the kill budget counts on the docker backend's stop grace
+		assert.Equal(t, map[string]string{"backend": "docker"}, w.Labels, "%s runs on docker agents", b.Workflow)
+	}
+
+	// it must not take an agent the parallel pair needs at once
+	var timeoutDeps []string
+	for _, d := range workflows["synthetic-timeout"].DependsOn {
+		timeoutDeps = append(timeoutDeps, d.Name)
+	}
+	assert.ElementsMatch(t, budgets(t).Overlapping[0], timeoutDeps, "synthetic-timeout waits for the parallel pair")
+}
+
+// TestKillBudgetCoversStopGrace: the step that runs into its timeout ignores
+// SIGTERM, so the docker backend kills it only after its stop grace; the
+// kill budget must hold that grace and the time to start, kill and report.
+func TestKillBudgetCoversStopGrace(t *testing.T) {
+	const headroom = 10 // seconds: the pull, the kill, the report
+	var grace int64
+	for _, f := range docker.Flags {
+		if f, ok := f.(*cli.Int64Flag); ok && f.Name == "backend-docker-stop-timeout" {
+			grace = f.Value
+		}
+	}
+	require.Positive(t, grace, "the docker backend's default stop timeout")
+	for _, b := range budgets(t).Timeouts {
+		assert.GreaterOrEqualf(t, b.MaxKillSeconds, grace+headroom,
+			"%s/%s: max_kill_seconds against the %ds stop grace", b.Workflow, b.Step, grace)
 	}
 }

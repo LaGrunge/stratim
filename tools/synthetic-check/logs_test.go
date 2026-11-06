@@ -52,6 +52,7 @@ func TestCountLines(t *testing.T) {
 		want  LogCount
 	}{
 		{name: "empty"},
+		{name: "null"},
 		{name: "in order", lines: []string{"▶  awk ...", numberedLine(1), numberedLine(2), numberedLine(3)}, want: LogCount{Lines: 3}},
 		{name: "a gap", lines: []string{numberedLine(1), numberedLine(2), numberedLine(5), numberedLine(6)}, want: LogCount{Lines: 4, FirstGap: 3}},
 		{name: "missing the first", lines: []string{numberedLine(2), numberedLine(3)}, want: LogCount{Lines: 2, FirstGap: 1}},
@@ -68,7 +69,11 @@ func TestCountLines(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := CountLines(strings.NewReader(logJSON(t, tt.lines...)))
+			body := logJSON(t, tt.lines...)
+			if tt.name == "null" {
+				body = "null" // what the API sends for a step without log entries
+			}
+			got, err := CountLines(strings.NewReader(body))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
@@ -208,7 +213,7 @@ func TestRunChecksLogs(t *testing.T) {
 	short := func(int64) (LogCount, error) { return LogCount{Lines: 939820, FirstGap: 4}, nil }
 
 	var out strings.Builder
-	failed, err := run(b, src, short, &out)
+	failed, err := run(b, src, &logSources{count: short, status: saw("success")}, &out)
 	require.NoError(t, err)
 	assert.True(t, failed, "a pipeline within its time budgets fails on a short log")
 	assert.Regexp(t, `synthetic-logs/big-log log\s+939820 lines, first gap at 4\s+3000000 lines in order\s+OVER`, out.String())
@@ -220,7 +225,7 @@ func TestRunReportsWhenALogIsUnreadable(t *testing.T) {
 	broken := func(int64) (LogCount, error) { return LogCount{}, errors.New("504 Gateway Timeout") }
 
 	var out strings.Builder
-	failed, err := run(b, src, broken, &out)
+	failed, err := run(b, src, &logSources{count: broken, status: saw("success")}, &out)
 	assert.ErrorContains(t, err, "504", "exit 2: the check could not run")
 	assert.True(t, failed)
 	assert.Regexp(t, `synthetic-logs time\s+900s\s+600s\s+OVER`, out.String(), "the other checks are still reported")

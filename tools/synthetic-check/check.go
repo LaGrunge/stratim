@@ -42,6 +42,9 @@ type Budgets struct {
 	Overlapping [][]string `json:"overlapping"`
 	// Logs lists steps whose log must hold every line they numbered.
 	Logs []LogBudget `json:"logs"`
+	// Timeouts lists steps that must run into their timeout and what must
+	// follow them.
+	Timeouts []TimeoutBudget `json:"timeouts"`
 }
 
 // WorkflowBudget is what one workflow must end as and may last.
@@ -108,11 +111,15 @@ func (b Budgets) validate() error {
 			errs = append(errs, fmt.Errorf("log of %s needs a step and a positive lines", l.Workflow))
 		}
 	}
+	for _, t := range b.Timeouts {
+		errs = append(errs, t.validate(b.Workflows)...)
+	}
 	return errors.Join(errs...)
 }
 
 // Check compares the pipeline with the budgets. It returns the results in a
-// stable order: queue wait, pipeline, workflows by name, overlapping groups.
+// stable order: queue wait, pipeline, workflows by name, overlapping groups,
+// timeouts.
 func Check(p *woodpecker.Pipeline, b Budgets) []Result {
 	byName := make(map[string]*woodpecker.Workflow, len(p.Workflows))
 	for _, w := range p.Workflows {
@@ -175,7 +182,7 @@ func Check(p *woodpecker.Pipeline, b Budgets) []Result {
 	for _, group := range b.Overlapping {
 		results = append(results, overlap(byName, group))
 	}
-	return results
+	return append(results, CheckTimeouts(p, b.Timeouts)...)
 }
 
 func ran(w *woodpecker.Workflow) bool { return w.Started != 0 }

@@ -16,6 +16,7 @@
 package ciconfig
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
 	"path/filepath"
@@ -28,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 
+	backend_types "go.woodpecker-ci.org/woodpecker/v3/pipeline/backend/types"
 	pipeline_errors "go.woodpecker-ci.org/woodpecker/v3/pipeline/errors"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/builder"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
@@ -145,6 +147,20 @@ func TestWorkflowsBuild(t *testing.T) {
 				require.Len(t, cmds, 1)
 				assert.Contains(t, cmds[0], `..........\n", i }'`)
 				assert.NotContains(t, cmds[0], "\n")
+				// the finalizer prints the outcome it is given at run time: the
+				// build must leave the variable for the shell
+				assert.Equal(t, []string{`echo "STRATIM_PIPELINE_STATUS=$STRATIM_PIPELINE_STATUS"`},
+					stepCommands(items, "synthetic-timeout", "report"))
+				// the check measures the kill against the timeout the step is
+				// built with
+				timeouts := syntheticTimeouts(t)
+				require.NotEmpty(t, timeouts)
+				for _, b := range timeouts {
+					step := builtStep(items, b.Workflow, b.Step)
+					require.NotNilf(t, step, "%s/%s is built", b.Workflow, b.Step)
+					assert.Equalf(t, time.Duration(b.TimeoutSeconds)*time.Second, step.Timeout,
+						"%s/%s is built with the timeout of its budget", b.Workflow, b.Step)
+				}
 			}
 			if tt.wantTest != nil {
 				assert.Subset(t, stepNames(items, "test"), tt.wantTest, "steps of the test workflow")
@@ -266,7 +282,7 @@ func stepNames(items []*builder.Item, workflow string) []string {
 }
 
 // syntheticWorkflows are those the nightly synthetic cron runs.
-var syntheticWorkflows = []string{"synthetic-check", "synthetic-logs", "synthetic-parallel-a", "synthetic-parallel-b", "synthetic-tests"}
+var syntheticWorkflows = []string{"synthetic-check", "synthetic-logs", "synthetic-parallel-a", "synthetic-parallel-b", "synthetic-tests", "synthetic-timeout"}
 
 // TestCrons: the server makes exactly one cron of .woodpecker/, the
 // synthetic one, nightly at 03:00 UTC.
@@ -285,6 +301,14 @@ func TestCrons(t *testing.T) {
 
 // stepCommands are the commands of a workflow's step.
 func stepCommands(items []*builder.Item, workflow, step string) []string {
+	if s := builtStep(items, workflow, step); s != nil {
+		return s.Commands
+	}
+	return nil
+}
+
+// builtStep is the step of a workflow as the build made it, or nil.
+func builtStep(items []*builder.Item, workflow, step string) *backend_types.Step {
 	for _, item := range items {
 		if item.Workflow.Name != workflow || item.Config == nil {
 			continue
@@ -292,10 +316,31 @@ func stepCommands(items []*builder.Item, workflow, step string) []string {
 		for _, stage := range item.Config.Stages {
 			for _, s := range stage.Steps {
 				if s.Name == step {
-					return s.Commands
+					return s
 				}
 			}
 		}
 	}
 	return nil
+}
+
+// syntheticTimeouts are the timeout budgets of the synthetic check, as
+// much of them as this test reads.
+func syntheticTimeouts(t *testing.T) []struct {
+	Workflow       string `json:"workflow"`
+	Step           string `json:"step"`
+	TimeoutSeconds int64  `json:"timeout_seconds"`
+} {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(configDir, "synthetic", "budgets.json"))
+	require.NoError(t, err)
+	var budgets struct {
+		Timeouts []struct {
+			Workflow       string `json:"workflow"`
+			Step           string `json:"step"`
+			TimeoutSeconds int64  `json:"timeout_seconds"`
+		} `json:"timeouts"`
+	}
+	require.NoError(t, json.Unmarshal(data, &budgets))
+	return budgets.Timeouts
 }

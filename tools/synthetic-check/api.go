@@ -96,31 +96,53 @@ func apiSource(cfg apiConfig) source {
 	}
 }
 
-// apiLogSource reads step logs from the Stratim API.
+// apiLogSource counts the numbered lines of step logs from the Stratim API.
 func apiLogSource(cfg apiConfig) logSource {
-	return func(stepID int64) (LogCount, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), logRequestTimeout)
-		defer cancel()
-		url := fmt.Sprintf("%s/api/repos/%d/logs/%d/%d", trimSlash(cfg.URL), cfg.Repo, cfg.Number, stepID)
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-		if err != nil {
-			return LogCount{}, err
-		}
-		resp, err := cfg.httpClient(logRequestTimeout).Do(req)
-		if err != nil {
-			return LogCount{}, err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(io.LimitReader(resp.Body, 512)) //nolint:mnd
-			return LogCount{}, fmt.Errorf("%s: %s", resp.Status, body)
-		}
-		count, err := CountLines(resp.Body)
-		if errors.Is(err, context.DeadlineExceeded) {
-			return LogCount{}, fmt.Errorf("reading the log took longer than %s", logRequestTimeout)
-		}
+	return func(stepID int64) (count LogCount, err error) {
+		err = readLog(cfg, stepID, func(r io.Reader) (err error) {
+			count, err = CountLines(r)
+			return err
+		})
 		return count, err
 	}
+}
+
+// apiStatusSource reads what step logs from the Stratim API say
+// STRATIM_PIPELINE_STATUS was.
+func apiStatusSource(cfg apiConfig) statusSource {
+	return func(stepID int64) (status string, err error) {
+		err = readLog(cfg, stepID, func(r io.Reader) (err error) {
+			status, err = PipelineStatus(r)
+			return err
+		})
+		return status, err
+	}
+}
+
+// readLog has read read the log of a step from the Stratim API, as the API
+// returns it.
+func readLog(cfg apiConfig, stepID int64, read func(io.Reader) error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), logRequestTimeout)
+	defer cancel()
+	url := fmt.Sprintf("%s/api/repos/%d/logs/%d/%d", trimSlash(cfg.URL), cfg.Repo, cfg.Number, stepID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := cfg.httpClient(logRequestTimeout).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512)) //nolint:mnd
+		return fmt.Errorf("%s: %s", resp.Status, body)
+	}
+	err = read(resp.Body)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("reading the log took longer than %s", logRequestTimeout)
+	}
+	return err
 }
 
 func trimSlash(s string) string { return strings.TrimRight(s, "/") }

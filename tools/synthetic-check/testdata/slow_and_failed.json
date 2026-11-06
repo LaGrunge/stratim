@@ -124,6 +124,58 @@
       ]
     },
     {
+      "id": 1006,
+      "pipeline_id": 44,
+      "pid": 6,
+      "name": "synthetic-timeout",
+      "state": "success",
+      "started": 1793900200,
+      "finished": 1793900249,
+      "agent_id": 1,
+      "children": [
+        {
+          "id": 2006,
+          "uuid": "00000000-0000-0000-0000-000000000006",
+          "pipeline_id": 44,
+          "pid": 106,
+          "ppid": 6,
+          "name": "hang",
+          "state": "timeout",
+          "exit_code": 124,
+          "started": 1793900200,
+          "finished": 1793900245,
+          "type": "commands"
+        },
+        {
+          "id": 2007,
+          "uuid": "00000000-0000-0000-0000-000000000007",
+          "pipeline_id": 44,
+          "pid": 107,
+          "ppid": 6,
+          "name": "after",
+          "state": "success",
+          "exit_code": 0,
+          "started": 1793900246,
+          "finished": 1793900247,
+          "type": "commands"
+        },
+        {
+          "id": 2008,
+          "uuid": "00000000-0000-0000-0000-000000000008",
+          "pipeline_id": 44,
+          "pid": 108,
+          "ppid": 6,
+          "name": "report",
+          "state": "success",
+          "exit_code": 0,
+          "started": 1793900248,
+          "finished": 1793900249,
+          "type": "commands",
+          "finalizer": true
+        }
+      ]
+    },
+    {
       "id": 1005,
       "pipeline_id": 44,
       "pid": 5,

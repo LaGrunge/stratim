@@ -6,6 +6,7 @@ depends_on:
 - synthetic-parallel-a
 - synthetic-parallel-b
 - synthetic-tests
+- synthetic-timeout
 steps:
 - commands:
   - go run ./tools/synthetic-check -budgets .woodpecker/synthetic/budgets.json

@@ -42,33 +42,54 @@ type LogCount struct {
 // logSource yields the count of numbered lines in the log of a step.
 type logSource func(stepID int64) (LogCount, error)
 
-// CountLines reads a step's log as the API returns it, a JSON array of
-// entries, one entry at a time, so a log of any size fits in memory.
-func CountLines(r io.Reader) (LogCount, error) {
+// eachLogLine reads a step's log as the API returns it, a JSON array of
+// entries, one entry at a time, so a log of any size fits in memory, and
+// calls line with each entry's data until it returns false. A log without
+// entries comes as null (a nil slice), an empty one too.
+func eachLogLine(r io.Reader, line func(data []byte) bool) error {
 	dec := json.NewDecoder(r)
-	if err := expectDelim(dec, '['); err != nil {
-		return LogCount{}, err
+	tok, err := dec.Token()
+	if err != nil {
+		return fmt.Errorf("log: %w", err)
 	}
-	var c LogCount
-	next := int64(1)
-	for dec.More() {
+	if tok == nil {
+		return nil
+	}
+	if tok != json.Delim('[') {
+		return fmt.Errorf("log: want [, got %v", tok)
+	}
+	for n := 1; dec.More(); n++ {
 		var entry struct {
 			Data []byte `json:"data"`
 		}
 		if err := dec.Decode(&entry); err != nil {
-			return LogCount{}, fmt.Errorf("log entry %d: %w", c.Lines+1, err)
+			return fmt.Errorf("log entry %d: %w", n, err)
 		}
-		n, ok := lineNumber(entry.Data)
+		if !line(entry.Data) {
+			return nil
+		}
+	}
+	return expectDelim(dec, ']')
+}
+
+// CountLines counts the numbered lines of a step's log as the API returns
+// it.
+func CountLines(r io.Reader) (LogCount, error) {
+	var c LogCount
+	next := int64(1)
+	err := eachLogLine(r, func(data []byte) bool {
+		n, ok := lineNumber(data)
 		if !ok {
-			continue
+			return true
 		}
 		c.Lines++
 		if n != next && c.FirstGap == 0 {
 			c.FirstGap = next
 		}
 		next = n + 1
-	}
-	if err := expectDelim(dec, ']'); err != nil {
+		return true
+	})
+	if err != nil {
 		return LogCount{}, err
 	}
 	return c, nil

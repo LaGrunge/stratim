@@ -5,8 +5,21 @@
     "synthetic-logs": { "state": "success", "max_seconds": 600 },
     "synthetic-tests": { "state": "success", "max_seconds": 300 },
     "synthetic-parallel-a": { "state": "success", "max_seconds": 300 },
-    "synthetic-parallel-b": { "state": "success", "max_seconds": 300 }
+    "synthetic-parallel-b": { "state": "success", "max_seconds": 300 },
+    "synthetic-timeout": { "state": "success", "max_seconds": 300 }
   },
   "overlapping": [["synthetic-parallel-a", "synthetic-parallel-b"]],
-  "logs": [{ "workflow": "synthetic-logs", "step": "big-log", "lines": 3000000 }]
+  "logs": [{ "workflow": "synthetic-logs", "step": "big-log", "lines": 3000000 }],
+  "timeouts": [
+    {
+      "workflow": "synthetic-timeout",
+      "step": "hang",
+      "timeout_seconds": 30,
+      "max_kill_seconds": 40,
+      "after": "after",
+      "finalizer": "report",
+      "pipeline_status": "success",
+      "note": "max_kill_seconds: Started is stamped before the image pull, the hang ignores SIGTERM so the docker backend kills it after its stop grace (WOODPECKER_BACKEND_DOCKER_STOP_TIMEOUT, 20s by default), then the kill and the report"
+    }
+  ]
 }
