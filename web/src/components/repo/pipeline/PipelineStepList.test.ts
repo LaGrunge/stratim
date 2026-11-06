@@ -136,6 +136,22 @@ describe('pipelineStepList', () => {
     expect(() => mountStepList(pipeline)).not.toThrow();
   });
 
+  it('lists the workflows reused from the parent pipelines, grouped by pipeline', () => {
+    const pipeline = makePipeline([makeWorkflow(1, [makeStep(1)], 'success')]);
+    pipeline.reused_workflows = [
+      { name: 'build', pipeline_number: 3, workflow_id: 10, state: 'success' },
+      { name: 'lint', pipeline_number: 3, workflow_id: 20, state: 'success' },
+      { name: 'test', environ: { GO: '1.26' }, axis_id: 2, pipeline_number: 2, workflow_id: 30, state: 'success' },
+    ];
+
+    const wrapper = mountStepList(pipeline);
+    expect(wrapper.findAll('[data-test="reused-workflow"]')).toHaveLength(3);
+    // One header link per pipeline the workflows passed in.
+    expect(wrapper.findAll('[data-test="reused-workflows-header"]')).toHaveLength(2);
+    // Only the steps of the current pipeline are selectable here.
+    expect(wrapper.findAll('[data-step-id]')).toHaveLength(1);
+  });
+
   it('renders a workflow whose children key is absent', () => {
     const pipeline = makePipeline([makeWorkflow(1, undefined, 'skipped'), makeWorkflow(2, [makeStep(1)], 'success')]);
 

@@ -17,8 +17,10 @@ package metadata
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"path"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -83,6 +85,7 @@ func (m *Metadata) Environ() map[string]string {
 	if pipeline.RerunCount > 0 {
 		setNonEmptyEnvVar(params, "CI_PIPELINE_RERUNS", strconv.FormatInt(pipeline.RerunCount, 10))
 	}
+	setNonEmptyEnvVar(params, "CI_PIPELINE_REUSED_WORKFLOWS", reusedWorkflowsEnv(pipeline.ReusedWorkflows))
 
 	workflow := m.Workflow
 	setNonEmptyEnvVar(params, "CI_WORKFLOW_NAME", workflow.Name)
@@ -215,3 +218,17 @@ func envPipelineStatus(status string) string {
 	}
 	return status
 }
+
+// reusedWorkflowsEnv formats the workflows a partial restart did not rerun as
+// "name=pipeline-number" pairs, sorted by name and separated by commas. In a
+// name, '%', ',' and '=' are percent-encoded (%25, %2C, %3D), so the pairs
+// can be split on ',' and '=' and the name decoded afterwards.
+func reusedWorkflowsEnv(reused map[string]int64) string {
+	pairs := make([]string, 0, len(reused))
+	for _, name := range slices.Sorted(maps.Keys(reused)) {
+		pairs = append(pairs, reusedNameEscaper.Replace(name)+"="+strconv.FormatInt(reused[name], 10))
+	}
+	return strings.Join(pairs, ",")
+}
+
+var reusedNameEscaper = strings.NewReplacer("%", "%25", ",", "%2C", "=", "%3D")

@@ -203,6 +203,12 @@ func (s storage) UpdatePipeline(pipeline *model.Pipeline) error {
 	})
 }
 
+func (s storage) UpdatePipelineStatus(pipeline *model.Pipeline) error {
+	return retryWrite(func() error {
+		return wrapUpdate(s.engine.ID(pipeline.ID).Cols("status", "errors", "started", "finished").Update(pipeline))
+	})
+}
+
 func (s storage) DeletePipeline(pipeline *model.Pipeline) error {
 	return retryWrite(func() error {
 		return s.deletePipeline(s.engine.NewSession(), pipeline.ID)

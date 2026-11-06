@@ -13,6 +13,17 @@ export interface CancelInfo {
   superseded_by: number;
 }
 
+// A workflow a partial restart did not run again but took over from the
+// pipeline it ran in.
+export interface ReusedWorkflow {
+  name: string;
+  environ?: Record<string, string>;
+  axis_id?: number;
+  pipeline_number: number;
+  workflow_id: number;
+  state: PipelineStatus;
+}
+
 // A pipeline for a repository.
 export interface Pipeline {
   id: number;
@@ -22,6 +33,16 @@ export interface Pipeline {
   number: number;
 
   parent: number;
+
+  // Set if the pipeline only reruns the failed workflows of its parent.
+  partial_restart?: boolean;
+
+  // The workflows a partial restart took over from earlier pipelines.
+  reused_workflows?: ReusedWorkflow[];
+
+  // Whether the failed workflows can be restarted on their own; only set
+  // when the pipeline comes with its workflows.
+  can_restart_failed?: boolean;
 
   event: WebhookEvents;
 

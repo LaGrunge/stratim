@@ -18,7 +18,10 @@ package datastore
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -477,4 +480,49 @@ func TestCreatePipelineRetriesSQLiteLocks(t *testing.T) {
 			require.EqualValues(t, 1, stored.Number)
 		})
 	}
+}
+
+// TestPipelineReusedWorkflowsLarge stores the reused workflows of a large
+// matrix, beyond what a TEXT column of MariaDB/MySQL holds (64 KiB).
+func TestPipelineReusedWorkflowsLarge(t *testing.T) {
+	store, closer := newTestStore(t, new(model.Repo), new(model.Pipeline))
+	defer closer()
+
+	repo := &model.Repo{UserID: 1, FullName: "owner/large", Owner: "owner", Name: "large", ForgeRemoteID: "large"}
+	require.NoError(t, store.CreateRepo(repo))
+
+	var reused []*model.ReusedWorkflow
+	for i := range 600 {
+		reused = append(reused, &model.ReusedWorkflow{
+			Name:           "matrix",
+			Environ:        map[string]string{"VARIANT": fmt.Sprintf("%04d-%s", i, strings.Repeat("x", 100))},
+			AxisID:         i + 1,
+			PipelineNumber: 1,
+			WorkflowID:     int64(i + 1),
+			State:          model.StatusSuccess,
+		})
+	}
+	pipeline := &model.Pipeline{RepoID: repo.ID, Status: model.StatusPending, PartialRestart: true, ReusedWorkflows: reused}
+	require.NoError(t, store.CreatePipeline(pipeline))
+
+	data, err := json.Marshal(reused)
+	require.NoError(t, err)
+	require.Greater(t, len(data), 64*1024, "the test must exceed a TEXT column")
+
+	stored, err := store.GetPipeline(pipeline.ID)
+	require.NoError(t, err)
+	assert.Equal(t, reused, stored.ReusedWorkflows)
+
+	// a status-only update leaves the other columns alone
+	stored.Status = model.StatusError
+	stored.Finished = 42
+	stored.ReusedWorkflows = nil
+	stored.Message = "not written"
+	require.NoError(t, store.UpdatePipelineStatus(stored))
+	again, err := store.GetPipeline(pipeline.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.StatusError, again.Status)
+	assert.EqualValues(t, 42, again.Finished)
+	assert.Equal(t, reused, again.ReusedWorkflows)
+	assert.Empty(t, again.Message)
 }

@@ -147,6 +147,29 @@ Some workflows don't need the source code, like creating a notification on failu
 Read more about `skip_clone` at [pipeline syntax](./20-workflow-syntax.md#skip_clone)
 :::
 
+## Restarting failed workflows
+
+When one workflow out of many fails, for example because of a flaky test or a network hiccup, you usually don't want to wait for all the others again. **Restart failed** in the menu next to **Restart** on the pipeline page (or `woodpecker-cli pipeline start --failed`) creates a new pipeline that only runs:
+
+- the workflows that did not pass: the ones that failed, errored or timed out, and the ones that were canceled or skipped. Canceling a pipeline skips every workflow that had not started yet, so restarting a canceled pipeline picks up everything that did not finish. For a [matrix workflow](./30-matrix-workflows.md) only the variants that did not pass run again.
+- every workflow that depends on one of them, directly or through other workflows, as the configuration of the restart declares it. `depends_on` is never skipped: a deploy that waits for the tests runs again together with them.
+- workflows added to the configuration since, as they never passed.
+
+The other workflows of the configuration are not run again; a workflow that is no longer in the configuration is left out. The new pipeline links to the one it was restarted from and lists the workflows it took over with the pipeline each of them ran in, where their logs are. This list is recorded when the restart is created: deleting an earlier pipeline does not change what a later restart takes over, it only removes the logs of the workflows that ran in it. In the forge their statuses stay as they are, so a commit turns green once the restarted workflows pass.
+
+A workflow is the smallest unit that can be restarted: all its steps run again from the start, as the workspace of the failed run is gone.
+
+A dependency on a workflow that is not run again counts with the status it finished with. That status also gates `when: status` filters, so a workflow that only runs on failure is skipped again once the restarted workflows pass.
+
+If your workflows exchange files through some external storage and use `CI_PIPELINE_NUMBER` to find them, keep in mind that a workflow taken over from an earlier pipeline stored its files under that pipeline's number. `CI_PIPELINE_REUSED_WORKFLOWS` tells you where each of them ran. The variants of a matrix workflow are listed one by one as `name/N`, with `N` the position of the variant in the matrix, like in the status the forge shows, in the matrix of the current configuration. A variant that is not in the list runs in the current pipeline. The pairs are separated by `,` and each has a single `=`: a `%`, `,` or `=` in a workflow name is written as `%25`, `%2C` or `%3D`, so to look up a name, encode those characters in it first.
+
+```bash
+# CI_PIPELINE_REUSED_WORKFLOWS=build=12,lint=12,test/1=12,test/2=13
+name=$(printf '%s' "build" | sed -e 's/%/%25/g' -e 's/,/%2C/g' -e 's/=/%3D/g')
+build_pipeline=$(echo "$CI_PIPELINE_REUSED_WORKFLOWS" | tr ',' '\n' | awk -F= -v n="$name" '$1 == n { print $2 }')
+aws s3 cp "s3://my-bucket/artifacts/${build_pipeline:-$CI_PIPELINE_NUMBER}/app.tar.gz" .
+```
+
 ## Concurrency
 
 By default workflows run with no concurrency limit. Some workflows, however, must not run more than a given number of times at once. A typical example is a deployment workflow: running two deployments at the same time can cause race conditions or corrupt state. Cancelling the previous pipeline is often not an option either, since it could interrupt an ongoing deployment.

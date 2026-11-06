@@ -184,7 +184,8 @@ func handleParseErrors(pipeline *model.Pipeline, parseErr error) (blocking bool)
 }
 
 // The createPipelineItems parses the pipeline config and persists the resulting
-// workflows. It is the shared core of Create, Approve, and Restart.
+// workflows. It is the shared core of Create, Approve, and a full Restart; a
+// restart of the failed workflows uses createPartialRestartItems.
 //
 // Returns two errors: parseErr carries pipeline config diagnostics, which
 // callers classify with handleParseErrors and report as a blocking failure in
@@ -201,21 +202,30 @@ func createPipelineItems(ctx context.Context, forge forge.Forge, store store.Sto
 		return currentPipeline, nil, parseErr, nil
 	}
 
-	// An empty pipeline (e.g. everything filtered out) has no workflows to
-	// persist. Return early so the caller can filter it without us touching
-	// the store.
+	pipeline, err = persistPipelineItems(store, currentPipeline, repo, pipelineItems, replaceExisting)
+	if err != nil {
+		return currentPipeline, nil, parseErr, err
+	}
+	return pipeline, pipelineItems, parseErr, nil
+}
+
+// persistPipelineItems stores the workflows of the parsed items, see
+// createPipelineItems. An empty pipeline (e.g. everything filtered out) has
+// no workflows to persist, so the store is not touched and the caller can
+// filter it.
+func persistPipelineItems(store store.Store, currentPipeline *model.Pipeline, repo *model.Repo,
+	pipelineItems []*builder.Item, replaceExisting bool,
+) (*model.Pipeline, error) {
 	if len(pipelineItems) == 0 {
-		return currentPipeline, pipelineItems, parseErr, nil
+		return currentPipeline, nil
 	}
 
 	enrichPipelineItemSteps(pipelineItems, repo)
 	savedPipeline, err := saveWorkflowsFromPipelineBuilder(store, currentPipeline, pipelineItems, replaceExisting)
 	if err != nil {
-		// callers use the returned pipeline before they check err, so never return nil
-		return currentPipeline, nil, parseErr, err
+		return nil, err
 	}
-
-	return savedPipeline, pipelineItems, parseErr, nil
+	return savedPipeline, nil
 }
 
 // enrichPipelineItemSteps stamps server-side fields onto the backend step
