@@ -16,12 +16,22 @@ package common
 
 import (
 	"encoding/base64"
+	"slices"
 )
 
 // CommandMarker prefixes the echoed command line before each step command runs.
 // The web UI (PipelineLog.vue) uses it to detect and collapse command output,
 // and plugins are documented to print it too, so every backend must use it.
 const CommandMarker = "▶  "
+
+// posixEntrypoint runs CI_SCRIPT, base64, with /bin/sh -e. The script is
+// decoded whole before it runs, not piped into the shell: a shell reads a
+// pipe a buffer at a time, and a command reading stdin took the rest of a
+// long script as its input, so the commands after it silently did not run.
+// A script that does not decode fails the step. The "." keeps the newlines
+// that end the script, which command substitution would strip, so that a
+// last line ending in a backslash continues onto nothing, as it did piped.
+var posixEntrypoint = []string{"/bin/sh", "-e", "-c", `CI_SCRIPT="$(echo "$CI_SCRIPT" | base64 -d && echo .)"; eval "${CI_SCRIPT%.}"`}
 
 func GenerateContainerConf(commands []string, osType, workDir string) (env map[string]string, entry []string, err error) {
 	env = make(map[string]string)
@@ -33,7 +43,7 @@ func GenerateContainerConf(commands []string, osType, workDir string) (env map[s
 	} else {
 		env["CI_SCRIPT"] = base64.StdEncoding.EncodeToString([]byte(generateScriptPosix(commands, workDir)))
 		env["SHELL"] = "/bin/sh"
-		entry = []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d | /bin/sh -e"}
+		entry = slices.Clone(posixEntrypoint)
 	}
 
 	return env, entry, nil

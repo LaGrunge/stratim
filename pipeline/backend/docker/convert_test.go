@@ -151,7 +151,7 @@ func TestStepToConfig(t *testing.T) {
 	conf, err := testEngine.toConfig(testCmdStep, BackendOptions{})
 	require.NoError(t, err)
 	if assert.NotNil(t, conf) {
-		assert.EqualValues(t, []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d | /bin/sh -e"}, conf.Entrypoint)
+		assert.EqualValues(t, []string{"/bin/sh", "-e", "-c", `CI_SCRIPT="$(echo "$CI_SCRIPT" | base64 -d && echo .)"; eval "${CI_SCRIPT%.}"`}, conf.Entrypoint)
 		assert.Nil(t, conf.Cmd)
 		assert.EqualValues(t, testCmdStep.UUID, conf.Labels["wp_uuid"])
 	}
@@ -201,7 +201,7 @@ func TestToConfigSmall(t *testing.T) {
 	assert.EqualValues(t, &container.Config{
 		AttachStdout: true,
 		AttachStderr: true,
-		Entrypoint:   []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d | /bin/sh -e"},
+		Entrypoint:   []string{"/bin/sh", "-e", "-c", `CI_SCRIPT="$(echo "$CI_SCRIPT" | base64 -d && echo .)"; eval "${CI_SCRIPT%.}"`},
 		Labels: map[string]string{
 			"wp_step": "test",
 			"wp_uuid": "09238932",
@@ -263,7 +263,7 @@ func TestToConfigFull(t *testing.T) {
 		WorkingDir:   "/src",
 		AttachStdout: true,
 		AttachStderr: true,
-		Entrypoint:   []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d | /bin/sh -e"},
+		Entrypoint:   []string{"/bin/sh", "-e", "-c", `CI_SCRIPT="$(echo "$CI_SCRIPT" | base64 -d && echo .)"; eval "${CI_SCRIPT%.}"`},
 		Labels: map[string]string{
 			"wp_step": "test",
 			"wp_uuid": "09238932",

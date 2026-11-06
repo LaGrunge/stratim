@@ -36,5 +36,5 @@ func TestGenerateContainerConf(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, posixScriptBase64, gotEnv["CI_SCRIPT"])
 	assert.Equal(t, "/bin/sh", gotEnv["SHELL"])
-	assert.Equal(t, []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d | /bin/sh -e"}, gotEntry)
+	assert.Equal(t, []string{"/bin/sh", "-e", "-c", `CI_SCRIPT="$(echo "$CI_SCRIPT" | base64 -d && echo .)"; eval "${CI_SCRIPT%.}"`}, gotEntry)
 }

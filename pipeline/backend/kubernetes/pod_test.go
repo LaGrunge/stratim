@@ -249,8 +249,9 @@ func TestTinyPod(t *testing.T) {
 					"image": "gradle:8.4.0-jdk21",
 					"command": [
 						"/bin/sh",
+						"-e",
 						"-c",
-						"echo $CI_SCRIPT | base64 -d | /bin/sh -e"
+						"CI_SCRIPT=\"$(echo \"$CI_SCRIPT\" | base64 -d && echo .)\"; eval \"${CI_SCRIPT%%.}\""
 					],
 					"env": [
 						"<<UNORDERED>>",
