@@ -17,4 +17,8 @@ package types
 // Stage denotes a collection of one or more steps.
 type Stage struct {
 	Steps []*Step `json:"steps,omitempty"`
+	// Finalizer marks a stage of finalizers: the compiler puts them last, the
+	// runtime runs them after the other stages ended or were stopped, by a
+	// cancel or a timeout too.
+	Finalizer bool `json:"finalizer,omitempty"`
 }

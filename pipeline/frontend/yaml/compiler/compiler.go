@@ -20,9 +20,11 @@ import (
 	"maps"
 	"path"
 	"slices"
+	"time"
 
 	backend_types "go.woodpecker-ci.org/woodpecker/v3/pipeline/backend/types"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/metadata"
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/constraint"
 	yaml_types "go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/types"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/utils"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/constant"
@@ -228,11 +230,18 @@ func (c *Compiler) Compile(conf *yaml_types.Workflow) (*backend_types.Config, er
 
 	// add pipeline steps
 	stepNames := make(map[string]struct{}, len(conf.Steps.ContainerList))
+	finalizerNames := make(map[string]struct{})
 	for _, container := range conf.Steps.ContainerList {
 		stepNames[container.Name] = struct{}{}
+		if container.OnFinish {
+			finalizerNames[container.Name] = struct{}{}
+		}
 	}
 
+	// finalizers run after all other steps, so they are staged apart: a
+	// dependency of one on another step is met by then
 	steps := make([]*dagCompilerStep, 0, len(conf.Steps.ContainerList))
+	var finalizers []*dagCompilerStep
 	for pos, container := range conf.Steps.ContainerList {
 		// Skip if local and should not run local
 		if c.local && !container.When.IsLocal() {
@@ -259,16 +268,81 @@ func (c *Compiler) Compile(conf *yaml_types.Workflow) (*backend_types.Config, er
 			maps.Copy(step.Environment, c.cloneEnv)
 		}
 
-		steps = append(steps, &dagCompilerStep{
+		dagStep := &dagCompilerStep{
 			step:      step,
 			position:  pos,
 			name:      container.Name,
 			dependsOn: container.DependsOn,
-		})
+		}
+		if !container.OnFinish {
+			for _, dep := range container.DependsOn {
+				if _, ok := finalizerNames[dep.Name]; ok {
+					return nil, &ErrStepDependsOnFinalizer{name: container.Name, dep: dep.Name}
+				}
+			}
+			steps = append(steps, dagStep)
+			continue
+		}
+		var ownDeps constraint.DependsOn
+		for _, dep := range container.DependsOn {
+			if _, isStep := stepNames[dep.Name]; isStep {
+				if _, isFinalizer := finalizerNames[dep.Name]; !isFinalizer {
+					continue
+				}
+			}
+			ownDeps = append(ownDeps, dep)
+		}
+		dagStep.dependsOn = ownDeps
+		finalizers = append(finalizers, dagStep)
 	}
 
 	// generate stages out of steps
-	stepStages, err := newDAGCompiler(steps).compile()
+	stepStages, err := compileStages(steps, stepNames)
+	if err != nil {
+		return nil, err
+	}
+	finalizerStages, err := compileStages(finalizers, stepNames)
+	if err != nil {
+		return nil, err
+	}
+	for _, stage := range finalizerStages {
+		stage.Finalizer = true
+	}
+	stepStages = append(stepStages, finalizerStages...)
+	if len(finalizers) > 0 {
+		config.FinalizeTimeout = finalizeTimeout(finalizers)
+	}
+
+	config.Stages = append(config.Stages, stepStages...)
+
+	return config, nil
+}
+
+const (
+	// DefaultFinalizeTimeout is how long a workflow's finalizers may run in
+	// all, unless their own timeouts add up to more.
+	DefaultFinalizeTimeout = 10 * time.Minute
+	// MaxFinalizeTimeout caps that: finalizers may run after the workflow's
+	// timeout, so they have to end by themselves.
+	MaxFinalizeTimeout = time.Hour
+)
+
+// finalizeTimeout is how long the finalizers may run in all: the sum of
+// their own timeouts, at least DefaultFinalizeTimeout and at most
+// MaxFinalizeTimeout.
+func finalizeTimeout(finalizers []*dagCompilerStep) time.Duration {
+	var sum time.Duration
+	for _, finalizer := range finalizers {
+		sum += max(finalizer.step.Timeout, 0)
+	}
+	return min(max(sum, DefaultFinalizeTimeout), MaxFinalizeTimeout)
+}
+
+// compileStages stages steps by their dependencies. The stepNames are all steps
+// of the config: a dependency on one of them that is not in steps was
+// filtered out by its 'when' conditions.
+func compileStages(steps []*dagCompilerStep, stepNames map[string]struct{}) ([]*backend_types.Stage, error) {
+	stages, err := newDAGCompiler(steps).compile()
 	if err != nil {
 		// If the missing dep exists in the config but isn't in the surviving
 		// step list, it was filtered out by its 'when' conditions. Surface a
@@ -280,8 +354,5 @@ func (c *Compiler) Compile(conf *yaml_types.Workflow) (*backend_types.Config, er
 		}
 		return nil, err
 	}
-
-	config.Stages = append(config.Stages, stepStages...)
-
-	return config, nil
+	return stages, nil
 }

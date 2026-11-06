@@ -253,8 +253,16 @@ func (c *client) Next(ctx context.Context, filter rpc.Filter) (*rpc.Workflow, er
 
 // Wait blocks until the workflow with the given ID is marked as completed or canceled by the server.
 func (c *client) Wait(ctx context.Context, workflowID string) (canceled bool, err error) {
-	req := &proto.WaitRequest{Id: workflowID}
+	return c.wait(ctx, &proto.WaitRequest{Id: workflowID})
+}
 
+// WaitKilled blocks, for a workflow canceled, until its finalizers are to be
+// stopped too.
+func (c *client) WaitKilled(ctx context.Context, workflowID string) (killed bool, err error) {
+	return c.wait(ctx, &proto.WaitRequest{Id: workflowID, AfterCancel: true})
+}
+
+func (c *client) wait(ctx context.Context, req *proto.WaitRequest) (bool, error) {
 	resp, err := retryRPC(ctx, c, "wait", func() (*proto.WaitResponse, error) {
 		if !c.IsConnected() {
 			return nil, errNotConnected
@@ -318,13 +326,35 @@ func (c *client) Done(ctx context.Context, workflowID string, state rpc.Workflow
 
 // Extend extends the workflow deadline.
 func (c *client) Extend(ctx context.Context, workflowID string) error {
-	req := &proto.ExtendRequest{Id: workflowID}
+	return c.extend(ctx, &proto.ExtendRequest{Id: workflowID})
+}
 
+// ExtendFinalizing extends the lease, telling when the finalizers' time ends,
+// as how long it still lasts (see finalizeLeft).
+func (c *client) ExtendFinalizing(ctx context.Context, workflowID string, finalizeDeadline time.Time) error {
+	return c.extendWith(ctx, func() *proto.ExtendRequest {
+		left := finalizeLeft(finalizeDeadline, time.Now())
+		return &proto.ExtendRequest{Id: workflowID, FinalizeLeftMs: &left}
+	})
+}
+
+// finalizeLeft is how long, in milliseconds, from now until deadline, both
+// of the agent's clock: the server counts it from its own.
+func finalizeLeft(deadline, now time.Time) int64 {
+	return deadline.Sub(now).Milliseconds()
+}
+
+func (c *client) extend(ctx context.Context, req *proto.ExtendRequest) error {
+	return c.extendWith(ctx, func() *proto.ExtendRequest { return req })
+}
+
+// extendWith extends the lease with the request newReq builds for each try.
+func (c *client) extendWith(ctx context.Context, newReq func() *proto.ExtendRequest) error {
 	_, err := retryRPC(ctx, c, "extend", func() (*proto.Empty, error) {
 		if !c.IsConnected() {
 			return nil, errNotConnected
 		}
-		r, err := c.client.Extend(ctx, req)
+		r, err := c.client.Extend(ctx, newReq())
 		return r, classifyRPCErr(ctx, err)
 	})
 	return err

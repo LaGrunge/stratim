@@ -30,7 +30,7 @@ import (
 
 func mockStoreStep(t *testing.T) store.Store {
 	s := mocks.NewMockStore(t)
-	s.On("StepUpdate", mock.Anything).Return(nil)
+	s.On("StepReport", mock.Anything, mock.Anything).Return(true, nil).Maybe()
 	return s
 }
 
@@ -48,7 +48,7 @@ func TestUpdateStepStatus(t *testing.T) {
 				step := &model.Step{State: model.StatusPending}
 				state := rpc.StepState{Started: 42, Finished: 0}
 
-				err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+				err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 				assert.NoError(t, err)
 				assert.Equal(t, model.StatusRunning, step.State)
@@ -61,7 +61,7 @@ func TestUpdateStepStatus(t *testing.T) {
 				step := &model.Step{State: model.StatusPending}
 				state := rpc.StepState{Started: 0, Finished: 0}
 
-				err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+				err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 				assert.NoError(t, err)
 				assert.Equal(t, model.StatusRunning, step.State)
@@ -77,7 +77,7 @@ func TestUpdateStepStatus(t *testing.T) {
 				step := &model.Step{State: model.StatusPending}
 				state := rpc.StepState{Started: 42, Exited: true, Finished: 100, ExitCode: 0, Error: ""}
 
-				err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+				err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 				assert.NoError(t, err)
 				assert.Equal(t, model.StatusSuccess, step.State)
@@ -90,7 +90,7 @@ func TestUpdateStepStatus(t *testing.T) {
 				step := &model.Step{State: model.StatusPending}
 				state := rpc.StepState{Started: 42, Exited: true, Finished: 0, ExitCode: 0, Error: ""}
 
-				err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+				err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 				assert.NoError(t, err)
 				assert.Equal(t, model.StatusSuccess, step.State)
@@ -106,7 +106,7 @@ func TestUpdateStepStatus(t *testing.T) {
 				step := &model.Step{State: model.StatusPending}
 				state := rpc.StepState{Started: 42, Exited: true, Finished: 34, ExitCode: 1, Error: "an error"}
 
-				err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+				err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 				assert.NoError(t, err)
 				assert.Equal(t, model.StatusFailure, step.State)
@@ -127,7 +127,7 @@ func TestUpdateStepStatus(t *testing.T) {
 				step := &model.Step{State: model.StatusRunning, Started: 42}
 				state := rpc.StepState{Exited: true, Finished: 100, ExitCode: 0, Error: ""}
 
-				err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+				err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 				assert.NoError(t, err)
 				assert.Equal(t, model.StatusSuccess, step.State)
@@ -139,7 +139,7 @@ func TestUpdateStepStatus(t *testing.T) {
 				step := &model.Step{State: model.StatusRunning, Started: 42}
 				state := rpc.StepState{Exited: true, Finished: 0, ExitCode: 0, Error: ""}
 
-				err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+				err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 				assert.NoError(t, err)
 				assert.Equal(t, model.StatusSuccess, step.State)
@@ -155,7 +155,7 @@ func TestUpdateStepStatus(t *testing.T) {
 				step := &model.Step{State: model.StatusRunning, Started: 42}
 				state := rpc.StepState{Exited: true, Finished: 34, ExitCode: pipeline.ExitCodeKilled, Error: "an error"}
 
-				err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+				err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 				assert.NoError(t, err)
 				assert.Equal(t, model.StatusFailure, step.State)
@@ -168,7 +168,7 @@ func TestUpdateStepStatus(t *testing.T) {
 				step := &model.Step{State: model.StatusRunning, Started: 42}
 				state := rpc.StepState{Exited: true, Finished: 34, ExitCode: 0, Error: "an error"}
 
-				err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+				err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 				assert.NoError(t, err)
 				assert.Equal(t, model.StatusFailure, step.State)
@@ -181,7 +181,7 @@ func TestUpdateStepStatus(t *testing.T) {
 			step := &model.Step{State: model.StatusRunning, Started: 42}
 			state := rpc.StepState{Exited: false, Finished: 0}
 
-			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 			assert.NoError(t, err)
 			assert.Equal(t, model.StatusRunning, step.State)
@@ -197,7 +197,7 @@ func TestUpdateStepStatus(t *testing.T) {
 			step := &model.Step{State: model.StatusRunning, Started: 42}
 			state := rpc.StepState{Canceled: true}
 
-			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 			assert.NoError(t, err)
 			assert.Equal(t, model.StatusKilled, step.State)
@@ -209,7 +209,7 @@ func TestUpdateStepStatus(t *testing.T) {
 			step := &model.Step{State: model.StatusRunning, Started: 42}
 			state := rpc.StepState{Canceled: true, Exited: true, Finished: 100, ExitCode: 1, Error: "canceled"}
 
-			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 			assert.NoError(t, err)
 			assert.Equal(t, model.StatusKilled, step.State)
@@ -227,7 +227,7 @@ func TestUpdateStepStatus(t *testing.T) {
 			step := &model.Step{State: model.StatusRunning, Started: 42}
 			state := rpc.StepState{Exited: true, Finished: 100, ExitCode: 124, Error: "step timed out", TimedOut: true}
 
-			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 			assert.NoError(t, err)
 			assert.Equal(t, model.StatusTimeout, step.State)
@@ -240,7 +240,7 @@ func TestUpdateStepStatus(t *testing.T) {
 			step := &model.Step{State: model.StatusPending}
 			state := rpc.StepState{Started: 42, Exited: true, Finished: 100, ExitCode: 124, Error: "step timed out", TimedOut: true}
 
-			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 			assert.NoError(t, err)
 			assert.Equal(t, model.StatusTimeout, step.State)
@@ -251,7 +251,7 @@ func TestUpdateStepStatus(t *testing.T) {
 			step := &model.Step{State: model.StatusRunning, Started: 42}
 			state := rpc.StepState{Canceled: true, TimedOut: true, Exited: true, Finished: 100, ExitCode: 137, Error: "Canceled"}
 
-			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 			assert.NoError(t, err)
 			assert.Equal(t, model.StatusTimeout, step.State)
@@ -263,7 +263,7 @@ func TestUpdateStepStatus(t *testing.T) {
 			step := &model.Step{State: model.StatusRunning, Started: 42}
 			state := rpc.StepState{Canceled: true, TimedOut: true}
 
-			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 			assert.NoError(t, err)
 			assert.Equal(t, model.StatusTimeout, step.State)
@@ -276,7 +276,7 @@ func TestUpdateStepStatus(t *testing.T) {
 			step := &model.Step{State: model.StatusRunning, Started: 42}
 			state := rpc.StepState{Exited: true, Finished: 100, ExitCode: 124}
 
-			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 			assert.NoError(t, err)
 			assert.Equal(t, model.StatusFailure, step.State)
@@ -301,14 +301,14 @@ func TestUpdateStepStatus(t *testing.T) {
 	t.Run("FailureCancelOnCanceledPipeline", func(t *testing.T) {
 		t.Parallel()
 		s := mocks.NewMockStore(t)
-		s.On("StepUpdate", mock.MatchedBy(func(step *model.Step) bool {
+		s.On("StepReport", mock.MatchedBy(func(step *model.Step) bool {
 			return step.State == model.StatusTimeout
-		})).Return(nil).Once()
+		}), model.StatusRunning).Return(true, nil).Once()
 		s.On("GetPipeline", int64(7)).Return(&model.Pipeline{ID: 7, Status: model.StatusKilled}, nil)
 		step := &model.Step{State: model.StatusRunning, Started: 42, PipelineID: 7, Failure: model.FailureCancel}
 		state := rpc.StepState{Exited: true, Finished: 100, ExitCode: 124, Error: "step timed out", TimedOut: true}
 
-		err := UpdateStepStatus(t.Context(), s, step, state)
+		err := UpdateStepStatus(t.Context(), s, WorkflowEnd{}, step, state)
 
 		assert.NoError(t, err)
 		assert.Equal(t, model.StatusTimeout, step.State)
@@ -319,19 +319,19 @@ func TestUpdateStepStatus(t *testing.T) {
 	t.Run("FailureCancelStoresStepFirst", func(t *testing.T) {
 		t.Parallel()
 		s := mocks.NewMockStore(t)
-		s.On("StepUpdate", mock.MatchedBy(func(step *model.Step) bool {
+		s.On("StepReport", mock.MatchedBy(func(step *model.Step) bool {
 			return step.State == model.StatusTimeout
-		})).Return(nil).Once()
+		}), model.StatusRunning).Return(true, nil).Once()
 		s.On("GetPipeline", int64(7)).Return(&model.Pipeline{ID: 7, RepoID: 3, Status: model.StatusRunning}, nil)
 		s.On("GetRepo", int64(3)).Return(nil, errors.New("store unavailable"))
 		step := &model.Step{State: model.StatusRunning, Started: 42, PipelineID: 7, Failure: model.FailureCancel}
 		state := rpc.StepState{Exited: true, Finished: 100, ExitCode: 124, Error: "step timed out", TimedOut: true}
 
-		err := UpdateStepStatus(t.Context(), s, step, state)
+		err := UpdateStepStatus(t.Context(), s, WorkflowEnd{}, step, state)
 
 		assert.Error(t, err, "the cancel failed")
 		assert.Equal(t, model.StatusTimeout, step.State)
-		s.AssertCalled(t, "StepUpdate", mock.Anything)
+		s.AssertCalled(t, "StepReport", mock.Anything, model.StatusRunning)
 	})
 
 	t.Run("Skipped", func(t *testing.T) {
@@ -352,7 +352,7 @@ func TestUpdateStepStatus(t *testing.T) {
 				Started:  0,
 			}
 
-			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 			assert.NoError(t, err)
 			// Must be Skipped, NOT Running (the bug: Finished==0 triggers StatusRunning first)
@@ -368,7 +368,7 @@ func TestUpdateStepStatus(t *testing.T) {
 			step := &model.Step{State: model.StatusPending}
 			state := rpc.StepState{Skipped: true}
 
-			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 			assert.NoError(t, err)
 			assert.Equal(t, model.StatusSkipped, step.State)
@@ -379,7 +379,7 @@ func TestUpdateStepStatus(t *testing.T) {
 			step := &model.Step{State: model.StatusPending}
 			state := rpc.StepState{Skipped: true, Exited: true, Finished: 50}
 
-			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), WorkflowEnd{}, step, state)
 
 			assert.NoError(t, err)
 			assert.Equal(t, model.StatusSkipped, step.State)
@@ -387,12 +387,31 @@ func TestUpdateStepStatus(t *testing.T) {
 		})
 	})
 
+	// A late report of its agent finds the step ended meanwhile (its
+	// workflow killed): that end stays, the step as the caller has it too,
+	// and no cancel follows.
+	t.Run("EndedMeanwhile", func(t *testing.T) {
+		t.Parallel()
+		s := mocks.NewMockStore(t)
+		s.On("StepReport", mock.MatchedBy(func(step *model.Step) bool {
+			return step.State == model.StatusFailure
+		}), model.StatusRunning).Return(false, nil).Once()
+		step := &model.Step{State: model.StatusRunning, Started: 42, PipelineID: 7, Failure: model.FailureCancel}
+		state := rpc.StepState{Exited: true, Finished: 100, ExitCode: 1}
+
+		err := UpdateStepStatus(t.Context(), s, WorkflowEnd{}, step, state)
+
+		assert.ErrorIs(t, err, ErrStepEnded)
+		assert.Equal(t, model.StatusRunning, step.State)
+		s.AssertNotCalled(t, "GetPipeline", mock.Anything)
+	})
+
 	t.Run("TerminalState", func(t *testing.T) {
 		t.Parallel()
 		step := &model.Step{State: model.StatusKilled, Started: 42, Finished: 64}
 		state := rpc.StepState{Exited: false}
 
-		err := UpdateStepStatus(t.Context(), mocks.NewMockStore(t), step, state)
+		err := UpdateStepStatus(t.Context(), mocks.NewMockStore(t), WorkflowEnd{}, step, state)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "does not expect rpc state updates")
@@ -406,9 +425,12 @@ func TestUpdateStepToStatusSkipped(t *testing.T) {
 	t.Run("NotStarted", func(t *testing.T) {
 		t.Parallel()
 
-		step, err := UpdateStepToStatusSkipped(mockStoreStep(t), model.Step{}, int64(1), model.StatusSkipped)
+		s := mocks.NewMockStore(t)
+		s.On("StepFinish", mock.Anything, []model.StatusValue{model.StatusPending}).Return(true, nil).Once()
+		step, won, err := UpdateStepToStatusSkipped(s, model.Step{State: model.StatusPending}, int64(1), model.StatusSkipped)
 
 		assert.NoError(t, err)
+		assert.True(t, won)
 		assert.Equal(t, model.StatusSkipped, step.State)
 		assert.Equal(t, int64(0), step.Finished)
 	})
@@ -416,9 +438,12 @@ func TestUpdateStepToStatusSkipped(t *testing.T) {
 	t.Run("AlreadyStarted", func(t *testing.T) {
 		t.Parallel()
 
-		step, err := UpdateStepToStatusSkipped(mockStoreStep(t), model.Step{Started: 42}, int64(100), model.StatusSkipped)
+		s := mocks.NewMockStore(t)
+		s.On("StepFinish", mock.Anything, []model.StatusValue{model.StatusRunning}).Return(false, nil).Once()
+		step, won, err := UpdateStepToStatusSkipped(s, model.Step{State: model.StatusRunning, Started: 42}, int64(100), model.StatusSkipped)
 
 		assert.NoError(t, err)
+		assert.False(t, won, "its agent ended it meanwhile")
 		assert.Equal(t, model.StatusSuccess, step.State)
 		assert.Equal(t, int64(100), step.Finished)
 	})

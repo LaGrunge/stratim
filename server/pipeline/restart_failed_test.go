@@ -113,6 +113,17 @@ func TestPlanRestart(t *testing.T) {
 			reused: []string{"f"},
 		},
 		{
+			name: "a canceled pipeline's workflows still running their finalizers, or polled, did not pass",
+			old: []ranWorkflow{
+				old(1, "a", model.StatusRunning, nil),
+				old(2, "b", model.StatusPending, nil),
+				old(3, "c", model.StatusSuccess, nil),
+			},
+			items:  []*builder.Item{item("a", nil), item("b", nil), item("c", nil)},
+			rerun:  []string{"a", "b"},
+			reused: []string{"c"},
+		},
+		{
 			name: "a dependent only in the new config is rerun and not reused",
 			old: []ranWorkflow{
 				old(10, "test", model.StatusFailure, nil),

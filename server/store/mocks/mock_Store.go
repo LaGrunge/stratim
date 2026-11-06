@@ -4833,6 +4833,126 @@ func (_c *MockStore_Ping_Call) RunAndReturn(run func() error) *MockStore_Ping_Ca
 	return _c
 }
 
+// PipelineCancel provides a mock function for the type MockStore
+func (_mock *MockStore) PipelineCancel(pipeline *model.Pipeline) (bool, error) {
+	ret := _mock.Called(pipeline)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PipelineCancel")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*model.Pipeline) (bool, error)); ok {
+		return returnFunc(pipeline)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*model.Pipeline) bool); ok {
+		r0 = returnFunc(pipeline)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*model.Pipeline) error); ok {
+		r1 = returnFunc(pipeline)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_PipelineCancel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PipelineCancel'
+type MockStore_PipelineCancel_Call struct {
+	*mock.Call
+}
+
+// PipelineCancel is a helper method to define mock.On call
+//   - pipeline *model.Pipeline
+func (_e *MockStore_Expecter) PipelineCancel(pipeline any) *MockStore_PipelineCancel_Call {
+	return &MockStore_PipelineCancel_Call{Call: _e.mock.On("PipelineCancel", pipeline)}
+}
+
+func (_c *MockStore_PipelineCancel_Call) Run(run func(pipeline *model.Pipeline)) *MockStore_PipelineCancel_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.Pipeline
+		if args[0] != nil {
+			arg0 = args[0].(*model.Pipeline)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_PipelineCancel_Call) Return(b bool, err error) *MockStore_PipelineCancel_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockStore_PipelineCancel_Call) RunAndReturn(run func(pipeline *model.Pipeline) (bool, error)) *MockStore_PipelineCancel_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PipelineCanceledKilled provides a mock function for the type MockStore
+func (_mock *MockStore) PipelineCanceledKilled(pipeline *model.Pipeline) (bool, error) {
+	ret := _mock.Called(pipeline)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PipelineCanceledKilled")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*model.Pipeline) (bool, error)); ok {
+		return returnFunc(pipeline)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*model.Pipeline) bool); ok {
+		r0 = returnFunc(pipeline)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*model.Pipeline) error); ok {
+		r1 = returnFunc(pipeline)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_PipelineCanceledKilled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PipelineCanceledKilled'
+type MockStore_PipelineCanceledKilled_Call struct {
+	*mock.Call
+}
+
+// PipelineCanceledKilled is a helper method to define mock.On call
+//   - pipeline *model.Pipeline
+func (_e *MockStore_Expecter) PipelineCanceledKilled(pipeline any) *MockStore_PipelineCanceledKilled_Call {
+	return &MockStore_PipelineCanceledKilled_Call{Call: _e.mock.On("PipelineCanceledKilled", pipeline)}
+}
+
+func (_c *MockStore_PipelineCanceledKilled_Call) Run(run func(pipeline *model.Pipeline)) *MockStore_PipelineCanceledKilled_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.Pipeline
+		if args[0] != nil {
+			arg0 = args[0].(*model.Pipeline)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_PipelineCanceledKilled_Call) Return(b bool, err error) *MockStore_PipelineCanceledKilled_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockStore_PipelineCanceledKilled_Call) RunAndReturn(run func(pipeline *model.Pipeline) (bool, error)) *MockStore_PipelineCanceledKilled_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PipelineConfigCreate provides a mock function for the type MockStore
 func (_mock *MockStore) PipelineConfigCreate(pipelineConfig *model.PipelineConfig) error {
 	ret := _mock.Called(pipelineConfig)
@@ -4880,6 +5000,126 @@ func (_c *MockStore_PipelineConfigCreate_Call) Return(err error) *MockStore_Pipe
 }
 
 func (_c *MockStore_PipelineConfigCreate_Call) RunAndReturn(run func(pipelineConfig *model.PipelineConfig) error) *MockStore_PipelineConfigCreate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PipelineFinish provides a mock function for the type MockStore
+func (_mock *MockStore) PipelineFinish(pipeline *model.Pipeline) (bool, error) {
+	ret := _mock.Called(pipeline)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PipelineFinish")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*model.Pipeline) (bool, error)); ok {
+		return returnFunc(pipeline)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*model.Pipeline) bool); ok {
+		r0 = returnFunc(pipeline)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*model.Pipeline) error); ok {
+		r1 = returnFunc(pipeline)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_PipelineFinish_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PipelineFinish'
+type MockStore_PipelineFinish_Call struct {
+	*mock.Call
+}
+
+// PipelineFinish is a helper method to define mock.On call
+//   - pipeline *model.Pipeline
+func (_e *MockStore_Expecter) PipelineFinish(pipeline any) *MockStore_PipelineFinish_Call {
+	return &MockStore_PipelineFinish_Call{Call: _e.mock.On("PipelineFinish", pipeline)}
+}
+
+func (_c *MockStore_PipelineFinish_Call) Run(run func(pipeline *model.Pipeline)) *MockStore_PipelineFinish_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.Pipeline
+		if args[0] != nil {
+			arg0 = args[0].(*model.Pipeline)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_PipelineFinish_Call) Return(b bool, err error) *MockStore_PipelineFinish_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockStore_PipelineFinish_Call) RunAndReturn(run func(pipeline *model.Pipeline) (bool, error)) *MockStore_PipelineFinish_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PipelineStart provides a mock function for the type MockStore
+func (_mock *MockStore) PipelineStart(pipeline *model.Pipeline) (bool, error) {
+	ret := _mock.Called(pipeline)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PipelineStart")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*model.Pipeline) (bool, error)); ok {
+		return returnFunc(pipeline)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*model.Pipeline) bool); ok {
+		r0 = returnFunc(pipeline)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*model.Pipeline) error); ok {
+		r1 = returnFunc(pipeline)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_PipelineStart_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PipelineStart'
+type MockStore_PipelineStart_Call struct {
+	*mock.Call
+}
+
+// PipelineStart is a helper method to define mock.On call
+//   - pipeline *model.Pipeline
+func (_e *MockStore_Expecter) PipelineStart(pipeline any) *MockStore_PipelineStart_Call {
+	return &MockStore_PipelineStart_Call{Call: _e.mock.On("PipelineStart", pipeline)}
+}
+
+func (_c *MockStore_PipelineStart_Call) Run(run func(pipeline *model.Pipeline)) *MockStore_PipelineStart_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.Pipeline
+		if args[0] != nil {
+			arg0 = args[0].(*model.Pipeline)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_PipelineStart_Call) Return(b bool, err error) *MockStore_PipelineStart_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockStore_PipelineStart_Call) RunAndReturn(run func(pipeline *model.Pipeline) (bool, error)) *MockStore_PipelineStart_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -6024,6 +6264,81 @@ func (_c *MockStore_StepByUUID_Call) RunAndReturn(run func(uuid string) (*model.
 	return _c
 }
 
+// StepFinish provides a mock function for the type MockStore
+func (_mock *MockStore) StepFinish(step *model.Step, from ...model.StatusValue) (bool, error) {
+	var tmpRet mock.Arguments
+	if len(from) > 0 {
+		tmpRet = _mock.Called(step, from)
+	} else {
+		tmpRet = _mock.Called(step)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for StepFinish")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*model.Step, ...model.StatusValue) (bool, error)); ok {
+		return returnFunc(step, from...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*model.Step, ...model.StatusValue) bool); ok {
+		r0 = returnFunc(step, from...)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*model.Step, ...model.StatusValue) error); ok {
+		r1 = returnFunc(step, from...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_StepFinish_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StepFinish'
+type MockStore_StepFinish_Call struct {
+	*mock.Call
+}
+
+// StepFinish is a helper method to define mock.On call
+//   - step *model.Step
+//   - from ...model.StatusValue
+func (_e *MockStore_Expecter) StepFinish(step any, from ...any) *MockStore_StepFinish_Call {
+	return &MockStore_StepFinish_Call{Call: _e.mock.On("StepFinish",
+		append([]any{step}, from...)...)}
+}
+
+func (_c *MockStore_StepFinish_Call) Run(run func(step *model.Step, from ...model.StatusValue)) *MockStore_StepFinish_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.Step
+		if args[0] != nil {
+			arg0 = args[0].(*model.Step)
+		}
+		var arg1 []model.StatusValue
+		var variadicArgs []model.StatusValue
+		if len(args) > 1 {
+			variadicArgs = args[1].([]model.StatusValue)
+		}
+		arg1 = variadicArgs
+		run(
+			arg0,
+			arg1...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_StepFinish_Call) Return(b bool, err error) *MockStore_StepFinish_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockStore_StepFinish_Call) RunAndReturn(run func(step *model.Step, from ...model.StatusValue) (bool, error)) *MockStore_StepFinish_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StepFinished provides a mock function for the type MockStore
 func (_mock *MockStore) StepFinished(context1 context.Context, step *model.Step) error {
 	ret := _mock.Called(context1, step)
@@ -6269,6 +6584,72 @@ func (_c *MockStore_StepLoad_Call) Return(step *model.Step, err error) *MockStor
 }
 
 func (_c *MockStore_StepLoad_Call) RunAndReturn(run func(pipelineID int64, stepID int64) (*model.Step, error)) *MockStore_StepLoad_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StepReport provides a mock function for the type MockStore
+func (_mock *MockStore) StepReport(step *model.Step, from model.StatusValue) (bool, error) {
+	ret := _mock.Called(step, from)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StepReport")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*model.Step, model.StatusValue) (bool, error)); ok {
+		return returnFunc(step, from)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*model.Step, model.StatusValue) bool); ok {
+		r0 = returnFunc(step, from)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*model.Step, model.StatusValue) error); ok {
+		r1 = returnFunc(step, from)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_StepReport_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StepReport'
+type MockStore_StepReport_Call struct {
+	*mock.Call
+}
+
+// StepReport is a helper method to define mock.On call
+//   - step *model.Step
+//   - from model.StatusValue
+func (_e *MockStore_Expecter) StepReport(step any, from any) *MockStore_StepReport_Call {
+	return &MockStore_StepReport_Call{Call: _e.mock.On("StepReport", step, from)}
+}
+
+func (_c *MockStore_StepReport_Call) Run(run func(step *model.Step, from model.StatusValue)) *MockStore_StepReport_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.Step
+		if args[0] != nil {
+			arg0 = args[0].(*model.Step)
+		}
+		var arg1 model.StatusValue
+		if args[1] != nil {
+			arg1 = args[1].(model.StatusValue)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_StepReport_Call) Return(b bool, err error) *MockStore_StepReport_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockStore_StepReport_Call) RunAndReturn(run func(step *model.Step, from model.StatusValue) (bool, error)) *MockStore_StepReport_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -6809,6 +7190,66 @@ func (_c *MockStore_WorkflowByStep_Call) RunAndReturn(run func(step *model.Step)
 	return _c
 }
 
+// WorkflowFinish provides a mock function for the type MockStore
+func (_mock *MockStore) WorkflowFinish(workflow *model.Workflow) (bool, error) {
+	ret := _mock.Called(workflow)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WorkflowFinish")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*model.Workflow) (bool, error)); ok {
+		return returnFunc(workflow)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*model.Workflow) bool); ok {
+		r0 = returnFunc(workflow)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*model.Workflow) error); ok {
+		r1 = returnFunc(workflow)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_WorkflowFinish_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WorkflowFinish'
+type MockStore_WorkflowFinish_Call struct {
+	*mock.Call
+}
+
+// WorkflowFinish is a helper method to define mock.On call
+//   - workflow *model.Workflow
+func (_e *MockStore_Expecter) WorkflowFinish(workflow any) *MockStore_WorkflowFinish_Call {
+	return &MockStore_WorkflowFinish_Call{Call: _e.mock.On("WorkflowFinish", workflow)}
+}
+
+func (_c *MockStore_WorkflowFinish_Call) Run(run func(workflow *model.Workflow)) *MockStore_WorkflowFinish_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.Workflow
+		if args[0] != nil {
+			arg0 = args[0].(*model.Workflow)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_WorkflowFinish_Call) Return(b bool, err error) *MockStore_WorkflowFinish_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockStore_WorkflowFinish_Call) RunAndReturn(run func(workflow *model.Workflow) (bool, error)) *MockStore_WorkflowFinish_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // WorkflowGetTree provides a mock function for the type MockStore
 func (_mock *MockStore) WorkflowGetTree(pipeline *model.Pipeline) ([]*model.Workflow, error) {
 	ret := _mock.Called(pipeline)
@@ -6995,6 +7436,126 @@ func (_c *MockStore_WorkflowLoad_Call) RunAndReturn(run func(n int64) (*model.Wo
 	return _c
 }
 
+// WorkflowSkip provides a mock function for the type MockStore
+func (_mock *MockStore) WorkflowSkip(workflow *model.Workflow) (bool, error) {
+	ret := _mock.Called(workflow)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WorkflowSkip")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*model.Workflow) (bool, error)); ok {
+		return returnFunc(workflow)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*model.Workflow) bool); ok {
+		r0 = returnFunc(workflow)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*model.Workflow) error); ok {
+		r1 = returnFunc(workflow)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_WorkflowSkip_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WorkflowSkip'
+type MockStore_WorkflowSkip_Call struct {
+	*mock.Call
+}
+
+// WorkflowSkip is a helper method to define mock.On call
+//   - workflow *model.Workflow
+func (_e *MockStore_Expecter) WorkflowSkip(workflow any) *MockStore_WorkflowSkip_Call {
+	return &MockStore_WorkflowSkip_Call{Call: _e.mock.On("WorkflowSkip", workflow)}
+}
+
+func (_c *MockStore_WorkflowSkip_Call) Run(run func(workflow *model.Workflow)) *MockStore_WorkflowSkip_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.Workflow
+		if args[0] != nil {
+			arg0 = args[0].(*model.Workflow)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_WorkflowSkip_Call) Return(b bool, err error) *MockStore_WorkflowSkip_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockStore_WorkflowSkip_Call) RunAndReturn(run func(workflow *model.Workflow) (bool, error)) *MockStore_WorkflowSkip_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WorkflowStart provides a mock function for the type MockStore
+func (_mock *MockStore) WorkflowStart(workflow *model.Workflow) (bool, error) {
+	ret := _mock.Called(workflow)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WorkflowStart")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*model.Workflow) (bool, error)); ok {
+		return returnFunc(workflow)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*model.Workflow) bool); ok {
+		r0 = returnFunc(workflow)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*model.Workflow) error); ok {
+		r1 = returnFunc(workflow)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_WorkflowStart_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WorkflowStart'
+type MockStore_WorkflowStart_Call struct {
+	*mock.Call
+}
+
+// WorkflowStart is a helper method to define mock.On call
+//   - workflow *model.Workflow
+func (_e *MockStore_Expecter) WorkflowStart(workflow any) *MockStore_WorkflowStart_Call {
+	return &MockStore_WorkflowStart_Call{Call: _e.mock.On("WorkflowStart", workflow)}
+}
+
+func (_c *MockStore_WorkflowStart_Call) Run(run func(workflow *model.Workflow)) *MockStore_WorkflowStart_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.Workflow
+		if args[0] != nil {
+			arg0 = args[0].(*model.Workflow)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_WorkflowStart_Call) Return(b bool, err error) *MockStore_WorkflowStart_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockStore_WorkflowStart_Call) RunAndReturn(run func(workflow *model.Workflow) (bool, error)) *MockStore_WorkflowStart_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // WorkflowUpdate provides a mock function for the type MockStore
 func (_mock *MockStore) WorkflowUpdate(workflow *model.Workflow) error {
 	ret := _mock.Called(workflow)
@@ -7093,6 +7654,74 @@ func (_c *MockStore_WorkflowsCreate_Call) Return(err error) *MockStore_Workflows
 }
 
 func (_c *MockStore_WorkflowsCreate_Call) RunAndReturn(run func(workflows []*model.Workflow) error) *MockStore_WorkflowsCreate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WorkflowsLeftInCanceledPipelines provides a mock function for the type MockStore
+func (_mock *MockStore) WorkflowsLeftInCanceledPipelines(canceledBefore int64, limit int) ([]*model.Workflow, error) {
+	ret := _mock.Called(canceledBefore, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WorkflowsLeftInCanceledPipelines")
+	}
+
+	var r0 []*model.Workflow
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64, int) ([]*model.Workflow, error)); ok {
+		return returnFunc(canceledBefore, limit)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64, int) []*model.Workflow); ok {
+		r0 = returnFunc(canceledBefore, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*model.Workflow)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64, int) error); ok {
+		r1 = returnFunc(canceledBefore, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_WorkflowsLeftInCanceledPipelines_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WorkflowsLeftInCanceledPipelines'
+type MockStore_WorkflowsLeftInCanceledPipelines_Call struct {
+	*mock.Call
+}
+
+// WorkflowsLeftInCanceledPipelines is a helper method to define mock.On call
+//   - canceledBefore int64
+//   - limit int
+func (_e *MockStore_Expecter) WorkflowsLeftInCanceledPipelines(canceledBefore any, limit any) *MockStore_WorkflowsLeftInCanceledPipelines_Call {
+	return &MockStore_WorkflowsLeftInCanceledPipelines_Call{Call: _e.mock.On("WorkflowsLeftInCanceledPipelines", canceledBefore, limit)}
+}
+
+func (_c *MockStore_WorkflowsLeftInCanceledPipelines_Call) Run(run func(canceledBefore int64, limit int)) *MockStore_WorkflowsLeftInCanceledPipelines_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_WorkflowsLeftInCanceledPipelines_Call) Return(workflows []*model.Workflow, err error) *MockStore_WorkflowsLeftInCanceledPipelines_Call {
+	_c.Call.Return(workflows, err)
+	return _c
+}
+
+func (_c *MockStore_WorkflowsLeftInCanceledPipelines_Call) RunAndReturn(run func(canceledBefore int64, limit int) ([]*model.Workflow, error)) *MockStore_WorkflowsLeftInCanceledPipelines_Call {
 	_c.Call.Return(run)
 	return _c
 }

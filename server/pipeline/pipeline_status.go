@@ -34,10 +34,14 @@ func PipelineStatus(workflows []*model.Workflow) model.StatusValue {
 	return status
 }
 
-func UpdateToStatusRunning(store store.Store, pipeline model.Pipeline, started int64) (*model.Pipeline, error) {
+// UpdateToStatusRunning writes a pipeline's start (status, started) if it
+// still is pending, and reports whether it did: a cancel claimed meanwhile
+// stays.
+func UpdateToStatusRunning(store store.Store, pipeline model.Pipeline, started int64) (*model.Pipeline, bool, error) {
 	pipeline.Status = model.StatusRunning
 	pipeline.Started = started
-	return &pipeline, store.UpdatePipeline(&pipeline)
+	won, err := store.PipelineStart(&pipeline)
+	return &pipeline, won, err
 }
 
 func UpdateToStatusPending(store store.Store, pipeline model.Pipeline, reviewer string) (*model.Pipeline, error) {
@@ -67,12 +71,5 @@ func UpdateToStatusError(store store.Store, pipeline model.Pipeline, err error) 
 	pipeline.Status = model.StatusError
 	pipeline.Started = time.Now().Unix()
 	pipeline.Finished = pipeline.Started
-	return &pipeline, store.UpdatePipeline(&pipeline)
-}
-
-func UpdateToStatusKilled(store store.Store, pipeline model.Pipeline, cancelInfo *model.CancelInfo, state model.StatusValue) (*model.Pipeline, error) {
-	pipeline.Status = state
-	pipeline.Finished = time.Now().Unix()
-	pipeline.CancelInfo = cancelInfo
 	return &pipeline, store.UpdatePipeline(&pipeline)
 }

@@ -57,6 +57,22 @@ func (*ErrStepFilteredDependency) Is(target error) bool {
 	return ok
 }
 
+// ErrStepDependsOnFinalizer is a step depending on an on_finish step, which
+// runs only after all other steps.
+type ErrStepDependsOnFinalizer struct {
+	name,
+	dep string
+}
+
+func (err *ErrStepDependsOnFinalizer) Error() string {
+	return fmt.Sprintf("step '%s' depends on step '%s', which is on_finish and runs after all other steps", err.name, err.dep)
+}
+
+func (*ErrStepDependsOnFinalizer) Is(target error) bool {
+	_, ok := target.(*ErrStepDependsOnFinalizer)
+	return ok
+}
+
 type ErrStepDuplicateName struct {
 	name string
 }

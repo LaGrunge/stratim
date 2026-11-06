@@ -17,14 +17,14 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 
 	"go.woodpecker-ci.org/woodpecker/v3/rpc"
 	"go.woodpecker-ci.org/woodpecker/v3/rpc/proto"
 	"go.woodpecker-ci.org/woodpecker/v3/server/logging"
+	"go.woodpecker-ci.org/woodpecker/v3/server/pipeline"
 	"go.woodpecker-ci.org/woodpecker/v3/server/scheduler"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 	"go.woodpecker-ci.org/woodpecker/v3/version"
@@ -36,34 +36,25 @@ type WoodpeckerServer struct {
 	peer RPC
 }
 
-// NewWoodpeckerServer creates a WoodpeckerServer with its metrics registered
-// into registerer. Pass prometheus.DefaultRegisterer in production; pass a
-// fresh prometheus.NewRegistry() in tests to avoid "duplicate metrics
-// collector registration" panics when the server is created multiple times.
-// A nil registerer defaults to prometheus.DefaultRegisterer.
-func NewWoodpeckerServer(scheduler scheduler.Scheduler, logger logging.Log, store store.Store, registerer prometheus.Registerer) proto.WoodpeckerServer {
-	if registerer == nil {
-		registerer = prometheus.DefaultRegisterer
-	}
-	factory := promauto.With(registerer)
-	pipelineTime := factory.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "woodpecker",
-		Name:      "pipeline_time",
-		Help:      "Pipeline time.",
-	}, []string{"repo", "branch", "status", "pipeline"})
-	pipelineCount := factory.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "woodpecker",
-		Name:      "pipeline_count",
-		Help:      "Pipeline count.",
-	}, []string{"repo", "branch", "status", "pipeline"})
+// NewWoodpeckerServer creates a WoodpeckerServer; end follows the end of
+// the workflows its agents report done, or it settles.
+func NewWoodpeckerServer(scheduler scheduler.Scheduler, logger logging.Log, store store.Store, end pipeline.WorkflowEnd) proto.WoodpeckerServer {
 	peer := RPC{
-		store:         store,
-		scheduler:     scheduler,
-		logger:        logger,
-		pipelineTime:  pipelineTime,
-		pipelineCount: pipelineCount,
+		store:     store,
+		scheduler: scheduler,
+		logger:    logger,
+		end:       end,
+	}
+	if scheduler != nil {
+		scheduler.SetCanceledExpiredHandler(peer.settleCanceledWorkflow)
 	}
 	return &WoodpeckerServer{peer: peer}
+}
+
+// finalizeDeadline is when the finalizers' time ends that lasts leftMs
+// milliseconds from now.
+func finalizeDeadline(leftMs int64, now time.Time) time.Time {
+	return now.Add(time.Duration(leftMs) * time.Millisecond)
 }
 
 // Version returns the server- & grpc-version.
@@ -142,7 +133,13 @@ func (s *WoodpeckerServer) Done(c context.Context, req *proto.DoneRequest) (*pro
 // Also signals via err if workflow got canceled.
 func (s *WoodpeckerServer) Wait(c context.Context, req *proto.WaitRequest) (*proto.WaitResponse, error) {
 	res := new(proto.WaitResponse)
-	canceled, err := s.peer.Wait(c, req.GetId())
+	wait := s.peer.Wait
+	if req.GetAfterCancel() {
+		// an agent of this release waiting to stop its finalizers; an older
+		// one never asks
+		wait = s.peer.WaitKilled
+	}
+	canceled, err := wait(c, req.GetId())
 	res.Canceled = canceled
 	return res, err
 }
@@ -150,6 +147,11 @@ func (s *WoodpeckerServer) Wait(c context.Context, req *proto.WaitRequest) (*pro
 // Extend extends the workflow deadline.
 func (s *WoodpeckerServer) Extend(c context.Context, req *proto.ExtendRequest) (*proto.Empty, error) {
 	res := new(proto.Empty)
+	if req.FinalizeLeftMs != nil {
+		// an agent of this release whose finalizers run; an older one never
+		// tells. How long they last, counted from the server's clock.
+		return res, s.peer.ExtendFinalizing(c, req.GetId(), finalizeDeadline(req.GetFinalizeLeftMs(), time.Now()))
+	}
 	err := s.peer.Extend(c, req.GetId())
 	return res, err
 }

@@ -45,6 +45,24 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
+// WithCancelSignal sets a context that ends when the workflow is canceled,
+// heard also after the workflow's context ended: a cancel then stops the
+// finalizers, unless it came before they started.
+func WithCancelSignal(ctx context.Context) Option {
+	return func(r *Runtime) {
+		r.cancelSignal = ctx
+	}
+}
+
+// WithKillSignal sets a context that ends when the finalizers are to be
+// stopped too, by a second cancel: whenever it comes, the finalizer running
+// is stopped and the ones left do not start.
+func WithKillSignal(ctx context.Context) Option {
+	return func(r *Runtime) {
+		r.killSignal = ctx
+	}
+}
+
 // WithDescription sets the descriptive key-value pairs attached to every log line.
 func WithDescription(desc map[string]string) Option {
 	return func(r *Runtime) {

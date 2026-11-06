@@ -311,6 +311,8 @@ func TestFifoBasicOperations(t *testing.T) {
 		// Edge case: verify ErrCancel results in StatusKilled not StatusFailure
 		assert.NotEqual(t, model.StatusFailure, got2.DepStatus["cancel-prop-1"])
 		assert.NoError(t, q.Done(ctx, got2.ID, model.StatusSuccess))
+		// the canceled task runs on for its agent until it reports it done
+		assert.NoError(t, q.Done(ctx, got1.ID, model.StatusKilled))
 		waitForProcess()
 	})
 

@@ -50,6 +50,11 @@ type Step struct {
 	Ports          []Port            `json:"ports,omitempty"`
 	BackendOptions map[string]any    `json:"backend_options,omitempty"`
 	WorkflowLabels map[string]string `json:"workflow_labels,omitempty"`
+	// RunOn lists the outcomes so far the step runs after (the pipeline
+	// Status* values; failure covers timeout and killed, skipped is a step
+	// of an earlier stage skipped). Empty, OnSuccess and OnFailure decide,
+	// which the compiler sets too for agents from before RunOn.
+	RunOn []string `json:"run_on,omitempty"`
 }
 
 // StepType identifies the type of step.

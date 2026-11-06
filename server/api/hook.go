@@ -218,6 +218,10 @@ func PostHook(c *gin.Context) {
 	// behavior and API response). If it takes longer we respond 202 Accepted and
 	// let creation finish in the background.
 	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(context.Background()), backgroundPipelineCreationTimeout)
+	if end, ok := pipeline.WorkflowEndFromContext(c); ok {
+		// for the cancel of previous pipelines
+		bgCtx = pipeline.InjectWorkflowEnd(bgCtx, end)
+	}
 
 	done := make(chan struct{})
 	var pl *model.Pipeline

@@ -33,11 +33,13 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/logging"
 	"go.woodpecker-ci.org/woodpecker/v3/server/metric"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/pipeline"
 	"go.woodpecker-ci.org/woodpecker/v3/server/pubsub/memory"
 	"go.woodpecker-ci.org/woodpecker/v3/server/queue"
 	queue_mocks "go.woodpecker-ci.org/woodpecker/v3/server/queue/mocks"
 	"go.woodpecker-ci.org/woodpecker/v3/server/scheduler"
 	log_mocks "go.woodpecker-ci.org/woodpecker/v3/server/services/log/mocks"
+	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 	store_mocks "go.woodpecker-ci.org/woodpecker/v3/server/store/mocks"
 )
 
@@ -45,21 +47,23 @@ import (
 func newTestRPC(t *testing.T, mockStore *store_mocks.MockStore, q queue.Queue) RPC {
 	t.Helper()
 
-	pipelineTime := prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "woodpecker_test",
-		Name:      "pipeline_time_" + t.Name(),
-	}, []string{"repo", "branch", "status", "pipeline"})
-	pipelineCount := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "woodpecker_test",
-		Name:      "pipeline_count_" + t.Name(),
-	}, []string{"repo", "branch", "status", "pipeline"})
-
+	sched := scheduler.NewScheduler(t.Context(), mockStore, q, memory.New())
+	logs := logging.New()
 	return RPC{
-		store:         mockStore,
-		scheduler:     scheduler.NewScheduler(t.Context(), mockStore, q, memory.New()),
-		logger:        logging.New(),
-		pipelineTime:  pipelineTime,
-		pipelineCount: pipelineCount,
+		store:     mockStore,
+		scheduler: sched,
+		logger:    logs,
+		end:       testWorkflowEnd(mockStore, sched, logs),
+	}
+}
+
+// testWorkflowEnd is the server's end of workflows, without metrics.
+func testWorkflowEnd(store store.Store, sched scheduler.Scheduler, logs logging.Log) pipeline.WorkflowEnd {
+	return pipeline.WorkflowEnd{
+		Store:     store,
+		Publisher: sched,
+		Logs:      logs,
+		Statuses:  server.Config.Services.Statuses,
 	}
 }
 
@@ -137,7 +141,7 @@ func TestRPCUpdate(t *testing.T) {
 		mockStore.On("StepByUUID", "step-uuid-123").Return(step, nil)
 		mockStore.On("GetRepo", int64(10)).Return(repo, nil)
 		// pipeline.UpdateStepStatus calls StepUpdate
-		mockStore.On("StepUpdate", mock.Anything).Return(nil)
+		mockStore.On("StepReport", mock.Anything, mock.Anything).Return(true, nil)
 		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{workflow}, nil)
 
 		rpcInst := newTestRPC(t, mockStore, nil)
@@ -149,6 +153,38 @@ func TestRPCUpdate(t *testing.T) {
 			Exited:   false,
 		})
 		assert.NoError(t, err)
+	})
+
+	t.Run("finalizer reports after the pipeline was canceled", func(t *testing.T) {
+		// Cancel kills the pipeline at once but leaves a running workflow and
+		// its pending steps to the agent, whose finalizers run after it.
+		mockStore := store_mocks.NewMockStore(t)
+		mockLogStore := log_mocks.NewMockService(t)
+		origLogStore := server.Config.Services.LogStore
+		server.Config.Services.LogStore = mockLogStore
+		t.Cleanup(func() { server.Config.Services.LogStore = origLogStore })
+
+		pipeline := defaultPipeline(model.StatusKilled)
+		workflow := defaultWorkflow(model.StatusRunning)
+		step := defaultStep(model.StatusPending)
+
+		mockStore.On("WorkflowLoad", int64(30)).Return(workflow, nil)
+		mockStore.On("GetPipeline", int64(20)).Return(pipeline, nil)
+		mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
+		mockStore.On("StepByUUID", "step-uuid-123").Return(step, nil)
+		mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
+		mockStore.On("StepReport", mock.Anything, mock.Anything).Return(true, nil)
+		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{workflow}, nil)
+		mockLogStore.On("StepFinished", mock.Anything, mock.Anything).Return(nil)
+
+		rpcInst := newTestRPC(t, mockStore, nil)
+		ctx := context.WithValue(t.Context(), agentIDKey, int64(1))
+
+		require.NoError(t, rpcInst.Update(ctx, "30", rpc.StepState{StepUUID: "step-uuid-123", Started: 100}))
+		assert.Equal(t, model.StatusRunning, step.State)
+		require.NoError(t, allowAppendingLogs(pipeline, step), "a running finalizer may log")
+		require.NoError(t, rpcInst.Update(ctx, "30", rpc.StepState{StepUUID: "step-uuid-123", Started: 100, Finished: 110, Exited: true}))
+		assert.Equal(t, model.StatusSuccess, step.State)
 	})
 
 	t.Run("allow terminal step update when workflow already finished", func(t *testing.T) {
@@ -170,7 +206,7 @@ func TestRPCUpdate(t *testing.T) {
 		mockStore.On("AgentFind", int64(1)).Return(agent, nil)
 		mockStore.On("StepByUUID", "step-uuid-123").Return(step, nil)
 		mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
-		mockStore.On("StepUpdate", mock.Anything).Return(nil)
+		mockStore.On("StepReport", mock.Anything, mock.Anything).Return(true, nil)
 		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{workflow}, nil)
 		mockLogStore.On("StepFinished", mock.Anything, mock.Anything).Return(nil)
 
@@ -343,10 +379,10 @@ func TestRPCInit(t *testing.T) {
 		mockStore.On("AgentFind", int64(1)).Return(agent, nil)
 		mockStore.On("GetPipeline", int64(20)).Return(pipeline, nil)
 		mockStore.On("GetRepo", int64(10)).Return(repo, nil)
-		// pipeline.UpdateToStatusRunning -> UpdatePipeline
-		mockStore.On("UpdatePipeline", mock.Anything).Return(nil)
-		// pipeline.UpdateWorkflowStatusToRunning -> WorkflowUpdate
-		mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+		// pipeline.UpdateToStatusRunning -> PipelineStart
+		mockStore.On("PipelineStart", mock.Anything).Return(true, nil).Once()
+		// pipeline.UpdateWorkflowStatusToRunning -> WorkflowStart
+		mockStore.On("WorkflowStart", mock.Anything).Return(true, nil).Once()
 		// pubsub deferred -> WorkflowGetTree
 		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{workflow}, nil)
 		// updateAgentLastWork -> AgentUpdate
@@ -370,7 +406,7 @@ func TestRPCInit(t *testing.T) {
 		mockStore.On("AgentFind", int64(1)).Return(agent, nil)
 		mockStore.On("GetPipeline", int64(20)).Return(pipeline, nil)
 		mockStore.On("GetRepo", int64(10)).Return(repo, nil)
-		mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+		mockStore.On("WorkflowStart", mock.Anything).Return(true, nil).Once()
 		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{workflow}, nil)
 		mockStore.On("AgentUpdate", mock.Anything).Return(nil)
 
@@ -379,6 +415,38 @@ func TestRPCInit(t *testing.T) {
 
 		err := rpcInst.Init(ctx, "30", rpc.WorkflowState{Started: 100})
 		assert.NoError(t, err)
+	})
+
+	// A cancel claimed between Init's read and its write stays: the
+	// pipeline is written running only if still pending, the workflow only
+	// if still pending; the subscribers get the pipeline as it is.
+	t.Run("a cancel claimed meanwhile stays", func(t *testing.T) {
+		mockStore := store_mocks.NewMockStore(t)
+		workflow := defaultWorkflow(model.StatusPending)
+		reads := 0
+		mockStore.EXPECT().GetPipeline(int64(20)).RunAndReturn(func(int64) (*model.Pipeline, error) {
+			reads++
+			if reads == 1 {
+				return defaultPipeline(model.StatusPending), nil
+			}
+			return killedPipeline(), nil
+		})
+		mockStore.On("WorkflowLoad", int64(30)).Return(workflow, nil)
+		mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
+		mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
+		mockStore.On("PipelineStart", mock.MatchedBy(func(p *model.Pipeline) bool {
+			return p.Status == model.StatusRunning && p.Started == 100
+		})).Return(false, nil).Once()
+		mockStore.On("WorkflowStart", mock.Anything).Return(false, nil).Once()
+		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{workflow}, nil)
+		mockStore.On("AgentUpdate", mock.Anything).Return(nil)
+		rpcInst := newTestRPC(t, mockStore, nil)
+		ctx := context.WithValue(t.Context(), agentIDKey, int64(1))
+
+		require.NoError(t, rpcInst.Init(ctx, "30", rpc.WorkflowState{Started: 100}))
+		mockStore.AssertNotCalled(t, "UpdatePipeline", mock.Anything)
+		mockStore.AssertNotCalled(t, "WorkflowUpdate", mock.Anything)
+		assert.Equal(t, 2, reads, "the pipeline killed meanwhile is read again for its subscribers")
 	})
 
 	t.Run("reject workflow already finished", func(t *testing.T) {
@@ -500,9 +568,9 @@ func TestRPCDoneQueueStatus(t *testing.T) {
 			mockStore.On("GetPipeline", int64(20)).Return(defaultPipeline(model.StatusRunning), nil)
 			mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
 			mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
-			mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+			mockStore.On("WorkflowFinish", mock.Anything).Return(true, nil)
 			mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{}, nil)
-			mockStore.On("UpdatePipeline", mock.Anything).Return(nil)
+			mockStore.On("PipelineFinish", mock.Anything).Return(true, nil)
 			mockStore.On("AgentUpdate", mock.Anything).Return(nil)
 			// an unexpected call to the mocked queue fails the test
 			if tt.want == "" {
@@ -541,9 +609,9 @@ func TestRPCDone(t *testing.T) {
 		mockStore.On("GetPipeline", int64(20)).Return(pipeline, nil)
 		mockStore.On("GetRepo", int64(10)).Return(repo, nil)
 		mockStore.On("AgentFind", int64(1)).Return(agent, nil)
-		mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+		mockStore.On("WorkflowFinish", mock.Anything).Return(true, nil)
 		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{}, nil)
-		mockStore.On("UpdatePipeline", mock.Anything).Return(nil)
+		mockStore.On("PipelineFinish", mock.Anything).Return(true, nil)
 		mockStore.On("AgentUpdate", mock.Anything).Return(nil)
 		mockQueue.On("Done", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
@@ -573,9 +641,9 @@ func TestRPCDone(t *testing.T) {
 		mockStore.On("GetPipeline", int64(20)).Return(pipeline, nil)
 		mockStore.On("GetRepo", int64(10)).Return(repo, nil)
 		mockStore.On("AgentFind", int64(1)).Return(agent, nil)
-		mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+		mockStore.On("WorkflowFinish", mock.Anything).Return(true, nil)
 		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{failedWorkflow, storedWorkflow}, nil)
-		mockStore.On("UpdatePipeline", mock.Anything).Return(nil)
+		mockStore.On("PipelineFinish", mock.Anything).Return(true, nil)
 		mockStore.On("AgentUpdate", mock.Anything).Return(nil)
 		mockQueue.On("Done", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
@@ -586,7 +654,7 @@ func TestRPCDone(t *testing.T) {
 		err := rpcInst.Done(ctx, "30", rpc.WorkflowState{})
 		require.NoError(t, err)
 
-		mockStore.AssertCalled(t, "UpdatePipeline", mock.MatchedBy(func(p *model.Pipeline) bool {
+		mockStore.AssertCalled(t, "PipelineFinish", mock.MatchedBy(func(p *model.Pipeline) bool {
 			return p.Status == model.StatusFailure && p.Finished == 200
 		}))
 	})
@@ -603,7 +671,7 @@ func TestRPCDone(t *testing.T) {
 		mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
 		mockStore.On("AgentFind", int64(1)).Return(agent, nil)
 
-		rpcInst := newTestRPC(t, mockStore, nil)
+		rpcInst := newTestRPC(t, mockStore, queue.NewMemoryQueue(t.Context()))
 		ctx := context.WithValue(t.Context(), agentIDKey, int64(1))
 
 		err := rpcInst.Done(ctx, "30", rpc.WorkflowState{Finished: 200})
@@ -1066,7 +1134,7 @@ func TestRPCUpdateStepTypeMetric(t *testing.T) {
 		mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
 		mockStore.On("StepByUUID", "step-uuid-commands").Return(step, nil)
 		mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
-		mockStore.On("StepUpdate", mock.Anything).Return(nil)
+		mockStore.On("StepReport", mock.Anything, mock.Anything).Return(true, nil)
 		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{workflow}, nil)
 		mockLogStore.On("StepFinished", mock.Anything, mock.Anything).Return(nil)
 
@@ -1128,7 +1196,7 @@ func TestRPCUpdateStepTypeMetric(t *testing.T) {
 		mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
 		mockStore.On("StepByUUID", "step-uuid-service").Return(step, nil)
 		mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
-		mockStore.On("StepUpdate", mock.Anything).Return(nil)
+		mockStore.On("StepReport", mock.Anything, mock.Anything).Return(true, nil)
 		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{workflow}, nil)
 		mockLogStore.On("StepFinished", mock.Anything, mock.Anything).Return(nil)
 
@@ -1190,7 +1258,7 @@ func TestRPCUpdateStepTypeMetric(t *testing.T) {
 		mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
 		mockStore.On("StepByUUID", "step-uuid-success").Return(step, nil)
 		mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
-		mockStore.On("StepUpdate", mock.Anything).Return(nil)
+		mockStore.On("StepReport", mock.Anything, mock.Anything).Return(true, nil)
 		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{workflow}, nil)
 		mockLogStore.On("StepFinished", mock.Anything, mock.Anything).Return(nil)
 

@@ -6,6 +6,7 @@ package mocks
 
 import (
 	"context"
+	"time"
 
 	mock "github.com/stretchr/testify/mock"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
@@ -46,6 +47,80 @@ type MockQueue_Expecter struct {
 
 func (_m *MockQueue) EXPECT() *MockQueue_Expecter {
 	return &MockQueue_Expecter{mock: &_m.Mock}
+}
+
+// CancelAtOnce provides a mock function for the type MockQueue
+func (_mock *MockQueue) CancelAtOnce(c context.Context, ids []string, escalate bool) ([]string, error) {
+	ret := _mock.Called(c, ids, escalate)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CancelAtOnce")
+	}
+
+	var r0 []string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string, bool) ([]string, error)); ok {
+		return returnFunc(c, ids, escalate)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string, bool) []string); ok {
+		r0 = returnFunc(c, ids, escalate)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []string, bool) error); ok {
+		r1 = returnFunc(c, ids, escalate)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockQueue_CancelAtOnce_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CancelAtOnce'
+type MockQueue_CancelAtOnce_Call struct {
+	*mock.Call
+}
+
+// CancelAtOnce is a helper method to define mock.On call
+//   - c context.Context
+//   - ids []string
+//   - escalate bool
+func (_e *MockQueue_Expecter) CancelAtOnce(c any, ids any, escalate any) *MockQueue_CancelAtOnce_Call {
+	return &MockQueue_CancelAtOnce_Call{Call: _e.mock.On("CancelAtOnce", c, ids, escalate)}
+}
+
+func (_c *MockQueue_CancelAtOnce_Call) Run(run func(c context.Context, ids []string, escalate bool)) *MockQueue_CancelAtOnce_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []string
+		if args[1] != nil {
+			arg1 = args[1].([]string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockQueue_CancelAtOnce_Call) Return(strings []string, err error) *MockQueue_CancelAtOnce_Call {
+	_c.Call.Return(strings, err)
+	return _c
+}
+
+func (_c *MockQueue_CancelAtOnce_Call) RunAndReturn(run func(c context.Context, ids []string, escalate bool) ([]string, error)) *MockQueue_CancelAtOnce_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // Done provides a mock function for the type MockQueue
@@ -296,6 +371,75 @@ func (_c *MockQueue_Extend_Call) Return(err error) *MockQueue_Extend_Call {
 }
 
 func (_c *MockQueue_Extend_Call) RunAndReturn(run func(c context.Context, agentID int64, workflowID string) error) *MockQueue_Extend_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ExtendFinalizing provides a mock function for the type MockQueue
+func (_mock *MockQueue) ExtendFinalizing(c context.Context, agentID int64, workflowID string, finalizeDeadline time.Time) error {
+	ret := _mock.Called(c, agentID, workflowID, finalizeDeadline)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExtendFinalizing")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, string, time.Time) error); ok {
+		r0 = returnFunc(c, agentID, workflowID, finalizeDeadline)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockQueue_ExtendFinalizing_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExtendFinalizing'
+type MockQueue_ExtendFinalizing_Call struct {
+	*mock.Call
+}
+
+// ExtendFinalizing is a helper method to define mock.On call
+//   - c context.Context
+//   - agentID int64
+//   - workflowID string
+//   - finalizeDeadline time.Time
+func (_e *MockQueue_Expecter) ExtendFinalizing(c any, agentID any, workflowID any, finalizeDeadline any) *MockQueue_ExtendFinalizing_Call {
+	return &MockQueue_ExtendFinalizing_Call{Call: _e.mock.On("ExtendFinalizing", c, agentID, workflowID, finalizeDeadline)}
+}
+
+func (_c *MockQueue_ExtendFinalizing_Call) Run(run func(c context.Context, agentID int64, workflowID string, finalizeDeadline time.Time)) *MockQueue_ExtendFinalizing_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockQueue_ExtendFinalizing_Call) Return(err error) *MockQueue_ExtendFinalizing_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockQueue_ExtendFinalizing_Call) RunAndReturn(run func(c context.Context, agentID int64, workflowID string, finalizeDeadline time.Time) error) *MockQueue_ExtendFinalizing_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -588,6 +732,46 @@ func (_c *MockQueue_Resume_Call) RunAndReturn(run func()) *MockQueue_Resume_Call
 	return _c
 }
 
+// SetCanceledExpiredHandler provides a mock function for the type MockQueue
+func (_mock *MockQueue) SetCanceledExpiredHandler(handler func(task *model.Task)) {
+	_mock.Called(handler)
+	return
+}
+
+// MockQueue_SetCanceledExpiredHandler_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetCanceledExpiredHandler'
+type MockQueue_SetCanceledExpiredHandler_Call struct {
+	*mock.Call
+}
+
+// SetCanceledExpiredHandler is a helper method to define mock.On call
+//   - handler func(task *model.Task)
+func (_e *MockQueue_Expecter) SetCanceledExpiredHandler(handler any) *MockQueue_SetCanceledExpiredHandler_Call {
+	return &MockQueue_SetCanceledExpiredHandler_Call{Call: _e.mock.On("SetCanceledExpiredHandler", handler)}
+}
+
+func (_c *MockQueue_SetCanceledExpiredHandler_Call) Run(run func(handler func(task *model.Task))) *MockQueue_SetCanceledExpiredHandler_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 func(task *model.Task)
+		if args[0] != nil {
+			arg0 = args[0].(func(task *model.Task))
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockQueue_SetCanceledExpiredHandler_Call) Return() *MockQueue_SetCanceledExpiredHandler_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockQueue_SetCanceledExpiredHandler_Call) RunAndReturn(run func(handler func(task *model.Task))) *MockQueue_SetCanceledExpiredHandler_Call {
+	_c.Run(run)
+	return _c
+}
+
 // Wait provides a mock function for the type MockQueue
 func (_mock *MockQueue) Wait(c context.Context, id string) error {
 	ret := _mock.Called(c, id)
@@ -641,6 +825,63 @@ func (_c *MockQueue_Wait_Call) Return(err error) *MockQueue_Wait_Call {
 }
 
 func (_c *MockQueue_Wait_Call) RunAndReturn(run func(c context.Context, id string) error) *MockQueue_Wait_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WaitKilled provides a mock function for the type MockQueue
+func (_mock *MockQueue) WaitKilled(c context.Context, id string) error {
+	ret := _mock.Called(c, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WaitKilled")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(c, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockQueue_WaitKilled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitKilled'
+type MockQueue_WaitKilled_Call struct {
+	*mock.Call
+}
+
+// WaitKilled is a helper method to define mock.On call
+//   - c context.Context
+//   - id string
+func (_e *MockQueue_Expecter) WaitKilled(c any, id any) *MockQueue_WaitKilled_Call {
+	return &MockQueue_WaitKilled_Call{Call: _e.mock.On("WaitKilled", c, id)}
+}
+
+func (_c *MockQueue_WaitKilled_Call) Run(run func(c context.Context, id string)) *MockQueue_WaitKilled_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockQueue_WaitKilled_Call) Return(err error) *MockQueue_WaitKilled_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockQueue_WaitKilled_Call) RunAndReturn(run func(c context.Context, id string) error) *MockQueue_WaitKilled_Call {
 	_c.Call.Return(run)
 	return _c
 }

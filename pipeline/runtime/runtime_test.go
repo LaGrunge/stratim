@@ -281,10 +281,11 @@ func TestWorkflowWithServiceStep(t *testing.T) {
 			Type:      "commands",
 			OnSuccess: true,
 			Environment: map[string]string{
-				"CI_PIPELINE_STARTED": fmt.Sprintf("%d", r.started),
-				"CI_PIPELINE_STATUS":  "success",
-				"CI_STEP_NAME":        "test",
-				"CI_STEP_TYPE":        "commands",
+				"CI_PIPELINE_STARTED":     fmt.Sprintf("%d", r.started),
+				"CI_PIPELINE_STATUS":      "success",
+				"CI_STEP_NAME":            "test",
+				"CI_STEP_TYPE":            "commands",
+				"STRATIM_PIPELINE_STATUS": "success",
 			},
 			Commands: []string{"echo test"},
 		},
@@ -490,6 +491,7 @@ func TestWorkflowPluginStep(t *testing.T) {
 			"DRONE_REPO_SCM":                 "git",
 			"EXPECT_TYPE":                    "plugin",
 			"PULLREQUEST_DRONE_PULL_REQUEST": "0",
+			"STRATIM_PIPELINE_STATUS":        "success",
 		}, lastPluginTrace.CurrStep.Environment)
 	}
 }

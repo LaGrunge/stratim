@@ -380,7 +380,7 @@ func TestRestartFailedWorkflowsCanceled(t *testing.T) {
 	require.NoError(t, err)
 	running, err := env.Store.GetPipeline(created.ID)
 	require.NoError(t, err)
-	require.NoError(t, pipeline.Cancel(t.Context(), forge, env.Store, env.Fixtures.Repo, env.Fixtures.Owner, running, nil))
+	require.NoError(t, pipeline.Cancel(t.Context(), forge, env.Store, env.WorkflowEnd, env.Fixtures.Repo, env.Fixtures.Owner, running, nil))
 	canceled := setup.WaitForPipeline(t, env.Store, created.ID)
 
 	// The pipeline is marked as canceled right away, the running workflow once

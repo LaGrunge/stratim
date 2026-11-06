@@ -250,7 +250,7 @@ func (e *local) TailStep(_ context.Context, step *types.Step, taskUUID string) (
 	return state.output, nil
 }
 
-func (e *local) DestroyStep(_ context.Context, step *types.Step, taskUUID string) error {
+func (e *local) DestroyStep(ctx context.Context, step *types.Step, taskUUID string) error {
 	state, err := e.getStepState(taskUUID, step.UUID)
 	if err != nil {
 		if errors.Is(err, ErrStepStateNotFound) {
@@ -271,6 +271,7 @@ func (e *local) DestroyStep(_ context.Context, step *types.Step, taskUUID string
 			// reap the killed process, unless a wait for it already runs
 			go func() { _, _ = cmd.Process.Wait() }()
 		}
+		waitProcessGroupGone(ctx, state.cmd)
 		state.cmd = nil
 	}
 	workflowState, err := e.getWorkflowState(taskUUID)

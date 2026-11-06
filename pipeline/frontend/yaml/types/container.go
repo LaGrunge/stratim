@@ -38,6 +38,9 @@ type Container struct {
 	Detached  bool                 `yaml:"detach,omitempty"`
 	// Timeout ends the step when it runs longer, if set.
 	Timeout base.Timeout `yaml:"timeout,omitempty"`
+	// OnFinish makes a step a finalizer, run after all other steps whatever
+	// their outcome.
+	OnFinish bool `yaml:"on_finish,omitempty"`
 	// state
 	Volumes Volumes `yaml:"volumes,omitempty"`
 	// network

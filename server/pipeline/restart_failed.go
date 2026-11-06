@@ -111,7 +111,9 @@ type restartPlan struct {
 // again, given the effective workflows of the pipeline it restarts:
 //   - the workflows that did not pass: failed, errored, timed out or killed
 //     ones, and skipped ones, as canceling a pipeline skips all workflows that
-//     did not start yet. Matrix variants are matched one by one.
+//     did not start yet; and the ones not ended yet, as those of a canceled
+//     pipeline still running their finalizers. Matrix variants are matched
+//     one by one.
 //   - the workflows that did not exist when the pipeline ran, as they never
 //     passed.
 //   - every workflow depending on a rerun one, directly or transitively, in
@@ -146,7 +148,8 @@ func planRestart(old []ranWorkflow, items []*builder.Item) (*restartPlan, error)
 	for _, item := range items {
 		key := workflowKey(item.Workflow.Name, item.Workflow.Environ)
 		wf, existed := oldByKey[key]
-		if !existed || wf.State.IsFailure() || wf.State == model.StatusSkipped {
+		if !existed || wf.State.IsFailure() || wf.State == model.StatusSkipped ||
+			wf.State == model.StatusPending || wf.State == model.StatusRunning {
 			plan.rerun[key] = struct{}{}
 			rerunNames[item.Workflow.Name] = struct{}{}
 		}

@@ -6003,6 +6003,10 @@ const docTemplate = `{
                 "exit_code": {
                     "type": "integer"
                 },
+                "finalizer": {
+                    "description": "Finalizer is set for an on_finish step: a cancel leaves it to the\nagent, which runs it after the other steps were stopped.",
+                    "type": "boolean"
+                },
                 "finished": {
                     "type": "integer"
                 },
@@ -6081,6 +6085,10 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "finalize_timeout": {
+                    "description": "FinalizeTimeout is how long, in seconds, the workflow's finalizers\nmay run in all: the queue holds it no longer for them once canceled.",
+                    "type": "integer"
                 },
                 "id": {
                     "type": "string"
@@ -6616,6 +6624,10 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "finalize_timeout": {
+                    "description": "FinalizeTimeout is how long, in seconds, the workflow's finalizers\nmay run in all: the queue holds it no longer for them once canceled.",
+                    "type": "integer"
                 },
                 "id": {
                     "type": "string"

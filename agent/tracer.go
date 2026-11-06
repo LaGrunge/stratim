@@ -48,8 +48,10 @@ func (r *Runner) createTracer(ctxMeta, workflowCtx context.Context, logger zerol
 			Canceled: errors.Is(state.CurrStepState.Error, pipeline_errors.ErrCancel),
 			Skipped:  state.CurrStepState.Skipped,
 		}
+		// a finalizer runs past the workflow's timeout: only its own
+		// timeout times it out, it is killed when anything else stops it
 		stepState.TimedOut = stepTimedOut(state.CurrStepState.Error) ||
-			(stepState.Canceled && workflowTimedOut(workflowCtx))
+			(stepState.Canceled && !state.CurrStepFinalizer && workflowTimedOut(workflowCtx))
 		if state.CurrStepState.Error != nil {
 			stepState.Error = state.CurrStepState.Error.Error()
 		}

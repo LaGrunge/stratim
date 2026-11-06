@@ -75,6 +75,7 @@ func TestRunReportsCancelWithoutError(t *testing.T) {
 	peer.On("Next", mock.Anything, mock.Anything).Return(dummyWorkflow(), nil)
 	peer.On("Init", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	peer.On("Wait", mock.Anything, mock.Anything).Return(true, nil)
+	peer.On("WaitKilled", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 	peer.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	peer.On("Done", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {

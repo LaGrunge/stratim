@@ -389,6 +389,21 @@ func TestRunsOnStatus(t *testing.T) {
 			want: []string{"success"},
 		},
 		{
+			name: "timeout and skipped",
+			when: "when:\n  event: push\n  status: [ timeout, skipped ]\n",
+			want: []string{"timeout", "skipped"},
+		},
+		{
+			name: "killed",
+			when: "when:\n  event: push\n  status: [ killed ]\n",
+			want: []string{"killed"},
+		},
+		{
+			name: "success and skipped",
+			when: "when:\n  event: push\n  status: [ success, skipped ]\n",
+			want: []string{"success", "skipped"},
+		},
+		{
 			// The deprecated spelling must keep deciding on its own, even
 			// though the when above it sets no status.
 			name: "deprecated runs_on wins over when",

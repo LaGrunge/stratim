@@ -37,7 +37,10 @@ func mockStorePipeline(t *testing.T) store.Store {
 func TestUpdateToStatusRunning(t *testing.T) {
 	t.Parallel()
 
-	pipeline, _ := UpdateToStatusRunning(mockStorePipeline(t), model.Pipeline{}, int64(1))
+	s := mocks.NewMockStore(t)
+	s.On("PipelineStart", mock.Anything).Return(true, nil).Once()
+	pipeline, won, _ := UpdateToStatusRunning(s, model.Pipeline{}, int64(1))
+	assert.True(t, won)
 	assert.Equal(t, model.StatusRunning, pipeline.Status)
 	assert.EqualValues(t, 1, pipeline.Started)
 }
@@ -88,20 +91,4 @@ func TestUpdateToStatusError(t *testing.T) {
 	assert.Equal(t, pipeline.Started, pipeline.Finished)
 	assert.LessOrEqual(t, now, pipeline.Started)
 	assert.Equal(t, pipeline.Started, pipeline.Finished)
-}
-
-func TestUpdateToStatusKilled(t *testing.T) {
-	t.Parallel()
-
-	now := time.Now().Unix()
-	cancelInfo := &model.CancelInfo{
-		SupersededBy: 2,
-	}
-
-	pipeline, _ := UpdateToStatusKilled(mockStorePipeline(t), model.Pipeline{}, cancelInfo, model.StatusKilled)
-
-	assert.Equal(t, model.StatusKilled, pipeline.Status)
-	assert.NotNil(t, pipeline.CancelInfo)
-	assert.EqualValues(t, 2, pipeline.CancelInfo.SupersededBy)
-	assert.LessOrEqual(t, now, pipeline.Finished)
 }

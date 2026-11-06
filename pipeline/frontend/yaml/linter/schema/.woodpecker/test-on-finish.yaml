@@ -1,0 +1,24 @@
+when:
+  status: [success, skipped, timeout, killed]
+
+steps:
+  - name: test
+    image: alpine
+    commands:
+      - make test
+  - name: collect-logs
+    image: alpine
+    on_finish: true
+    commands:
+      - echo "$STRATIM_PIPELINE_STATUS"
+  - name: notify
+    image: plugins/slack
+    on_finish: true
+    when:
+      status: [failure, timeout]
+  - name: report-skips
+    image: alpine
+    commands:
+      - echo a step was skipped
+    when:
+      status: skipped

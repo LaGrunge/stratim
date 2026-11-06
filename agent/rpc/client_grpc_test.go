@@ -174,3 +174,15 @@ func TestProcessLogsFlushesContinuousStream(t *testing.T) {
 		synctest.Wait()
 	})
 }
+
+// The finalizers' end goes as how long it still lasts, by the agent's own
+// clock: however far it is from the server's, the server gets the same.
+func TestFinalizeLeft(t *testing.T) {
+	serverNow := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	for _, skew := range []time.Duration{0, 3 * time.Hour, -3 * time.Hour} {
+		agentNow := serverNow.Add(skew)
+		assert.Equal(t, int64(90_000), finalizeLeft(agentNow.Add(90*time.Second), agentNow), "skew %s", skew)
+	}
+	now := time.Now()
+	assert.Equal(t, int64(-5_000), finalizeLeft(now.Add(-5*time.Second), now), "ended: negative")
+}

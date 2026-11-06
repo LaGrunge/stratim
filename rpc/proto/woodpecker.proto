@@ -94,6 +94,10 @@ message InitRequest {
 
 message WaitRequest {
   string id = 1;
+  // after_cancel waits, once the agent was told the workflow is canceled,
+  // for its finalizers to be stopped too: a second cancel, or the server
+  // giving up on it.
+  bool after_cancel = 2;
 }
 
 message DoneRequest {
@@ -103,6 +107,11 @@ message DoneRequest {
 
 message ExtendRequest {
   string id = 1;
+  // finalize_left_ms is how long, in milliseconds, the workflow's
+  // finalizers' time still lasts once they started (negative once it
+  // ended); unset when not known. A duration, not a time: the agent's clock
+  // and the server's may differ.
+  optional int64 finalize_left_ms = 2;
 }
 
 message UpdateRequest {

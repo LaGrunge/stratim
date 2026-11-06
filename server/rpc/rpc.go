@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	grpc_metadata "google.golang.org/grpc/metadata"
 
@@ -48,11 +47,14 @@ var agentIDKey = &ctxKey{}
 const updateAgentLastWorkDelay = time.Minute
 
 type RPC struct {
-	scheduler     scheduler.Scheduler
-	logger        logging.Log
-	store         store.Store
-	pipelineTime  *prometheus.GaugeVec
-	pipelineCount *prometheus.CounterVec
+	scheduler scheduler.Scheduler
+	logger    logging.Log
+	store     store.Store
+	// end follows a workflow's end, its Done's or its settle's.
+	end pipeline.WorkflowEnd
+	// killedCheckInterval replaces the const of the name when set; only
+	// tests set it.
+	killedCheckInterval time.Duration
 }
 
 // Next blocks until it provides the next workflow to execute.
@@ -132,6 +134,68 @@ func (s *RPC) Wait(c context.Context, workflowID string) (canceled bool, err err
 	return false, nil
 }
 
+// killedCheckInterval is how often WaitKilled checks the workflow's
+// stored state.
+const killedCheckInterval = 15 * time.Second
+
+// WaitKilled blocks, for a workflow its agent was told canceled, until its
+// finalizers are to be stopped too: the queue tells, or the workflow is
+// stored ended. The queue does not have a task after a server restart: a
+// second cancel then kills the workflow in the store only, which this
+// checks every killedCheckInterval.
+func (s *RPC) WaitKilled(c context.Context, workflowID string) (killed bool, err error) {
+	agent, err := s.getAgentFromContext(c)
+	if err != nil {
+		return false, err
+	}
+
+	if err := s.checkAgentPermissionByWorkflow(c, agent, workflowID, nil, nil); err != nil {
+		return false, err
+	}
+
+	ctx, cancel := context.WithCancelCause(c)
+	defer cancel(nil)
+	waited := make(chan error, 1)
+	go func() { waited <- s.scheduler.WaitKilled(ctx, workflowID) }()
+
+	interval := s.killedCheckInterval
+	if interval == 0 {
+		interval = killedCheckInterval
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case err := <-waited:
+			if errors.Is(err, queue.ErrCancel) {
+				log.Debug().Str("workflowID", workflowID).Msg("the queue stops the canceled workflow's finalizers")
+				return true, nil
+			}
+			return false, err
+		case <-ticker.C:
+			if s.workflowEnded(workflowID) {
+				log.Debug().Str("workflowID", workflowID).Msg("the workflow ended: its finalizers stop")
+				return true, nil
+			}
+		}
+	}
+}
+
+// workflowEnded reports whether the workflow of id is stored ended; not
+// when it cannot tell.
+func (s *RPC) workflowEnded(id string) bool {
+	workflowID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return false
+	}
+	workflow, err := s.store.WorkflowLoad(workflowID)
+	if err != nil {
+		log.Error().Err(err).Str("workflowID", id).Msg("cannot load the workflow waiting to be killed")
+		return false
+	}
+	return workflow.State.IsDone()
+}
+
 // Extend extends the lease for the workflow with the given ID.
 func (s *RPC) Extend(c context.Context, workflowID string) error {
 	agent, err := s.getAgentFromContext(c)
@@ -149,6 +213,26 @@ func (s *RPC) Extend(c context.Context, workflowID string) error {
 	}
 
 	return s.scheduler.Extend(c, agent.ID, workflowID)
+}
+
+// ExtendFinalizing extends the lease for the workflow with the given ID, its
+// agent telling when its finalizers' time ends.
+func (s *RPC) ExtendFinalizing(c context.Context, workflowID string, finalizeDeadline time.Time) error {
+	agent, err := s.getAgentFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	err = s.updateAgentLastWork(agent)
+	if err != nil {
+		return err
+	}
+
+	if err := s.checkAgentPermissionByWorkflow(c, agent, workflowID, nil, nil); err != nil {
+		return err
+	}
+
+	return s.scheduler.ExtendFinalizing(c, agent.ID, workflowID, finalizeDeadline)
 }
 
 // Update let agent updates the step state at the server.
@@ -211,7 +295,7 @@ func (s *RPC) Update(c context.Context, strWorkflowID string, state rpc.StepStat
 		return err
 	}
 
-	if err := pipeline.UpdateStepStatus(c, s.store, step, state); err != nil {
+	if err := pipeline.UpdateStepStatus(c, s.store, s.end, step, state); err != nil {
 		log.Error().Err(err).Msg("rpc.update: cannot update step")
 	}
 
@@ -290,14 +374,23 @@ func (s *RPC) Init(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 	}
 
 	if currentPipeline.Status == model.StatusPending {
-		if currentPipeline, err = pipeline.UpdateToStatusRunning(s.store, *currentPipeline, state.Started); err != nil {
+		// only a pending one: a cancel claimed meanwhile stays
+		started, won, err := pipeline.UpdateToStatusRunning(s.store, *currentPipeline, state.Started)
+		switch {
+		case err != nil:
 			log.Error().Err(err).Msgf("init: cannot update pipeline %d state", currentPipeline.ID)
+		case won:
+			currentPipeline = started
+		default:
+			if latest, err := s.store.GetPipeline(currentPipeline.ID); err == nil {
+				currentPipeline = latest
+			}
 		}
 	}
 
 	event := currentPipeline.Event
 	defer func() {
-		markStatuses(event, workflow.PipelineID, workflow.ID)
+		s.end.MarkStatuses(event, workflow.PipelineID, workflow.ID)
 		currentPipeline.Workflows, _ = s.store.WorkflowGetTree(currentPipeline)
 
 		if err := s.scheduler.PublishPipelineEvent(c, repo, currentPipeline); err != nil {
@@ -305,9 +398,12 @@ func (s *RPC) Init(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 		}
 	}()
 
-	workflow, err = pipeline.UpdateWorkflowStatusToRunning(s.store, *workflow, state)
-	if err != nil {
+	// only a pending one: an Init retried, or a cancel that skipped it
+	// meanwhile, leaves it as it is
+	if _, won, err := pipeline.UpdateWorkflowStatusToRunning(s.store, *workflow, state); err != nil {
 		return err
+	} else if !won {
+		log.Debug().Msgf("init: workflow %d is not pending any more", workflow.ID)
 	}
 
 	return s.updateAgentLastWork(agent)
@@ -355,6 +451,7 @@ func (s *RPC) Done(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 
 	// check workflow's own state to prevent finishing an already-finished or blocked workflow
 	if err := checkWorkflowState(workflow.State); err != nil {
+		s.releaseEnded(c, strWorkflowID, workflow.State)
 		return err
 	}
 
@@ -371,13 +468,26 @@ func (s *RPC) Done(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 	logger.Debug().Msgf("workflow state in store: %#v", workflow)
 	logger.Debug().Msgf("gRPC Done with state: %#v", state)
 
-	// Complete any still-running children (e.g. service containers) before
-	// computing the workflow status, so their final state is reflected.
-	s.completeChildrenIfParentCompleted(workflow, state)
+	// End any still-running children (e.g. service containers) before
+	// computing the workflow status, so their final state is reflected;
+	// they are written once the workflow's end is.
+	ended := s.completeChildrenIfParentCompleted(workflow, state)
 
 	if workflow, err = pipeline.UpdateWorkflowStatusToDone(s.store, *workflow, state); err != nil {
+		if errors.Is(err, pipeline.ErrWorkflowEnded) {
+			// settled or swept meanwhile: that end stands
+			logger.Warn().Msg("done: the workflow ended already")
+			if stored, err := s.store.WorkflowLoad(workflowID); err == nil {
+				s.releaseEnded(c, strWorkflowID, stored.State)
+			}
+			return nil
+		}
+		// not written: the agent tries again, the compare-and-set making that
+		// safe; nothing else is written, the queue keeps it
 		logger.Error().Err(err).Msgf("pipeline.UpdateWorkflowStatusToDone: cannot update workflow state: %s", err)
+		return err
 	}
+	s.storeSteps(ended)
 
 	// The queue gets the status the workflow was stored with: the workflows
 	// depending on it run or not by it.
@@ -391,55 +501,8 @@ func (s *RPC) Done(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 		logger.Error().Err(queueErr).Msg("queue.Done: cannot ack workflow")
 	}
 
-	currentPipeline.Workflows, err = s.store.WorkflowGetTree(currentPipeline)
-	if err != nil {
+	if err := s.end.Ended(c, logger, repo, currentPipeline, workflow); err != nil {
 		return err
-	}
-
-	event := currentPipeline.Event
-	if !model.IsThereRunningStage(currentPipeline.Workflows) {
-		// use the latest finish time of all workflows
-		finished := workflow.Finished
-		for _, w := range currentPipeline.Workflows {
-			finished = max(finished, w.Finished)
-		}
-		if finished == 0 {
-			finished = time.Now().Unix()
-		}
-
-		if currentPipeline, err = pipeline.UpdateStatusToDone(s.store, *currentPipeline, pipeline.PipelineStatus(currentPipeline.Workflows), finished); err != nil {
-			logger.Error().Err(err).Msgf("pipeline.UpdateStatusToDone: cannot update workflows final state")
-		}
-	}
-
-	markStatuses(event, workflow.PipelineID, workflow.ID)
-
-	// make sure writes to pubsub are non blocking (https://github.com/woodpecker-ci/woodpecker/blob/c919f32e0b6432a95e1a6d3d0ad662f591adf73f/server/logging/log.go#L9)
-	go func() {
-		for _, step := range workflow.Children {
-			if step.State != model.StatusSkipped {
-				if err := s.logger.Close(c, step.ID); err != nil {
-					// A step killed before it ran never opened a stream.
-					if errors.Is(err, logging.ErrNotFound) {
-						logger.Debug().Err(err).Msgf("done: no log stream to close for step %d", step.ID)
-					} else {
-						logger.Error().Err(err).Msgf("done: cannot close log stream for step %d", step.ID)
-					}
-				}
-			}
-		}
-	}()
-
-	if err := s.scheduler.PublishPipelineEvent(c, repo, currentPipeline); err != nil {
-		return err
-	}
-
-	if currentPipeline.Status == model.StatusSuccess || currentPipeline.Status == model.StatusFailure || currentPipeline.Status == model.StatusTimeout {
-		s.pipelineCount.WithLabelValues(repo.FullName, currentPipeline.Branch, string(currentPipeline.Status), "total").Inc()
-		s.pipelineTime.WithLabelValues(repo.FullName, currentPipeline.Branch, string(currentPipeline.Status), "total").Set(float64(currentPipeline.Finished - currentPipeline.Started))
-	}
-	if currentPipeline.IsMultiPipeline() {
-		s.pipelineTime.WithLabelValues(repo.FullName, currentPipeline.Branch, string(workflow.State), workflow.Name).Set(float64(workflow.Finished - workflow.Started))
 	}
 
 	return s.updateAgentLastWork(agent)
@@ -574,24 +637,48 @@ func (s *RPC) ReportHealth(ctx context.Context, status string) error {
 	return s.store.AgentUpdate(agent)
 }
 
-// completeChildrenIfParentCompleted ends the steps of a done workflow still
-// pending or running. A step the workflow's end stopped was killed; one that
-// never started when the workflow timed out is canceled, as after a cancel:
-// it was not killed by anyone.
-func (s *RPC) completeChildrenIfParentCompleted(completedWorkflow *model.Workflow, state rpc.WorkflowState) {
+// completeChildrenIfParentCompleted ends, in memory, the steps of a done
+// workflow still pending or running, and returns them to be written once
+// the workflow's end is. A step the workflow's end stopped was killed (a
+// service: success); one that never started when the workflow was canceled
+// or timed out is canceled: it was not killed by anyone.
+func (s *RPC) completeChildrenIfParentCompleted(completedWorkflow *model.Workflow, state rpc.WorkflowState) []*model.Step {
+	var ended []*model.Step
 	for _, c := range completedWorkflow.Children {
-		if c.Running() {
-			status := model.StatusKilled
-			if state.TimedOut && c.Started == 0 {
-				status = model.StatusCanceled
-			}
-			if updated, err := pipeline.UpdateStepToStatusSkipped(s.store, *c, state.Finished, status); err != nil {
-				log.Error().Err(err).Msgf("done: cannot update step_id %d child state", c.ID)
-			} else {
-				// Update in-memory state so WorkflowStatus sees the final state
-				c.State = updated.State
-				c.Finished = updated.Finished
-			}
+		if !c.Running() {
+			continue
+		}
+		end := pipeline.StepEndWorkflowDone
+		if state.Canceled || state.TimedOut {
+			end = pipeline.StepEndWorkflowStopped
+		}
+		c.State = pipeline.StepEndState(c, end)
+		if c.Started != 0 {
+			c.Finished = state.Finished
+		}
+		ended = append(ended, c)
+	}
+	return ended
+}
+
+// releaseEnded drops from the queue a workflow its agent reports done that
+// ended already (settled, swept), with the state it ended with, so that its
+// agent does not hold it any more; not one blocked, which never ran.
+func (s *RPC) releaseEnded(c context.Context, workflowID string, state model.StatusValue) {
+	if state == model.StatusBlocked {
+		return
+	}
+	if err := s.scheduler.Done(c, workflowID, state); err != nil && !errors.Is(err, queue.ErrNotFound) {
+		log.Error().Err(err).Str("workflow_id", workflowID).Msg("cannot release an ended workflow from the queue")
+	}
+}
+
+// storeSteps writes the ends of steps not ended meanwhile, logging what it
+// cannot.
+func (s *RPC) storeSteps(steps []*model.Step) {
+	for _, step := range steps {
+		if _, err := s.store.StepFinish(step, model.StatusPending, model.StatusRunning); err != nil {
+			log.Error().Err(err).Msgf("done: cannot update step_id %d child state", step.ID)
 		}
 	}
 }
@@ -632,14 +719,4 @@ func (s *RPC) updateAgentLastWork(agent *model.Agent) error {
 	}
 
 	return nil
-}
-
-// markStatuses has the status of the workflow sent to its forge; of every
-// workflow of the pipeline for a deployment, whose status they show.
-func markStatuses(event model.WebhookEvent, pipelineID, workflowID int64) {
-	if event == model.EventDeploy {
-		server.Config.Services.Statuses.Pipeline(pipelineID)
-		return
-	}
-	server.Config.Services.Statuses.Workflow(pipelineID, workflowID)
 }

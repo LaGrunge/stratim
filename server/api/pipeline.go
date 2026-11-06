@@ -562,7 +562,8 @@ func CancelPipeline(c *gin.Context) {
 
 	pl := session.Pipeline(c)
 
-	if err := pipeline.Cancel(c, _forge, _store, repo, user, pl, &model.CancelInfo{
+	end, _ := pipeline.WorkflowEndFromContext(c)
+	if err := pipeline.Cancel(c, _forge, _store, end, repo, user, pl, &model.CancelInfo{
 		CanceledByUser: user.Login,
 	}); err != nil {
 		handlePipelineErr(c, err)

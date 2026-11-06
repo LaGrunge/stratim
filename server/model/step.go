@@ -38,6 +38,9 @@ type Step struct {
 	Finished   int64       `json:"finished,omitempty"   xorm:"finished"`
 	Type       StepType    `json:"type,omitempty"       xorm:"type"`
 	DependsOn  []string    `json:"depends_on,omitempty" xorm:"json 'depends_on'"`
+	// Finalizer is set for an on_finish step: a cancel leaves it to the
+	// agent, which runs it after the other steps were stopped.
+	Finalizer bool `json:"finalizer,omitempty" xorm:"NOT NULL DEFAULT false 'finalizer'"`
 } //	@name	Step
 
 // TableName return database table name for xorm.

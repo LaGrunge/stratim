@@ -35,29 +35,33 @@ const (
 	checkItems = 10
 )
 
-// Run starts the cron scheduler loop.
+// Run starts the cron scheduler loop. The pipelines it creates get ctx:
+// what it carries (the server's end of workflows, for the cancel of
+// previous pipelines) reaches them.
 func Run(ctx context.Context, store store.Store) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-time.After(checkTime):
-			go func() {
-				now := time.Now()
-				log.Trace().Msg("cron: fetch next crons")
+			go RunDue(ctx, store, time.Now())
+		}
+	}
+}
 
-				crons, err := store.CronListNextExecute(now.Unix(), checkItems)
-				if err != nil {
-					log.Error().Err(err).Int64("now", now.Unix()).Msg("obtain cron list")
-					return
-				}
+// RunDue runs the crons due at now, as Run does every checkTime.
+func RunDue(ctx context.Context, store store.Store, now time.Time) {
+	log.Trace().Msg("cron: fetch next crons")
 
-				for _, cron := range crons {
-					if err := runCron(ctx, store, cron, now); err != nil {
-						log.Error().Err(err).Int64("cronID", cron.ID).Msg("run cron failed")
-					}
-				}
-			}()
+	crons, err := store.CronListNextExecute(now.Unix(), checkItems)
+	if err != nil {
+		log.Error().Err(err).Int64("now", now.Unix()).Msg("obtain cron list")
+		return
+	}
+
+	for _, cron := range crons {
+		if err := runCron(ctx, store, cron, now); err != nil {
+			log.Error().Err(err).Int64("cronID", cron.ID).Msg("run cron failed")
 		}
 	}
 }

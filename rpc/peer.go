@@ -15,7 +15,10 @@
 
 package rpc
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Peer defines the bidirectional communication interface between Woodpecker agents and servers.
 //
@@ -127,6 +130,16 @@ type Peer interface {
 	//   - canceled=false, err!=nil: Communication error, agent should retry or handle error
 	Wait(c context.Context, workflowID string) (canceled bool, err error)
 
+	// WaitKilled blocks, once Wait reported the workflow canceled, until its
+	// finalizers are to be stopped too: a second cancel, or the server giving
+	// up on the workflow (its lease is over, or it no longer has it).
+	//
+	// Returns:
+	//   - killed=true, err=nil: stop the finalizers
+	//   - killed=false, err=nil: the context ended first
+	//   - killed=false, err!=nil: Communication error
+	WaitKilled(c context.Context, workflowID string) (killed bool, err error)
+
 	// Init signals to the server that the workflow has been initialized and execution has started.
 	//
 	// This is called once per workflow immediately after the agent accepts it from Next()
@@ -191,6 +204,12 @@ type Peer interface {
 	//   - nil on success (timeout was extended)
 	//   - error if communication fails or workflow is not found
 	Extend(c context.Context, workflowID string) error
+
+	// ExtendFinalizing is Extend once the workflow's finalizers started,
+	// telling when their time ends: the server holds a canceled workflow for
+	// its agent until then, and a grace, instead of counting their time from
+	// the cancel.
+	ExtendFinalizing(c context.Context, workflowID string, finalizeDeadline time.Time) error
 
 	// Update reports step state changes to the server as the workflow progresses.
 	//

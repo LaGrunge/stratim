@@ -21,7 +21,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -30,6 +29,7 @@ import (
 
 	"go.woodpecker-ci.org/woodpecker/v3/rpc/proto"
 	"go.woodpecker-ci.org/woodpecker/v3/server/logging"
+	"go.woodpecker-ci.org/woodpecker/v3/server/pipeline"
 	"go.woodpecker-ci.org/woodpecker/v3/server/scheduler"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 )
@@ -44,11 +44,9 @@ type ServeConfig struct {
 	JWTSecret        string
 	AgentToken       string
 	KeepaliveMinTime time.Duration
-	// Registerer is where the server's prometheus metrics are registered.
-	// Pass prometheus.DefaultRegisterer in production; pass a fresh
-	// prometheus.NewRegistry() in tests to avoid duplicate-registration
-	// panics when the server is created multiple times.
-	Registerer prometheus.Registerer
+	// WorkflowEnd follows the end of the workflows the agents report done,
+	// or that are settled: the server's one (server.Config.Services).
+	WorkflowEnd pipeline.WorkflowEnd
 }
 
 // errServerShutdown is the cancel cause of long-polling RPCs that got
@@ -79,7 +77,7 @@ func Serve(ctx context.Context, cfg ServeConfig) error {
 	)
 
 	proto.RegisterWoodpeckerServer(grpcServer, NewWoodpeckerServer(
-		cfg.Scheduler, cfg.Logger, cfg.Store, cfg.Registerer,
+		cfg.Scheduler, cfg.Logger, cfg.Store, cfg.WorkflowEnd,
 	))
 	proto.RegisterWoodpeckerAuthServer(grpcServer, NewWoodpeckerAuthServer(
 		jwtManager, cfg.AgentToken, cfg.Store,

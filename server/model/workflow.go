@@ -21,7 +21,7 @@ type Workflow struct {
 	PipelineID int64             `json:"pipeline_id"          xorm:"UNIQUE(s) INDEX 'pipeline_id'"`
 	PID        int               `json:"pid"                  xorm:"UNIQUE(s) 'pid'"`
 	Name       string            `json:"name"                 xorm:"name"`
-	State      StatusValue       `json:"state"                xorm:"state"`
+	State      StatusValue       `json:"state"                xorm:"INDEX 'state'"`
 	Error      string            `json:"error,omitempty"      xorm:"TEXT 'error'"`
 	Started    int64             `json:"started,omitempty"    xorm:"started"`
 	Finished   int64             `json:"finished,omitempty"   xorm:"finished"`

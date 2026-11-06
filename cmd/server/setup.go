@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/urfave/cli/v3"
@@ -39,6 +40,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/forgestatus"
 	"go.woodpecker-ci.org/woodpecker/v3/server/logging"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/pipeline"
 	"go.woodpecker-ci.org/woodpecker/v3/server/pubsub/memory"
 	"go.woodpecker-ci.org/woodpecker/v3/server/queue"
 	"go.woodpecker-ci.org/woodpecker/v3/server/scheduler"
@@ -110,6 +112,26 @@ func checkSqliteFileExist(path string) error {
 		return nil
 	}
 	return err
+}
+
+// setupWorkflowEnd is what follows every workflow's end, through the
+// server's services, which are set up by then; its metrics registered into
+// registerer.
+func setupWorkflowEnd(s store.Store, registerer prometheus.Registerer) pipeline.WorkflowEnd {
+	return pipeline.WorkflowEnd{
+		Store:     s,
+		Publisher: server.Config.Services.Scheduler,
+		Logs:      server.Config.Services.Logs,
+		Statuses:  server.Config.Services.Statuses,
+		Metrics:   newWorkflowEndMetrics(registerer),
+	}
+}
+
+// startCanceledWorkflowsSweep kills, now and every minute, the workflows a
+// cancel left that nothing ends any more once their time is up (a restart
+// loses the queue's running tasks), their ends followed by end.
+func startCanceledWorkflowsSweep(ctx context.Context, end pipeline.WorkflowEnd) {
+	go pipeline.RunCanceledWorkflowsSweep(ctx, end, pipeline.SweepInterval)
 }
 
 func setupQueue(ctx context.Context, s store.Store) (queue.Queue, error) {

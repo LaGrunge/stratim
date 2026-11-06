@@ -136,6 +136,31 @@ func (q *persistentQueue) PushAtOnce(c context.Context, tasks []*model.Task) err
 // Poll retrieves and removes a task head of this queue.
 func (q *persistentQueue) Poll(c context.Context, agentID int64, f func(*model.Task) (bool, int)) (*model.Task, error) {
 	task, err := q.Queue.Poll(c, agentID, f)
+	if task != nil && task.PipelineID != 0 {
+		// Its pipeline canceled (or ended) after the task was stored and
+		// before the cancel evicted it, as when the server stopped in
+		// between: the task was restored with the queue. It must not run.
+		ended, lookupErr := q.pipelineEnded(task.PipelineID)
+		switch {
+		case lookupErr != nil:
+			// Cannot tell: not handed out this time. It keeps its stored copy
+			// and its place in the queue's running tasks, whose lease expires
+			// and puts it back for a later poll; the agent polls on, for
+			// other tasks.
+			log.Error().Err(lookupErr).Msgf("pull queue item: %s: cannot load pipeline %d, retried later", task.ID, task.PipelineID)
+			return nil, nil
+		case ended:
+			// its dependents see it killed, and the sweep ends the workflow
+			log.Warn().Msgf("pull queue item: %s: pipeline ended, dropping canceled task", task.ID)
+			if deleteErr := q.store.TaskDelete(task.ID); deleteErr != nil && !errors.Is(deleteErr, types.ErrRecordNotExist) {
+				log.Error().Err(deleteErr).Msgf("pull queue item: %s: failed to remove from backup", task.ID)
+			}
+			if dropErr := q.Queue.Done(c, task.ID, model.StatusKilled); dropErr != nil {
+				log.Error().Err(dropErr).Msgf("pull queue item: %s: failed to drop canceled task", task.ID)
+			}
+			return nil, nil
+		}
+	}
 	if task != nil {
 		log.Debug().Msgf("pull queue item: %s: remove from backup", task.ID)
 		if deleteErr := q.store.TaskDelete(task.ID); deleteErr != nil {
@@ -192,6 +217,16 @@ func (q *persistentQueue) Poll(c context.Context, agentID int64, f func(*model.T
 	return task, err
 }
 
+// pipelineEnded reports whether the pipeline of id ended: canceled, or
+// ended otherwise.
+func (q *persistentQueue) pipelineEnded(id int64) (bool, error) {
+	pipeline, err := q.store.GetPipeline(id)
+	if err != nil {
+		return false, err
+	}
+	return pipeline.Status.IsDone(), nil
+}
+
 // Done signals the task is complete.
 func (q *persistentQueue) Done(c context.Context, id string, exitStatus model.StatusValue) error {
 	if err := q.Queue.Done(c, id, exitStatus); err != nil {
@@ -222,13 +257,25 @@ func (q *persistentQueue) Error(c context.Context, id string, err error) error {
 	return nil
 }
 
+// CancelAtOnce cancels the tasks, see Queue, and removes them from the
+// store, also when the queue does not hold some of them (ErrNotFound): the
+// stored ones would be restored after a restart and run.
+func (q *persistentQueue) CancelAtOnce(c context.Context, ids []string, escalate bool) ([]string, error) {
+	canceling, err := q.Queue.CancelAtOnce(c, ids, escalate)
+	return canceling, errors.Join(err, q.deleteTasks(ids))
+}
+
 // ErrorAtOnce signals multiple tasks are done and complete with an error.
 // If still pending they will just get removed from the queue.
 func (q *persistentQueue) ErrorAtOnce(c context.Context, ids []string, err error) error {
 	if err := q.Queue.ErrorAtOnce(c, ids, err); err != nil {
 		return err
 	}
+	return q.deleteTasks(ids)
+}
 
+// deleteTasks removes tasks from the store, those not in it aside.
+func (q *persistentQueue) deleteTasks(ids []string) error {
 	var errs []error
 	for _, id := range ids {
 		if deleteErr := q.store.TaskDelete(id); deleteErr != nil && !errors.Is(deleteErr, types.ErrRecordNotExist) {

@@ -79,6 +79,10 @@ func TestSchema(t *testing.T) {
 			testFile: ".woodpecker/test-workspace.yaml",
 		},
 		{
+			name:     "On finish and statuses",
+			testFile: ".woodpecker/test-on-finish.yaml",
+		},
+		{
 			name:     "Labels",
 			testFile: ".woodpecker/test-labels.yaml",
 		},

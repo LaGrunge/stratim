@@ -31,6 +31,7 @@ import (
 
 	"github.com/cenkalti/backoff/v7"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -40,6 +41,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	cron_scheduler "go.woodpecker-ci.org/woodpecker/v3/server/cron"
 	"go.woodpecker-ci.org/woodpecker/v3/server/metric"
+	"go.woodpecker-ci.org/woodpecker/v3/server/pipeline"
 	"go.woodpecker-ci.org/woodpecker/v3/server/router"
 	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
@@ -121,6 +123,10 @@ func run(ctx context.Context, c *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("can't setup globals: %w", err)
 	}
+	// one end of workflows for an agent's Done, a settle, a cancel (from the
+	// API, a webhook, a cron, a step) and the sweep
+	end := setupWorkflowEnd(_store, prometheus.DefaultRegisterer)
+	startCanceledWorkflowsSweep(ctx, end)
 
 	// wait for all services until one do stops with an error
 	serviceWaitingGroup := errgroup.Group{}
@@ -134,7 +140,7 @@ func run(ctx context.Context, c *cli.Command) error {
 
 	serviceWaitingGroup.Go(func() error {
 		log.Info().Msg("starting cron service ...")
-		if err := cron_scheduler.Run(ctx, _store); err != nil {
+		if err := cron_scheduler.Run(pipeline.InjectWorkflowEnd(ctx, end), _store); err != nil {
 			go stopServerFunc(err)
 			return err
 		}
@@ -145,7 +151,7 @@ func run(ctx context.Context, c *cli.Command) error {
 	// start the grpc server
 	serviceWaitingGroup.Go(func() error {
 		log.Info().Msg("starting grpc server ...")
-		if err := runGrpcServer(ctx, c, _store); err != nil {
+		if err := runGrpcServer(ctx, c, _store, end); err != nil {
 			// stop whole server as grpc is essential
 			go stopServerFunc(err)
 			return err
@@ -183,6 +189,7 @@ func run(ctx context.Context, c *cli.Command) error {
 		middleware.Logger(time.RFC3339, true),
 		middleware.Version,
 		middleware.Store(_store),
+		middleware.WorkflowEnd(end),
 	)
 
 	if c.String("server-cert") != "" {

@@ -20,7 +20,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -47,6 +46,7 @@ func TestServeReleasesPollingAgentsOnShutdown(t *testing.T) {
 
 	polling := make(chan struct{})
 	sched := mocks.NewMockScheduler(t)
+	sched.On("SetCanceledExpiredHandler", mock.Anything).Maybe()
 	sched.On("Poll", mock.Anything, int64(1), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			close(polling)
@@ -62,11 +62,10 @@ func TestServeReleasesPollingAgentsOnShutdown(t *testing.T) {
 	served := make(chan error, 1)
 	go func() {
 		served <- Serve(serveCtx, ServeConfig{
-			Listener:   lis,
-			Store:      store,
-			Scheduler:  sched,
-			JWTSecret:  jwtSecret,
-			Registerer: prometheus.NewRegistry(),
+			Listener:  lis,
+			Store:     store,
+			Scheduler: sched,
+			JWTSecret: jwtSecret,
 		})
 	}()
 

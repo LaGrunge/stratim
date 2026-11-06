@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -228,11 +229,10 @@ func (b *PipelineBuilder) genItemForWorkflow(workflow *Workflow, axis matrix.Axi
 	}
 
 	if len(item.RunsOn) == 0 {
-		if parsed.When.IncludesStatusFailure(workflowMetadata, true, environ) {
-			item.RunsOn = append(item.RunsOn, "failure")
-		}
-		if parsed.When.IncludesStatusSuccess(workflowMetadata, true, environ) {
-			item.RunsOn = append(item.RunsOn, "success")
+		statuses, unfiltered := parsed.When.MatchingStatuses(workflowMetadata, true, environ)
+		item.RunsOn = statuses
+		if unfiltered && !slices.Contains(statuses, pipeline.StatusSuccess) {
+			item.RunsOn = append(item.RunsOn, pipeline.StatusSuccess)
 		}
 	}
 

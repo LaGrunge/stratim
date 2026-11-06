@@ -18,6 +18,7 @@ import (
 	"container/list"
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
@@ -32,6 +33,32 @@ type entry struct {
 	done     chan bool
 	error    error
 	deadline time.Time
+	// canceling is set once the task was canceled while running: its agent
+	// was told (done is closed) and stops it, its finalizers may still run.
+	// It holds its lease, and its agent, until Done or its lease expires.
+	canceling bool
+	// canceledAt is when it was canceled: its lease is extended for its
+	// finalizers' time and a grace from then, not longer.
+	canceledAt time.Time
+	// finalizeDeadline is when its finalizers' time ends, as its agent
+	// reported it (ExtendFinalizing); zero if it did not.
+	finalizeDeadline time.Time
+	// killed is closed by a second cancel, which stops its finalizers too,
+	// or once the queue gives up on it: its lease expired or was capped, or
+	// it left the queue. Set when it is canceled.
+	killed chan bool
+}
+
+// kill closes the killed channel of a canceling entry, once.
+func (e *entry) kill() {
+	if e.killed == nil {
+		return
+	}
+	select {
+	case <-e.killed:
+	default:
+		close(e.killed)
+	}
 }
 
 type worker struct {
@@ -50,12 +77,35 @@ type fifo struct {
 	pending       *list.List
 	waitingOnDeps *list.List
 	extension     time.Duration
+	// canceledGrace is how long past its finalizers' time a canceled task's
+	// lease is extended.
+	canceledGrace time.Duration
 	paused        bool
+	// onCanceledExpired settles a canceled task whose lease expired before
+	// its Done: its agent is gone. Nil if not set.
+	onCanceledExpired func(task *model.Task)
 }
 
 // processTimeInterval is the time till the queue rearranges things,
 // as the agent pull in 10 milliseconds we should also give them work asap.
 const processTimeInterval = 100 * time.Millisecond
+
+// canceledLeaseGrace is how long past its finalizers' time the lease of a
+// canceled task is extended: the regular steps stopping, and the agent's
+// own grace (a minute), fit in it.
+const canceledLeaseGrace = 2 * time.Minute
+
+// maxFinalizeStartDelay bounds how much later than its finalizers' time
+// counted from the cancel the end its agent reports may be: the time its
+// regular steps took to stop.
+const maxFinalizeStartDelay = 15 * time.Minute
+
+// MaxCanceledHold is how long after its cancel the queue holds a canceled
+// task whose finalizers' time is finalizeTimeout at most: its lease extended
+// until the latest end its agent may report and the grace, then expiring.
+func MaxCanceledHold(finalizeTimeout time.Duration) time.Duration {
+	return finalizeTimeout + canceledLeaseGrace + maxFinalizeStartDelay + constant.TaskTimeout + processTimeInterval
+}
 
 // NewMemoryQueue returns a new fifo queue.
 func NewMemoryQueue(ctx context.Context) Queue {
@@ -66,6 +116,7 @@ func NewMemoryQueue(ctx context.Context) Queue {
 		pending:       list.New(),
 		waitingOnDeps: list.New(),
 		extension:     constant.TaskTimeout,
+		canceledGrace: canceledLeaseGrace,
 		paused:        false,
 	}
 	go q.process()
@@ -111,55 +162,99 @@ func (q *fifo) Poll(c context.Context, agentID int64, filter func(*model.Task) (
 
 // Done signals the task is complete.
 func (q *fifo) Done(_ context.Context, id string, exitStatus model.StatusValue) error {
-	return q.finished([]string{id}, exitStatus, nil)
+	_, err := q.finished([]string{id}, exitStatus, nil, false)
+	return err
 }
 
 // Error signals the task is done with an error.
 func (q *fifo) Error(_ context.Context, id string, err error) error {
-	return q.finished([]string{id}, model.StatusFailure, err)
+	_, err = q.finished([]string{id}, model.StatusFailure, err, false)
+	return err
 }
 
 // ErrorAtOnce signals multiple tasks are done and complete with an error.
 // If still pending they will just get removed from the queue.
 func (q *fifo) ErrorAtOnce(_ context.Context, ids []string, err error) error {
 	if errors.Is(err, ErrCancel) {
-		return q.finished(ids, model.StatusKilled, err)
+		_, err := q.finished(ids, model.StatusKilled, err, false)
+		return err
 	}
-	return q.finished(ids, model.StatusFailure, err)
+	_, err = q.finished(ids, model.StatusFailure, err, false)
+	return err
+}
+
+// CancelAtOnce cancels the tasks as ErrorAtOnce with ErrCancel does, and
+// returns the ones canceling: running, their agents told and stopping them,
+// the ones canceled before told to stop their finalizers too.
+func (q *fifo) CancelAtOnce(_ context.Context, ids []string, escalate bool) ([]string, error) {
+	return q.finished(ids, model.StatusKilled, ErrCancel, escalate)
 }
 
 // locks the queue itself!
-func (q *fifo) finished(ids []string, exitStatus model.StatusValue, err error) error {
+func (q *fifo) finished(ids []string, exitStatus model.StatusValue, err error, escalate bool) (canceling []string, _ error) {
 	q.Lock()
 	defer q.Unlock()
 
 	// it's an external error so we wrap it
 	err = NewErrExternal(err)
 
+	canceled := errors.Is(err, ErrCancel)
 	var errs []error
+	updated := make(map[string]model.StatusValue, len(ids))
 	// we first process the tasks itself
 	for _, id := range ids {
-		if taskEntry, ok := q.running[id]; ok {
+		taskEntry, ok := q.running[id]
+		status := exitStatus
+		if ok {
+			status = depStatus(taskEntry.item, exitStatus)
+		}
+		switch {
+		case !ok:
+			errs = append(errs, q.removeFromPendingAndWaiting(id))
+		case taskEntry.canceling && canceled:
+			// canceled again: only an explicit second cancel (escalate) stops its
+			// finalizers too
+			if escalate {
+				taskEntry.kill()
+			}
+			canceling = append(canceling, id)
+			continue
+		case taskEntry.canceling:
+			// its agent reports it done after the cancel
+			taskEntry.kill()
+			delete(q.running, id)
+		case canceled:
+			// its agent stops it, and runs its finalizers: it stays running,
+			// holding its lease and its agent, until Done or its lease expires
+			taskEntry.error = err
+			close(taskEntry.done)
+			taskEntry.canceling = true
+			taskEntry.canceledAt = time.Now()
+			taskEntry.killed = make(chan bool)
+			canceling = append(canceling, id)
+		default:
 			taskEntry.error = err
 			close(taskEntry.done)
 			delete(q.running, id)
-		} else {
-			errs = append(errs, q.removeFromPendingAndWaiting(id))
 		}
+		updated[id] = status
 	}
 
 	// next we aim for there dependencies
 	// we do this because in our ids list there could be tasks and its dependencies
 	// so not to mess things up
 	for _, id := range ids {
-		q.updateDepStatusInQueue(id, exitStatus)
+		if status, ok := updated[id]; ok {
+			q.updateDepStatusInQueue(id, status)
+		}
 	}
 
-	return errors.Join(errs...)
+	return canceling, errors.Join(errs...)
 }
 
 // Wait waits until the item is done executing.
-// Also signals via error ErrCancel if workflow got canceled.
+// Also signals via error ErrCancel if workflow got canceled, as often as
+// asked once canceled.
 func (q *fifo) Wait(ctx context.Context, taskID string) error {
 	q.Lock()
 	state := q.running[taskID]
@@ -181,21 +276,93 @@ func (q *fifo) Wait(ctx context.Context, taskID string) error {
 	return nil
 }
 
+// WaitKilled waits, for a task its agent was told canceled, until its
+// finalizers are to be stopped too: a second cancel, or the queue giving up
+// on it. It returns ErrCancel then; nil for a task not canceled, or when ctx
+// ends first. For a task the queue does not have, as after a server restart
+// (its agent's wait retried), it waits until ctx ends: the restart is no
+// reason to stop the finalizers, their time or the sweep ends them.
+func (q *fifo) WaitKilled(ctx context.Context, taskID string) error {
+	q.Lock()
+	state, ok := q.running[taskID]
+	var killed chan bool
+	if ok {
+		killed = state.killed
+	}
+	q.Unlock()
+	switch {
+	case !ok:
+		<-ctx.Done()
+		return nil
+	case killed == nil:
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return nil
+	case <-killed:
+		return ErrCancel
+	}
+}
+
 // Extend extends the task execution deadline.
 func (q *fifo) Extend(_ context.Context, agentID int64, taskID string) error {
+	return q.extend(agentID, taskID, time.Time{})
+}
+
+// ExtendFinalizing extends the task execution deadline, its agent telling
+// when its finalizers' time ends: a canceled task is held until then (and a
+// grace), not until its finalizers' time counted from the cancel.
+func (q *fifo) ExtendFinalizing(_ context.Context, agentID int64, taskID string, finalizeDeadline time.Time) error {
+	return q.extend(agentID, taskID, finalizeDeadline)
+}
+
+func (q *fifo) extend(agentID int64, taskID string, finalizeDeadline time.Time) error {
 	q.Lock()
 	defer q.Unlock()
 
 	state, ok := q.running[taskID]
-	if ok {
-		if state.item.AgentID != agentID {
-			return ErrAgentMissMatch
-		}
-
-		state.deadline = time.Now().Add(q.extension)
-		return nil
+	if !ok {
+		return ErrNotFound
 	}
-	return ErrNotFound
+	if state.item.AgentID != agentID {
+		return ErrAgentMissMatch
+	}
+	if !finalizeDeadline.IsZero() {
+		state.finalizeDeadline = finalizeDeadline
+	}
+	// a canceled task is held for its finalizers' time, not as long as its
+	// agent extends it: its lease then expires and it is settled
+	if state.canceling && time.Now().After(q.canceledLeaseEnd(state)) {
+		// the server gives up on it: a live agent stops its finalizers
+		state.kill()
+		return ErrCanceledLeaseOver
+	}
+
+	state.deadline = time.Now().Add(q.extension)
+	return nil
+}
+
+// canceledLeaseEnd is when the lease of a canceled task ends: the end of its
+// finalizers' time its agent reported, or, from an agent that reports none,
+// that time counted from the cancel; a grace after either. The finalizers
+// start once the regular steps stopped, so a reported end may come later,
+// but never more than maxFinalizeStartDelay later: an agent cannot hold it
+// for ever.
+func (q *fifo) canceledLeaseEnd(state *entry) time.Time {
+	finalize := time.Duration(state.item.FinalizeTimeout) * time.Second
+	fromCancel := state.canceledAt.Add(finalize + q.canceledGrace)
+	if state.finalizeDeadline.IsZero() {
+		return fromCancel
+	}
+	return minTime(state.finalizeDeadline.Add(q.canceledGrace), fromCancel.Add(maxFinalizeStartDelay))
+}
+
+func minTime(a, b time.Time) time.Time {
+	if a.Before(b) {
+		return a
+	}
+	return b
 }
 
 // Info returns internal queue information.
@@ -267,7 +434,12 @@ func (q *fifo) process() {
 			continue
 		}
 
-		q.resubmitExpiredPipelines()
+		canceledExpired := q.resubmitExpiredPipelines()
+		if handler := q.onCanceledExpired; handler != nil {
+			for _, task := range canceledExpired {
+				go handler(task)
+			}
+		}
 		q.filterWaiting()
 		for pending, worker := q.assignToWorker(); pending != nil && worker != nil; pending, worker = q.assignToWorker() {
 			task, _ := pending.Value.(*model.Task)
@@ -432,8 +604,38 @@ func taskOrderLess(a, b *model.Task) bool {
 	return a.Name < b.Name
 }
 
-func (q *fifo) resubmitExpiredPipelines() {
+// depStatus is the status task ended with for the tasks depending on it. A
+// task skipped while it waits for a skipped dependency (status: skipped)
+// waited for one that did not come: it counts as canceled for them, not as
+// a skip the ones waiting for a skip would run on.
+func depStatus(task *model.Task, status model.StatusValue) model.StatusValue {
+	if status == model.StatusSkipped && slices.Contains(task.RunOn, string(model.StatusSkipped)) {
+		return model.StatusCanceled
+	}
+	return status
+}
+
+// SetCanceledExpiredHandler sets what settles a canceled task whose lease
+// expired before its Done.
+func (q *fifo) SetCanceledExpiredHandler(handler func(task *model.Task)) {
+	q.Lock()
+	defer q.Unlock()
+	q.onCanceledExpired = handler
+}
+
+// resubmitExpiredPipelines puts the running tasks whose lease expired back
+// to pending, for another agent. A canceled one is not run again: it is
+// returned, to be settled by the caller once the queue is unlocked.
+// Expects the queue to be locked by the caller.
+func (q *fifo) resubmitExpiredPipelines() (canceledExpired []*model.Task) {
 	for taskID, taskState := range q.running {
+		if time.Now().After(taskState.deadline) && taskState.canceling {
+			log.Info().Str("task_id", taskID).Msg("queue: canceled task expired before its agent reported it done")
+			delete(q.running, taskID)
+			taskState.kill()
+			canceledExpired = append(canceledExpired, taskState.item)
+			continue
+		}
 		if time.Now().After(taskState.deadline) {
 			log.Info().Str("task_id", taskID).Msg("queue: resubmitting expired task")
 			taskState.error = ErrTaskExpired
@@ -442,6 +644,7 @@ func (q *fifo) resubmitExpiredPipelines() {
 			close(taskState.done)
 		}
 	}
+	return canceledExpired
 }
 
 func (q *fifo) depsInQueue(task *model.Task, pendingIDs map[string]struct{}) bool {
@@ -449,7 +652,8 @@ func (q *fifo) depsInQueue(task *model.Task, pendingIDs map[string]struct{}) boo
 		if _, ok := pendingIDs[dep]; ok {
 			return true
 		}
-		if _, ok := q.running[dep]; ok {
+		// a canceled one ended for its dependents: they got its status
+		if running, ok := q.running[dep]; ok && !running.canceling {
 			return true
 		}
 	}

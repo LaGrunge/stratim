@@ -313,6 +313,7 @@ func workflowsFromPipelineBuilder(pipeline *model.Pipeline, pipelineItems []*bui
 					Failure:    step.Failure,
 					Type:       model.StepType(step.Type),
 					DependsOn:  step.DependsOn,
+					Finalizer:  stage.Finalizer,
 				}
 
 				if pipeline.Status == model.StatusBlocked {
