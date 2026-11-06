@@ -82,6 +82,11 @@ func (g *RPC) LogFind(ctx context.Context, step *model.Step) ([]*model.LogEntry,
 	return resp, nil
 }
 
+// LogStream hands out the entries of LogFind: the addon protocol has no streaming call.
+func (g *RPC) LogStream(ctx context.Context, step *model.Step, fn func(*model.LogEntry) error) error {
+	return service_log.StreamFound(ctx, g.LogFind, step, fn)
+}
+
 func (g *RPC) LogAppend(ctx context.Context, step *model.Step, logEntries []*model.LogEntry) error {
 	args, err := json.Marshal(&argumentsAppend{
 		Step:       step,

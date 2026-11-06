@@ -24,7 +24,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/services/log"
 )
 
-func Serve(impl log.Service) {
+func Serve(impl log.AddonService) {
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: HandshakeConfig,
 		Plugins: map[string]plugin.Plugin{
@@ -34,7 +34,7 @@ func Serve(impl log.Service) {
 }
 
 type RPCServer struct {
-	Impl log.Service
+	Impl log.AddonService
 }
 
 type argumentsAppend struct {

@@ -17,11 +17,11 @@
 package api
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"mime"
 	"net/http"
 	"strconv"
@@ -367,21 +367,40 @@ func GetStepLogs(c *gin.Context) {
 
 // DownloadStepLogs
 //
-//	@Summary	Download logs for a pipeline step
-//	@Router		/repos/{repo_id}/logs/{pipeline_number}/{step_id}/download [get]
-//	@Produce	plain
-//	@Success	200	{string}	string
-//	@Tags		Pipeline logs
-//	@Param		Authorization	header	string	true	"Insert your personal access token"	default(Bearer <personal access token>)
-//	@Param		repo_id			path	int		true	"the repository id"
-//	@Param		pipeline_number	path	int		true	"the number of the pipeline"
-//	@Param		step_id			path	int		true	"the step id"
+//	@Summary		Download logs for a pipeline step
+//	@Description	The step's log as plain text, one line per log entry, each ending in a newline. ANSI
+//	@Description	escape sequences and control characters are removed, a backspace deletes the character
+//	@Description	before it, and of a line rewritten by carriage returns, moves to column 1 or erases of
+//	@Description	the line only the last part with visible text stays: the final state a terminal shows of
+//	@Description	a progress bar. With raw=true the lines are sent as stored instead. With line_numbers=true
+//	@Description	each line starts with its number as the UI shows it, right-aligned to six columns and
+//	@Description	followed by a tab, like `cat -n`. The log is streamed, not loaded whole. If it cannot be
+//	@Description	read to the end, the server aborts the transfer: the client, also one behind a proxy
+//	@Description	that speaks HTTP/1.1 to the server, sees a connection closed without the final chunk or
+//	@Description	a reset stream. Only where the server cannot abort its own connection (HTTP/2 to the
+//	@Description	server, or an HTTP/1.0 request) the body ends instead with a last line starting with
+//	@Description	"--- log truncated". Treat either as an incomplete log.
+//	@Router			/repos/{repo_id}/logs/{pipeline_number}/{step_id}/download [get]
+//	@Produce		plain
+//	@Success		200	{string}	string
+//	@Tags			Pipeline logs
+//	@Param			Authorization	header	string	true	"Insert your personal access token"	default(Bearer <personal access token>)
+//	@Param			repo_id			path	int		true	"the repository id"
+//	@Param			pipeline_number	path	int		true	"the number of the pipeline"
+//	@Param			step_id			path	int		true	"the step id"
+//	@Param			line_numbers	query	bool	false	"prefix each line with its number"
+//	@Param			raw				query	bool	false	"send the lines as stored, escape sequences included"
 func DownloadStepLogs(c *gin.Context) {
 	step := session.Step(c)
 
-	logs, err := server.Config.Services.LogStore.LogFind(c, step)
+	lineNumbers, err := queryBool(c, "line_numbers")
 	if err != nil {
-		handleDBError(c, err)
+		c.String(http.StatusBadRequest, "line_numbers must be a boolean")
+		return
+	}
+	raw, err := queryBool(c, "raw")
+	if err != nil {
+		c.String(http.StatusBadRequest, "raw must be a boolean")
 		return
 	}
 
@@ -391,19 +410,37 @@ func DownloadStepLogs(c *gin.Context) {
 	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
 	c.Header("Content-Type", "text/plain; charset=utf-8")
 	c.Header("X-Content-Type-Options", "nosniff")
-	c.Status(http.StatusOK)
 
-	for i, entry := range logs {
-		if i > 0 {
-			if _, err = io.WriteString(c.Writer, "\n"); err != nil {
-				_ = c.Error(err)
-				return
-			}
+	ctx := c.Request.Context()
+	w := bufio.NewWriterSize(c.Writer, downloadBufferSize)
+	var line []byte
+	err = server.Config.Services.LogStore.LogStream(ctx, step, func(entry *model.LogEntry) error {
+		line = appendDownloadLine(line[:0], entry, lineNumbers, raw)
+		if _, err := w.Write(line); err != nil {
+			return clientError{err}
 		}
-		if _, err = c.Writer.Write(entry.Data); err != nil {
-			_ = c.Error(err)
-			return
+		return nil
+	})
+	if err == nil {
+		if err = w.Flush(); err != nil {
+			err = clientError{err}
 		}
+	}
+
+	var clientErr clientError
+	switch {
+	case err == nil:
+		c.Status(http.StatusOK)
+	case errors.As(err, &clientErr) || ctx.Err() != nil:
+		// the client went away, nothing to answer
+		log.Debug().Err(err).Int64("step_id", step.ID).Msg("log download ended by the client")
+	case !c.Writer.Written():
+		// nothing reached the client yet, so the error can still be its answer
+		c.Header("Content-Disposition", "")
+		handleDBError(c, err)
+	default:
+		log.Error().Err(err).Int64("step_id", step.ID).Msg("could not stream the step log")
+		abortDownload(c, w)
 	}
 }
 

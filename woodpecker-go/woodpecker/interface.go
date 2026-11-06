@@ -15,6 +15,7 @@
 package woodpecker
 
 import (
+	"io"
 	"net/http"
 )
 
@@ -109,6 +110,12 @@ type Client interface {
 
 	// StepLogEntries returns the LogEntries for the given pipeline step
 	StepLogEntries(repoID, pipeline, stepID int64) ([]*LogEntry, error)
+
+	// StepLogDownload returns the step's log as plain text, without ANSI escape
+	// sequences unless opt.Raw. The caller closes the reader. The log is
+	// truncated when reading it fails, and when its last line starts with
+	// "--- log truncated": treat both as an error.
+	StepLogDownload(repoID, pipeline, stepID int64, opt StepLogDownloadOptions) (io.ReadCloser, error)
 
 	// Deploy triggers a deployment for an existing pipeline using the specified
 	// target environment.

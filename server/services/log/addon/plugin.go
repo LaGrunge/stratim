@@ -31,7 +31,7 @@ var HandshakeConfig = plugin.HandshakeConfig{
 }
 
 type Plugin struct {
-	Impl log.Service
+	Impl log.AddonService
 }
 
 func (p *Plugin) Server(*plugin.MuxBroker) (any, error) {

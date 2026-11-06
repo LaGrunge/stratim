@@ -3621,6 +3621,69 @@ func (_c *MockStore_LogFind_Call) RunAndReturn(run func(context1 context.Context
 	return _c
 }
 
+// LogStream provides a mock function for the type MockStore
+func (_mock *MockStore) LogStream(context1 context.Context, step *model.Step, fn func(*model.LogEntry) error) error {
+	ret := _mock.Called(context1, step, fn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogStream")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *model.Step, func(*model.LogEntry) error) error); ok {
+		r0 = returnFunc(context1, step, fn)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockStore_LogStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogStream'
+type MockStore_LogStream_Call struct {
+	*mock.Call
+}
+
+// LogStream is a helper method to define mock.On call
+//   - context1 context.Context
+//   - step *model.Step
+//   - fn func(*model.LogEntry) error
+func (_e *MockStore_Expecter) LogStream(context1 any, step any, fn any) *MockStore_LogStream_Call {
+	return &MockStore_LogStream_Call{Call: _e.mock.On("LogStream", context1, step, fn)}
+}
+
+func (_c *MockStore_LogStream_Call) Run(run func(context1 context.Context, step *model.Step, fn func(*model.LogEntry) error)) *MockStore_LogStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *model.Step
+		if args[1] != nil {
+			arg1 = args[1].(*model.Step)
+		}
+		var arg2 func(*model.LogEntry) error
+		if args[2] != nil {
+			arg2 = args[2].(func(*model.LogEntry) error)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_LogStream_Call) Return(err error) *MockStore_LogStream_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockStore_LogStream_Call) RunAndReturn(run func(context1 context.Context, step *model.Step, fn func(*model.LogEntry) error) error) *MockStore_LogStream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Migrate provides a mock function for the type MockStore
 func (_mock *MockStore) Migrate(context1 context.Context, b bool) error {
 	ret := _mock.Called(context1, b)
