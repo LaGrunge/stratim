@@ -1,0 +1,18 @@
+# running, 30 of 38 ok
+#345 running · 30/38 ok · ETA 25m
+# running, a failure and an ignored one
+#345 running · 3/7 ok · 1 failed · ETA 1h20m
+# running, no typical run
+#345 running · 0/2 ok
+# running, longer than the typical run
+#345 running · 0/2 ok
+# success with skipped steps
+#345 success · 4/4 ok
+# failure
+#345 failure · 4/9 ok · 2 failed
+# pending
+#345 pending · 0/3 ok · ETA 1h15m
+# blocked, no steps loaded
+#345 blocked
+# a config error
+#345 error

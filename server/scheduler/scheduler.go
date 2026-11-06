@@ -93,9 +93,10 @@ type PipelineObserver interface {
 // Option configures a scheduler.
 type Option func(*impl)
 
-// WithPipelineObserver hands every published pipeline snapshot to o too.
+// WithPipelineObserver hands every published pipeline snapshot to o too,
+// after the observers given before.
 func WithPipelineObserver(o PipelineObserver) Option {
-	return func(p *impl) { p.observer = o }
+	return func(p *impl) { p.observers = append(p.observers, o) }
 }
 
 func NewScheduler(ctx context.Context, store store.Store, q queue.Queue, ps pubsub.PubSub, opts ...Option) Scheduler {

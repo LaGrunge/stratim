@@ -32,9 +32,9 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/events"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware"
 	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware/session"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
-	"go.woodpecker-ci.org/woodpecker/v3/server/store/types"
 )
 
 const (
@@ -42,16 +42,8 @@ const (
 	eventsRetryMillis = 3000
 )
 
-var (
-	// An idle event stream is pinged every eventsPingInterval.
-	eventsPingInterval = 15 * time.Second
-	// The user of a stream and the repos they may read are looked up again
-	// after eventsAccessTTL.
-	eventsAccessTTL = time.Minute
-	// A repo whose access could not be looked up stays denied for
-	// eventsAccessBackoff.
-	eventsAccessBackoff = 30 * time.Second
-)
+// An idle event stream is pinged every eventsPingInterval.
+var eventsPingInterval = 15 * time.Second
 
 // droppedEventsV2Streams counts the /api/v2/events streams ended because
 // their client did not keep up with the events.
@@ -174,11 +166,16 @@ func streamEvents(c *gin.Context, hub *events.Hub) {
 	}
 
 	requestCtx := c.Request.Context()
+	stopping := middleware.StoppingOf(c)
 	ping := time.NewTicker(eventsPingInterval)
 	defer ping.Stop()
 	for {
 		select {
 		case <-requestCtx.Done():
+			return
+		case <-stopping:
+			// the client reconnects with the last id, to another server or
+			// this one once it is back
 			return
 		case <-ping.C:
 			if errors.Is(access.refresh(), errUserGone) {
@@ -243,19 +240,6 @@ func writeRecord(rc *http.ResponseController, w io.Writer, access *repoAccess, r
 	return true, nil
 }
 
-type httpError struct {
-	code int
-	msg  string
-}
-
-func (e *httpError) Error() string { return e.msg }
-
-func badRequest(format string, args ...any) error {
-	return &httpError{code: http.StatusBadRequest, msg: fmt.Sprintf(format, args...)}
-}
-
-var errEventsNotFound = &httpError{code: http.StatusNotFound, msg: "not found"}
-
 // parseEventsFilter reads the filter of the query. A repo or pipeline that
 // does not exist or the user cannot read is not found.
 func parseEventsFilter(c *gin.Context, access *repoAccess) (events.Filter, error) {
@@ -306,7 +290,7 @@ func parseEventsFilter(c *gin.Context, access *repoAccess) (events.Filter, error
 			return filter, err
 		}
 		if !allowed {
-			return filter, errEventsNotFound
+			return filter, errNotFound
 		}
 		filter.PipelineID = pipeline.ID
 	case numberParam != "":
@@ -341,121 +325,4 @@ func parseEventsCursor(c *gin.Context) (events.Cursor, error) {
 		return events.Cursor{}, fmt.Errorf("%s: want an event id", name)
 	}
 	return events.Cursor{ID: id, Set: true}, nil
-}
-
-func notFoundOr(err error) error {
-	if errors.Is(err, types.ErrRecordNotExist) {
-		return errEventsNotFound
-	}
-	return err
-}
-
-// errUserGone ends a stream whose user does not exist any more, or whose
-// tokens were reset.
-var errUserGone = &httpError{code: http.StatusUnauthorized, msg: "user not authorized"}
-
-// repoAccess tells the repos the user of a stream may read the events of,
-// by session.CanReadStored, from the repos and permissions as they are now.
-// What it found is trusted for eventsAccessTTL; then the user and the repos
-// are looked up again.
-type repoAccess struct {
-	store store.Store
-	user  *model.User
-	// hash is the user's hash when the stream started; a new one, as a
-	// reset of the user's tokens makes, ends the stream.
-	hash string
-
-	repos   map[int64]repoAccessEntry
-	checked time.Time
-}
-
-type repoAccessEntry struct {
-	allowed bool
-	until   time.Time
-}
-
-func newRepoAccess(s store.Store, user *model.User) *repoAccess {
-	return &repoAccess{store: s, user: user, hash: user.Hash, repos: make(map[int64]repoAccessEntry), checked: time.Now()}
-}
-
-// refresh looks the user up again once eventsAccessTTL passed, and forgets
-// the repos looked up. It returns errUserGone once the user is gone or has
-// another hash.
-func (a *repoAccess) refresh() error {
-	if time.Since(a.checked) < eventsAccessTTL {
-		return nil
-	}
-	user, err := a.store.GetUser(a.user.ID)
-	switch {
-	case errors.Is(err, types.ErrRecordNotExist):
-		return errUserGone
-	case err == nil && user.Hash != a.hash:
-		return errUserGone
-	case err != nil:
-		log.Error().Err(err).Str("user", a.user.Login).Msg("events v2: cannot look up the user")
-		a.checked = time.Now().Add(eventsAccessBackoff - eventsAccessTTL) // again after the backoff
-		return nil
-	}
-	a.user = user
-	a.checked = time.Now()
-	clear(a.repos)
-	return nil
-}
-
-// allowed tells whether the user may read the repo with the id.
-func (a *repoAccess) allowed(repoID int64) (bool, error) {
-	if err := a.refresh(); err != nil {
-		return false, err
-	}
-	if entry, ok := a.repos[repoID]; ok && time.Now().Before(entry.until) {
-		return entry.allowed, nil
-	}
-	repo, err := a.store.GetRepo(repoID)
-	if err != nil {
-		if !errors.Is(err, types.ErrRecordNotExist) {
-			log.Error().Err(err).Int64("repo", repoID).Msg("events v2: cannot look up a repo")
-		}
-		a.deny(repoID)
-		return false, nil
-	}
-	return a.canRead(repo), nil
-}
-
-// canRead tells whether the user may read the repo, from the stored
-// permission: a stream never asks the forge.
-func (a *repoAccess) canRead(repo *model.Repo) bool {
-	allowed, err := session.CanReadStored(a.store, a.user, repo)
-	if err != nil {
-		log.Error().Err(err).Int64("repo", repo.ID).Msg("events v2: cannot look up a permission")
-		a.deny(repo.ID)
-		return false
-	}
-	a.repos[repo.ID] = repoAccessEntry{allowed: allowed, until: a.checked.Add(eventsAccessTTL)}
-	return allowed
-}
-
-// deny denies the repo for eventsAccessBackoff.
-func (a *repoAccess) deny(repoID int64) {
-	a.repos[repoID] = repoAccessEntry{until: time.Now().Add(eventsAccessBackoff)}
-}
-
-// findRepo finds a repo by id or full name the user may read.
-func (a *repoAccess) findRepo(ref string) (*model.Repo, error) {
-	if err := a.refresh(); err != nil {
-		return nil, err
-	}
-	var repo *model.Repo
-	var err error
-	if id, parseErr := strconv.ParseInt(ref, 10, 64); parseErr == nil {
-		repo, err = a.store.GetRepo(id)
-	} else {
-		repo, err = a.store.GetRepoName(ref)
-	}
-	if err != nil {
-		return nil, notFoundOr(err)
-	}
-	if !a.canRead(repo) {
-		return nil, errEventsNotFound
-	}
-	return repo, nil
 }

@@ -55,9 +55,10 @@ const (
 )
 
 var (
-	stopServerFunc     context.CancelCauseFunc = func(error) {}
-	shutdownCancelFunc context.CancelFunc      = func() {}
-	shutdownCtx                                = context.Background()
+	stopServerFunc context.CancelCauseFunc = func(error) {}
+	// The store is closed by closeStore once the servers are shut down; a
+	// variable for tests.
+	closeStore = func(s store.Store) error { return s.Close() }
 )
 
 func run(ctx context.Context, c *cli.Command) error {
@@ -71,11 +72,9 @@ func run(ctx context.Context, c *cli.Command) error {
 			log.Error().Err(err).Msg("shutdown of whole server")
 		}
 		stopServerFunc = func(error) {}
-		shutdownCtx, shutdownCancelFunc = context.WithTimeout(shutdownCtx, shutdownTimeout)
 		ctxCancel(err)
 	}
 	defer stopServerFunc(nil)
-	defer shutdownCancelFunc()
 
 	// set gin mode based on log level
 	if zerolog.GlobalLevel() > zerolog.DebugLevel {
@@ -114,7 +113,7 @@ func run(ctx context.Context, c *cli.Command) error {
 	}
 
 	defer func() {
-		if err := _store.Close(); err != nil {
+		if err := closeStore(_store); err != nil {
 			log.Error().Err(err).Msg("could not close store")
 		}
 	}()
@@ -190,6 +189,7 @@ func run(ctx context.Context, c *cli.Command) error {
 		middleware.Version,
 		middleware.Store(_store),
 		middleware.WorkflowEnd(end),
+		middleware.Stopping(ctx),
 	)
 
 	if c.String("server-cert") != "" {
@@ -203,22 +203,19 @@ func run(ctx context.Context, c *cli.Command) error {
 				},
 			}
 
-			go func() {
-				<-ctx.Done()
-				log.Info().Msg("shutdown tls server ...")
-				if err := tlsServer.Shutdown(shutdownCtx); err != nil { //nolint:contextcheck
-					log.Error().Err(err).Msg("shutdown tls server failed")
-				} else {
-					log.Info().Msg("tls server stopped")
-				}
-			}()
+			shutdownDone := shutdownOnDone(ctx, "tls", tlsServer)
 
 			log.Info().Msg("starting tls server ...")
 			err := tlsServer.ListenAndServeTLS(
 				c.String("server-cert"),
 				c.String("server-key"),
 			)
-			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			if errors.Is(err, http.ErrServerClosed) {
+				// the requests in flight end before the store is closed
+				<-shutdownDone
+				return nil
+			}
+			if err != nil {
 				log.Error().Err(err).Msg("TLS server failed")
 				stopServerFunc(fmt.Errorf("TLS server failed: %w", err))
 			}
@@ -241,18 +238,13 @@ func run(ctx context.Context, c *cli.Command) error {
 				Addr:    server.Config.Server.Port,
 				Handler: http.HandlerFunc(redirect),
 			}
-			go func() {
-				<-ctx.Done()
-				log.Info().Msg("shutdown redirect server ...")
-				if err := redirectServer.Shutdown(shutdownCtx); err != nil { //nolint:contextcheck
-					log.Error().Err(err).Msg("shutdown redirect server failed")
-				} else {
-					log.Info().Msg("redirect server stopped")
-				}
-			}()
+			shutdownDone := shutdownOnDone(ctx, "redirect", redirectServer)
 
 			log.Info().Msg("starting redirect server ...")
-			if err := redirectServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			err := redirectServer.ListenAndServe()
+			if errors.Is(err, http.ErrServerClosed) {
+				<-shutdownDone
+			} else if err != nil {
 				log.Error().Err(err).Msg("redirect server failed")
 				stopServerFunc(fmt.Errorf("redirect server failed: %w", err))
 			}
@@ -289,18 +281,16 @@ func run(ctx context.Context, c *cli.Command) error {
 				Handler: handler,
 			}
 
-			go func() {
-				<-ctx.Done()
-				log.Info().Msg("shutdown http server ...")
-				if err := httpServer.Shutdown(shutdownCtx); err != nil { //nolint:contextcheck
-					log.Error().Err(err).Msg("shutdown http server failed")
-				} else {
-					log.Info().Msg("http server stopped")
-				}
-			}()
+			shutdownDone := shutdownOnDone(ctx, "http", httpServer)
 
 			log.Info().Msg("starting http server ...")
-			if err := httpServer.Serve(lis); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			err = httpServer.Serve(lis)
+			if errors.Is(err, http.ErrServerClosed) {
+				// the requests in flight end before the store is closed
+				<-shutdownDone
+				return nil
+			}
+			if err != nil {
 				log.Error().Err(err).Msg("http server failed")
 				stopServerFunc(fmt.Errorf("http server failed: %w", err))
 			}
@@ -318,18 +308,15 @@ func run(ctx context.Context, c *cli.Command) error {
 				Handler: metricsRouter,
 			}
 
-			go func() {
-				<-ctx.Done()
-				log.Info().Msg("shutdown metrics server ...")
-				if err := metricsServer.Shutdown(shutdownCtx); err != nil { //nolint:contextcheck
-					log.Error().Err(err).Msg("shutdown metrics server failed")
-				} else {
-					log.Info().Msg("metrics server stopped")
-				}
-			}()
+			shutdownDone := shutdownOnDone(ctx, "metrics", metricsServer)
 
 			log.Info().Msg("starting metrics server ...")
-			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			err := metricsServer.ListenAndServe()
+			if errors.Is(err, http.ErrServerClosed) {
+				<-shutdownDone
+				return nil
+			}
+			if err != nil {
 				log.Error().Err(err).Msg("metrics server failed")
 				stopServerFunc(fmt.Errorf("metrics server failed: %w", err))
 			}
@@ -338,6 +325,30 @@ func run(ctx context.Context, c *cli.Command) error {
 	}
 
 	return serviceWaitingGroup.Wait()
+}
+
+// shutdownOnDone shuts the server down once ctx is done, giving the requests
+// in flight shutdownTimeout to end, then closing their connections. The
+// channel it returns is closed once the server is shut down: whoever serves
+// waits for it before the store is closed.
+func shutdownOnDone(ctx context.Context, name string, srv *http.Server) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		<-ctx.Done()
+		log.Info().Msgf("shutdown %s server ...", name)
+		// a signal cancels ctx without a stopServerFunc: the timeout is taken
+		// here, so that a request that does not end cannot hold the shutdown
+		timeoutCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+		defer cancel()
+		if err := srv.Shutdown(timeoutCtx); err != nil {
+			log.Error().Err(err).Msgf("shutdown %s server failed, closing its connections", name)
+			_ = srv.Close()
+			return
+		}
+		log.Info().Msgf("%s server stopped", name)
+	}()
+	return done
 }
 
 func setUnixSocketPermission(path, permission string) error {

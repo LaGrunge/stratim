@@ -27,6 +27,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/services"
 	"go.woodpecker-ci.org/woodpecker/v3/server/services/log"
 	"go.woodpecker-ci.org/woodpecker/v3/server/services/permissions"
+	"go.woodpecker-ci.org/woodpecker/v3/server/summary"
 )
 
 var Config = struct {
@@ -39,6 +40,9 @@ var Config = struct {
 		Statuses   *forgestatus.Sender
 		// Events are the typed pipeline events of /api/v2/events.
 		Events *events.Hub
+		// Durations are the typical runs of the pipelines of a branch, for
+		// the summaries of /api/v2.
+		Durations *summary.Durations
 	}
 	Server struct {
 		JWTSecret             string

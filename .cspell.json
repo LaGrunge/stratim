@@ -234,6 +234,7 @@
     "structs",
     "stscreds",
     "sublicensable",
+    "swaggertype",
     "swaggo",
     "syscalls",
     "TARGETARCH",

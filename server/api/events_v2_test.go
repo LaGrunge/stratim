@@ -38,18 +38,23 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/events"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware"
 	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware/session"
 	manager_mocks "go.woodpecker-ci.org/woodpecker/v3/server/services/mocks"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 	store_mocks "go.woodpecker-ci.org/woodpecker/v3/server/store/mocks"
+	"go.woodpecker-ci.org/woodpecker/v3/server/summary"
 )
 
 // eventsV2Env is a server of /api/v2/events over a sqlite store: a user who
 // may read the private repo "mine", not the private repo "theirs", and the
 // public repo "open".
 type eventsV2Env struct {
-	store              store.Store
-	hub                *events.Hub
+	store     store.Store
+	hub       *events.Hub
+	durations *summary.Durations
+	// stop stops the server: its long polls and streams end
+	stop               context.CancelFunc
 	user               *model.User
 	mine, theirs, open *model.Repo
 	srv                *httptest.Server
@@ -64,7 +69,10 @@ func newEventsV2EnvWith(t *testing.T, options events.Options) *eventsV2Env {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	s := newTestStore(t)
-	env := &eventsV2Env{store: s, hub: events.NewHub(options)}
+	env := &eventsV2Env{store: s, hub: events.NewHub(options), durations: summary.NewDurations(0)}
+	stopping, stop := context.WithCancelCause(t.Context())
+	env.stop = func() { stop(nil) }
+	t.Cleanup(env.stop)
 
 	env.user = &model.User{Login: "me", ForgeRemoteID: "u1", Hash: "h1"}
 	require.NoError(t, s.CreateUser(env.user))
@@ -85,14 +93,15 @@ func newEventsV2EnvWith(t *testing.T, options events.Options) *eventsV2Env {
 	env.perm(t, env.mine, true)
 	env.perm(t, env.theirs, false)
 
-	pingInterval, ttl, manager := eventsPingInterval, eventsAccessTTL, server.Config.Services.Manager
-	eventsPingInterval, eventsAccessTTL = 50*time.Millisecond, time.Hour
+	pingInterval, ttl, manager := eventsPingInterval, v2AccessTTL, server.Config.Services.Manager
+	eventsPingInterval, v2AccessTTL = 50*time.Millisecond, time.Hour
 	server.Config.Services.Manager = nil // no forge to sync a permission with, unless a test sets one
 	t.Cleanup(func() {
-		eventsPingInterval, eventsAccessTTL, server.Config.Services.Manager = pingInterval, ttl, manager
+		eventsPingInterval, v2AccessTTL, server.Config.Services.Manager = pingInterval, ttl, manager
 	})
 
 	e := gin.New()
+	e.Use(middleware.Stopping(stopping))
 	e.Use(func(c *gin.Context) {
 		c.Set("store", s)
 		if c.GetHeader("X-Test-User") != "" {
@@ -102,6 +111,7 @@ func newEventsV2EnvWith(t *testing.T, options events.Options) *eventsV2Env {
 		}
 	})
 	e.GET("/api/v2/events", session.MustUser(), EventStreamV2(env.hub))
+	e.GET("/api/v2/pipelines/:pipeline_id/wait", session.MustUser(), WaitPipelineV2(env.hub, env.durations))
 	env.srv = httptest.NewServer(e)
 	t.Cleanup(env.srv.Close)
 	return env
@@ -158,7 +168,7 @@ func repoIDs(got []events.Event) []int64 {
 // it runs one step that fails.
 func (env *eventsV2Env) pipeline(t *testing.T, repo *model.Repo, number int64) *model.Pipeline {
 	t.Helper()
-	p := &model.Pipeline{RepoID: repo.ID, Number: number, Branch: "main", Status: model.StatusPending}
+	p := &model.Pipeline{RepoID: repo.ID, Number: number, Branch: "main", Event: model.EventPush, Status: model.StatusPending}
 	require.NoError(t, env.store.CreatePipeline(p))
 	env.hub.Observe(repo, p)
 	return p
@@ -424,10 +434,10 @@ func TestEventsV2AccessIsOfNow(t *testing.T) {
 }
 
 // TestEventsV2AccessChangesMidStream follows the user and their permissions
-// once eventsAccessTTL passed.
+// once v2AccessTTL passed.
 func TestEventsV2AccessChangesMidStream(t *testing.T) {
 	env := newEventsV2Env(t)
-	eventsAccessTTL = 100 * time.Millisecond
+	v2AccessTTL = 100 * time.Millisecond
 	c := env.connect(t, "min_severity=error", loggedIn)
 	require.Equal(t, "hello", c.next(t).event)
 	number := int64(0)
@@ -441,21 +451,21 @@ func TestEventsV2AccessChangesMidStream(t *testing.T) {
 	assert.Equal(t, []int64{env.mine.ID, env.mine.ID, env.mine.ID}, repoIDs(c.quiet(t)), "mine only")
 
 	env.setAdmin(t, true)
-	time.Sleep(eventsAccessTTL)
+	time.Sleep(v2AccessTTL)
 	failBoth()
 	assert.Equal(t, []int64{env.mine.ID, env.mine.ID, env.mine.ID, env.theirs.ID, env.theirs.ID, env.theirs.ID},
 		repoIDs(c.quiet(t)), "an admin reads all")
 
 	env.setAdmin(t, false)
 	env.perm(t, env.mine, false)
-	time.Sleep(eventsAccessTTL)
+	time.Sleep(v2AccessTTL)
 	failBoth()
 	assert.Empty(t, c.quiet(t), "neither once the admin and the pull are gone")
 }
 
 func TestEventsV2EndsWhenTheUserIsGone(t *testing.T) {
 	env := newEventsV2Env(t)
-	eventsAccessTTL = 100 * time.Millisecond
+	v2AccessTTL = 100 * time.Millisecond
 	c := env.connect(t, "", loggedIn)
 	require.Equal(t, "hello", c.next(t).event)
 
@@ -500,7 +510,7 @@ func TestEventsV2NeverAsksTheForge(t *testing.T) {
 
 func TestEventsV2EndsWhenTheTokensAreReset(t *testing.T) {
 	env := newEventsV2Env(t)
-	eventsAccessTTL = 100 * time.Millisecond
+	v2AccessTTL = 100 * time.Millisecond
 	c := env.connect(t, "", loggedIn)
 	require.Equal(t, "hello", c.next(t).event)
 

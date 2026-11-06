@@ -53,6 +53,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store/datastore"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store/types"
+	"go.woodpecker-ci.org/woodpecker/v3/server/summary"
 )
 
 func setupStore(ctx context.Context, c *cli.Command) (store.Store, error) {
@@ -203,8 +204,10 @@ func setupEvilGlobals(ctx context.Context, c *cli.Command, s store.Store) (err e
 	}
 	log.Info().Int("events", bufferSize).Msg("pipeline events: keeping the latest for replay")
 	server.Config.Services.Events = events.NewHub(events.Options{BufferSize: bufferSize})
+	server.Config.Services.Durations = summary.NewDurations(0)
 	server.Config.Services.Scheduler = scheduler.NewScheduler(ctx, s, queue, pubsub,
-		scheduler.WithPipelineObserver(server.Config.Services.Events))
+		scheduler.WithPipelineObserver(server.Config.Services.Events),
+		scheduler.WithPipelineObserver(server.Config.Services.Durations))
 	server.Config.Services.Manager, err = services.NewManager(c, s, setup.Forge)
 	if err != nil {
 		return fmt.Errorf("could not setup service manager: %w", err)

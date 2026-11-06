@@ -299,3 +299,12 @@ func TestSubscriptionPosition(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, first+5, sub.Position(first+3), "the other subscription has none queued")
 }
+
+func TestHubSubscribers(t *testing.T) {
+	h := NewHub(Options{})
+	assert.Equal(t, 0, h.Subscribers())
+	sub, _ := h.Subscribe(Filter{}, Cursor{})
+	assert.Equal(t, 1, h.Subscribers())
+	sub.Close()
+	assert.Equal(t, 0, h.Subscribers())
+}

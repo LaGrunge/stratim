@@ -36,6 +36,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/logging"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/pubsub"
+	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware"
 	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware/session"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 )
@@ -149,10 +150,13 @@ func EventStreamSSE(c *gin.Context) {
 		cancel(err)
 	})
 
+	stopping := middleware.StoppingOf(c)
 	for {
 		var err error
 		select {
 		case <-requestCtx.Done():
+			return
+		case <-stopping: // the server stops; the client reconnects
 			return
 		case <-ctx.Done():
 			return
@@ -299,6 +303,7 @@ func LogStreamSSE(c *gin.Context) {
 		cancel(err)
 	})
 
+	stopping := middleware.StoppingOf(c)
 	id := 1
 	last, _ := strconv.Atoi(
 		c.Request.Header.Get("Last-Event-ID"),
@@ -318,6 +323,9 @@ func LogStreamSSE(c *gin.Context) {
 			}
 		case <-requestCtx.Done(): // Monitor the request context for cancellation when the client has gone away.
 			log.Debug().Msg("log stream: closed, client has gone away")
+			return
+		case <-stopping: // the server stops; the client reconnects, without an eof
+			log.Debug().Msg("log stream: closed, the server stops")
 			return
 		case <-time.After(idlePingTime):
 			logWriteStringErr(io.WriteString(rw, ": ping\n\n"))
