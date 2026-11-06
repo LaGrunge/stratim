@@ -56,11 +56,19 @@ func TestShutdownEndsStreams(t *testing.T) {
 
 	config := server.Config
 	t.Cleanup(func() { server.Config = config })
-	var streamEnded, closedAfterStream atomic.Bool
+	var closedAfterStream atomic.Bool
 	storeClosed := make(chan struct{})
+	// ended closes once the client has read the stream to its end; the
+	// server closes the connection when the handler returned, so by the
+	// time the store closes the client sees that end at once.
+	ended := make(chan struct{})
 	t.Cleanup(func() { closeStore = func(s store.Store) error { return s.Close() } })
 	closeStore = func(s store.Store) error {
-		closedAfterStream.Store(streamEnded.Load())
+		select {
+		case <-ended:
+			closedAfterStream.Store(true)
+		case <-time.After(time.Second):
+		}
 		close(storeClosed)
 		return s.Close()
 	}
@@ -108,11 +116,9 @@ func TestShutdownEndsStreams(t *testing.T) {
 	line, err := r.ReadString('\n')
 	require.NoError(t, err)
 	assert.Equal(t, ": ping\n", line, "the stream is open")
-	ended := make(chan struct{})
 	go func() {
 		defer close(ended)
 		_, _ = io.Copy(io.Discard, r)
-		streamEnded.Store(true)
 	}()
 
 	started := time.Now()
