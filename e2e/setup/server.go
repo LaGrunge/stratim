@@ -27,6 +27,7 @@ import (
 
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/cache"
+	"go.woodpecker-ci.org/woodpecker/v3/server/events"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge"
 	forge_mocks "go.woodpecker-ci.org/woodpecker/v3/server/forge/mocks"
 	forge_types "go.woodpecker-ci.org/woodpecker/v3/server/forge/types"
@@ -74,10 +75,15 @@ type ServerEnv struct {
 	// PubSub carries the pipeline events the server publishes; see
 	// RecordEvents.
 	PubSub pubsub.PubSub
+	// Events are the typed events of /api/v2/events; see StreamEventsV2.
+	Events *events.Hub
 	// WorkflowEnd is the server's end of workflows, what a cancel takes.
 	WorkflowEnd pipeline.WorkflowEnd
 
 	stopStatuses context.CancelCauseFunc
+
+	eventsV2Once sync.Once
+	eventsV2Base string
 }
 
 func (env *ServerEnv) DummyPipeline(event model.WebhookEvent) *model.Pipeline {
@@ -132,7 +138,9 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 
 	server.Config.Services.Logs = logging.New()
 	ps := memory.New()
-	server.Config.Services.Scheduler = scheduler.NewScheduler(t.Context(), memStore, memQueue, ps) //nolint:contextcheck
+	hub := events.NewHub(events.Options{})
+	server.Config.Services.Events = hub
+	server.Config.Services.Scheduler = scheduler.NewScheduler(t.Context(), memStore, memQueue, ps, scheduler.WithPipelineObserver(hub)) //nolint:contextcheck
 	server.Config.Services.Membership = cache.NewMembershipService(memStore)
 	server.Config.Services.Manager = mgr
 	server.Config.Services.LogStore = memStore
@@ -177,6 +185,7 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 		Statuses: statuses,
 		Manager:  mgr,
 		PubSub:   ps,
+		Events:   hub,
 
 		WorkflowEnd: end,
 

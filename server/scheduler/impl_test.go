@@ -72,3 +72,25 @@ func TestPrioritizeWorkflows(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"2"}, moved)
 }
+
+type recordingObserver struct {
+	pipelines []int64
+}
+
+func (r *recordingObserver) Observe(_ *model.Repo, p *model.Pipeline) {
+	r.pipelines = append(r.pipelines, p.ID)
+}
+
+// TestPublishPipelineEventObserved hands every published snapshot to the
+// observer, the one StartPipeline publishes too.
+func TestPublishPipelineEventObserved(t *testing.T) {
+	observer := &recordingObserver{}
+	q := queue.NewMemoryQueue(t.Context())
+	s := NewScheduler(t.Context(), nil, q, &recordingPubSub{}, WithPipelineObserver(observer))
+
+	repo := &model.Repo{ID: 3}
+	require.NoError(t, s.PublishPipelineEvent(t.Context(), repo, &model.Pipeline{ID: 11}))
+	require.NoError(t, s.StartPipeline(t.Context(), repo, &model.Pipeline{ID: 12}, nil))
+
+	assert.Equal(t, []int64{11, 12}, observer.pipelines)
+}

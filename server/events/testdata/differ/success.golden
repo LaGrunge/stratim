@@ -1,0 +1,14 @@
+# snapshot 0: created
+{"v":1,"id":0,"type":"pipeline.created","severity":"info","ts":"2026-11-06T03:00:00Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","status":"created","summary":"#345 created on main"}
+# snapshot 1: pending
+# snapshot 2: running
+{"v":1,"id":0,"type":"pipeline.started","severity":"notice","ts":"2026-11-06T03:00:05Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","status":"running","summary":"#345 started"}
+{"v":1,"id":0,"type":"workflow.started","severity":"info","ts":"2026-11-06T03:00:05Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":1,"status":"running","summary":"#345 build started"}
+{"v":1,"id":0,"type":"step.started","severity":"debug","ts":"2026-11-06T03:00:06Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":1,"step":"clone","step_id":11,"status":"running","summary":"#345 build/clone started"}
+# snapshot 3: running
+{"v":1,"id":0,"type":"step.finished","severity":"info","ts":"2026-11-06T03:00:09Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":1,"step":"clone","step_id":11,"status":"success","exit_code":0,"duration_s":3,"summary":"#345 build/clone success after 3s"}
+{"v":1,"id":0,"type":"step.started","severity":"debug","ts":"2026-11-06T03:00:09Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":1,"step":"test","step_id":12,"status":"running","summary":"#345 build/test started"}
+# snapshot 4: success
+{"v":1,"id":0,"type":"step.finished","severity":"info","ts":"2026-11-06T03:01:09Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":1,"step":"test","step_id":12,"status":"success","exit_code":0,"duration_s":60,"summary":"#345 build/test success after 1m0s"}
+{"v":1,"id":0,"type":"workflow.finished","severity":"notice","ts":"2026-11-06T03:01:10Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":1,"status":"success","duration_s":65,"summary":"#345 build success after 1m5s"}
+{"v":1,"id":0,"type":"pipeline.finished","severity":"notice","ts":"2026-11-06T03:01:10Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","status":"success","duration_s":65,"summary":"#345 success after 1m5s"}

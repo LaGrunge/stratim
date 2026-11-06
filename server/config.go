@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server/cache"
+	"go.woodpecker-ci.org/woodpecker/v3/server/events"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forgestatus"
 	"go.woodpecker-ci.org/woodpecker/v3/server/logging"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
@@ -36,6 +37,8 @@ var Config = struct {
 		Manager    services.Manager
 		LogStore   log.Service
 		Statuses   *forgestatus.Sender
+		// Events are the typed pipeline events of /api/v2/events.
+		Events *events.Hub
 	}
 	Server struct {
 		JWTSecret             string

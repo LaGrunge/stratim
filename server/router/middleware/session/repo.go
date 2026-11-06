@@ -25,6 +25,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server"
+	"go.woodpecker-ci.org/woodpecker/v3/server/forge"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store/types"
@@ -117,60 +118,12 @@ func SetPerm() gin.HandlerFunc {
 			return
 		}
 
-		perm := new(model.Perm)
-
-		if user != nil && !user.Admin {
-			var err error
-			perm, err = _store.PermFind(user, repo)
-			if err != nil {
-				log.Error().Err(err).Msgf("error fetching permission for %s %s",
-					user.Login, repo.FullName)
-			}
-			// a user of another forge has no permissions on this repo and
-			// their token must not be sent to the repo's forge
-			if user.ForgeID == repo.ForgeID && time.Unix(perm.Synced, 0).Add(PermSyncInterval).Before(time.Now()) {
-				_repo, err := _forge.Repo(c, user, repo.ForgeRemoteID, repo.Owner, repo.Name)
-				if err == nil {
-					log.Debug().Msgf("synced user permission for %s %s", user.Login, repo.FullName)
-					_repo.ForgeID = repo.ForgeID
-					perm = _repo.Perm
-					perm.RepoID = repo.ID
-					perm.UserID = user.ID
-					perm.Synced = time.Now().Unix()
-					if err := _store.PermUpsert(perm); err != nil {
-						_ = c.AbortWithError(http.StatusInternalServerError, err)
-						return
-					}
-				} else if perm.Push || perm.Admin {
-					// the forge could not confirm the permission, so only keep read access;
-					// Synced stays old, so the next request asks the forge again
-					log.Warn().Err(err).Msgf("could not sync user permission for %s %s, falling back to read only",
-						user.Login, repo.FullName)
-					perm.Push = false
-					perm.Admin = false
-					perm.RepoID = repo.ID
-					perm.UserID = user.ID
-					if err := _store.PermUpsert(perm); err != nil {
-						_ = c.AbortWithError(http.StatusInternalServerError, err)
-						return
-					}
-				}
-			}
+		stored, err := LoadPerm(c, _store, func() (forge.Forge, error) { return _forge, nil }, user, repo, time.Now())
+		if err != nil {
+			_ = c.AbortWithError(http.StatusInternalServerError, err)
+			return
 		}
-
-		if perm == nil {
-			perm = new(model.Perm)
-		}
-
-		if user != nil && user.Admin {
-			perm.Pull = true
-			perm.Push = true
-			perm.Admin = true
-		}
-
-		if repo.Visibility == model.VisibilityPublic || (repo.Visibility == model.VisibilityInternal && user != nil) {
-			perm.Pull = true
-		}
+		perm := EffectivePerm(user, repo, stored)
 
 		if user != nil {
 			log.Debug().Msgf("%s granted %+v permission to %s",

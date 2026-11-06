@@ -4826,6 +4826,82 @@ const docTemplate = `{
                 }
             }
         },
+        "/v2/events": {
+            "get": {
+                "description": "Server-sent events, one per change of a pipeline, workflow or step, of the repos the user can read.\nEach has an id; a client that reconnects with the last one in Last-Event-ID is replayed what it missed,\nor told by a reset event that it has to load the current state. See the documentation of /api/v2/events.",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Stream typed pipeline events",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cpersonal access token\u003e",
+                        "description": "Insert your personal access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the id of the last event got: replay the ones after it",
+                        "name": "Last-Event-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "as Last-Event-ID; 0 replays every event kept",
+                        "name": "since",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "only of this repo, by id or full name; may repeat",
+                        "name": "repo",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "only of pipelines of this branch",
+                        "name": "branch",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "only of the pipeline with this id",
+                        "name": "pipeline",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "only of the pipeline with this number, of the one repo given",
+                        "name": "number",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "notice",
+                        "description": "the least severity: debug, info, notice, warning or error",
+                        "name": "min_severity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "only of these types, comma separated, e.g. step.failed,pipeline.finished",
+                        "name": "types",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
         "/version": {
             "get": {
                 "description": "Endpoint returns the server version and build information.",

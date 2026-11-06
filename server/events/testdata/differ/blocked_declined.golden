@@ -1,0 +1,6 @@
+# snapshot 0: blocked
+{"v":1,"id":0,"type":"pipeline.blocked","severity":"warning","ts":"2026-11-06T03:00:00Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","status":"blocked","summary":"#345 waits for approval"}
+# snapshot 1: declined
+{"v":1,"id":0,"type":"step.finished","severity":"debug","ts":"2026-11-06T03:01:40Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":1,"step":"test","step_id":11,"status":"declined","summary":"#345 build/test declined"}
+{"v":1,"id":0,"type":"workflow.finished","severity":"info","ts":"2026-11-06T03:01:40Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":1,"status":"declined","summary":"#345 build declined"}
+{"v":1,"id":0,"type":"pipeline.finished","severity":"warning","ts":"2026-11-06T03:00:30Z","repo_id":7,"repo":"LaGrunge/stratim","pipeline_id":812,"number":345,"branch":"main","status":"declined","summary":"#345 declined"}

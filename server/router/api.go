@@ -269,6 +269,11 @@ func apiRoutes(e *gin.RouterGroup) {
 			stream.GET("/events", api.EventStreamSSE)
 		}
 
+		v2 := apiBase.Group("/v2")
+		{
+			v2.GET("/events", session.MustUser(), api.EventStreamV2(server.Config.Services.Events))
+		}
+
 		if zerolog.GlobalLevel() <= zerolog.DebugLevel {
 			debugger := apiBase.Group("/debug")
 			{

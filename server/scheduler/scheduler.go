@@ -84,11 +84,29 @@ type Scheduler interface {
 	SetCanceledExpiredHandler(handler func(task *model.Task))
 }
 
-func NewScheduler(ctx context.Context, store store.Store, q queue.Queue, ps pubsub.PubSub) Scheduler {
-	return &impl{
+// PipelineObserver takes every pipeline snapshot the scheduler publishes,
+// e.g. to make typed events of them (server/events). It must not block.
+type PipelineObserver interface {
+	Observe(repo *model.Repo, pipeline *model.Pipeline)
+}
+
+// Option configures a scheduler.
+type Option func(*impl)
+
+// WithPipelineObserver hands every published pipeline snapshot to o too.
+func WithPipelineObserver(o PipelineObserver) Option {
+	return func(p *impl) { p.observer = o }
+}
+
+func NewScheduler(ctx context.Context, store store.Store, q queue.Queue, ps pubsub.PubSub, opts ...Option) Scheduler {
+	p := &impl{
 		ctx:   ctx,
 		store: store,
 		q:     q,
 		ps:    ps,
 	}
+	for _, opt := range opts {
+		opt(p)
+	}
+	return p
 }
