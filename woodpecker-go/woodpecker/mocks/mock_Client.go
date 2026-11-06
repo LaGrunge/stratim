@@ -3339,6 +3339,74 @@ func (_c *MockClient_PipelineStop_Call) RunAndReturn(run func(repoID int64, pipe
 	return _c
 }
 
+// PipelineWait provides a mock function for the type MockClient
+func (_mock *MockClient) PipelineWait(pipelineID int64, opt woodpecker.PipelineWaitOptions) (*woodpecker.PipelineWaitResult, error) {
+	ret := _mock.Called(pipelineID, opt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PipelineWait")
+	}
+
+	var r0 *woodpecker.PipelineWaitResult
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64, woodpecker.PipelineWaitOptions) (*woodpecker.PipelineWaitResult, error)); ok {
+		return returnFunc(pipelineID, opt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64, woodpecker.PipelineWaitOptions) *woodpecker.PipelineWaitResult); ok {
+		r0 = returnFunc(pipelineID, opt)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*woodpecker.PipelineWaitResult)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64, woodpecker.PipelineWaitOptions) error); ok {
+		r1 = returnFunc(pipelineID, opt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_PipelineWait_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PipelineWait'
+type MockClient_PipelineWait_Call struct {
+	*mock.Call
+}
+
+// PipelineWait is a helper method to define mock.On call
+//   - pipelineID int64
+//   - opt woodpecker.PipelineWaitOptions
+func (_e *MockClient_Expecter) PipelineWait(pipelineID any, opt any) *MockClient_PipelineWait_Call {
+	return &MockClient_PipelineWait_Call{Call: _e.mock.On("PipelineWait", pipelineID, opt)}
+}
+
+func (_c *MockClient_PipelineWait_Call) Run(run func(pipelineID int64, opt woodpecker.PipelineWaitOptions)) *MockClient_PipelineWait_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		var arg1 woodpecker.PipelineWaitOptions
+		if args[1] != nil {
+			arg1 = args[1].(woodpecker.PipelineWaitOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_PipelineWait_Call) Return(pipelineWaitResult *woodpecker.PipelineWaitResult, err error) *MockClient_PipelineWait_Call {
+	_c.Call.Return(pipelineWaitResult, err)
+	return _c
+}
+
+func (_c *MockClient_PipelineWait_Call) RunAndReturn(run func(pipelineID int64, opt woodpecker.PipelineWaitOptions) (*woodpecker.PipelineWaitResult, error)) *MockClient_PipelineWait_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // QueueInfo provides a mock function for the type MockClient
 func (_mock *MockClient) QueueInfo() (*woodpecker.Info, error) {
 	ret := _mock.Called()

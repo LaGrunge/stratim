@@ -37,8 +37,8 @@ type impl struct {
 	q     queue.Queue
 	ps    pubsub.PubSub
 
-	// observer, if set, takes every published pipeline snapshot too.
-	observer PipelineObserver
+	// observers take every published pipeline snapshot too.
+	observers []PipelineObserver
 }
 
 //
@@ -149,8 +149,8 @@ func (p *impl) PublishPipelineEvent(c context.Context, repo *model.Repo, pipelin
 	// publish to repo specific topic
 	subTopics[pubsub.GetRepoTopic(repo)] = struct{}{}
 
-	if p.observer != nil {
-		p.observer.Observe(repo, pipeline)
+	for _, o := range p.observers {
+		o.Observe(repo, pipeline)
 	}
 
 	return p.ps.Publish(c, subTopics, message)

@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,6 +34,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/events"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware/session"
+	"go.woodpecker-ci.org/woodpecker/v3/woodpecker-go/woodpecker"
 )
 
 // SSEFrame is one server-sent event.
@@ -45,8 +47,9 @@ type EventsV2Stream struct {
 	frames chan SSEFrame
 }
 
-// eventsV2URL serves /api/v2/events of the test server over HTTP, once, to
-// the fixture owner, who may pull the fixture repo (a private one).
+// eventsV2URL serves /api/v2/events and /api/v2/pipelines/{id}/wait of the
+// test server over HTTP, once, to the fixture owner, who may pull the fixture
+// repo (a private one).
 func (env *ServerEnv) eventsV2URL(t *testing.T) string {
 	t.Helper()
 	env.eventsV2Once.Do(func() {
@@ -58,11 +61,31 @@ func (env *ServerEnv) eventsV2URL(t *testing.T) string {
 			c.Set("user", env.Fixtures.Owner)
 		})
 		e.GET("/api/v2/events", session.MustUser(), api.EventStreamV2(env.Events))
+		e.GET("/api/v2/pipelines/:pipeline_id/wait", session.MustUser(), api.WaitPipelineV2(env.Events, env.Durations))
 		srv := httptest.NewServer(e)
 		t.Cleanup(srv.Close)
 		env.eventsV2Base = srv.URL
 	})
 	return env.eventsV2Base
+}
+
+// WaitV2 asks /api/v2/pipelines/{id}/wait with the query, as the fixture
+// owner. The caller closes the body.
+func (env *ServerEnv) WaitV2(t *testing.T, pipelineID int64, query string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet,
+		fmt.Sprintf("%s/api/v2/pipelines/%d/wait?%s", env.eventsV2URL(t), pipelineID, query), nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
+// WaitV2Client is a woodpecker-go client of the test server's /api/v2, as
+// the fixture owner.
+func (env *ServerEnv) WaitV2Client(t *testing.T) woodpecker.Client {
+	t.Helper()
+	return woodpecker.NewClient(env.eventsV2URL(t), http.DefaultClient)
 }
 
 // StreamEventsV2 opens a stream of /api/v2/events with the query, from the

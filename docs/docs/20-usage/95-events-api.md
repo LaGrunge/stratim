@@ -105,3 +105,65 @@ Ids start, when the server starts, from the current time in microseconds, so the
 - `invalid`: the id is newer than the newest event.
 
 After a reset, load the state you need from the API, e.g. the pipeline with `GET /api/repos/{repo_id}/pipelines/{pipeline_number}`.
+
+## Waiting for a pipeline
+
+`GET /api/v2/pipelines/{pipeline_id}/wait` waits until a condition of a pipeline is met and answers once, so that a script, a bot or an agent need not read the stream:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "$SERVER/api/v2/pipelines/812/wait?until=failed&timeout=10m"
+```
+
+It needs a login and read access to the pipeline's repository, as the stream does; a pipeline that does not exist or that the user cannot read answers 404, a malformed parameter 400.
+
+| Parameter | Meaning                                                                                                                    |
+| --------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `until`   | `finished` (the default), `failed`, or `step:<name>` with a name of at most 128 bytes; see below                           |
+| `timeout` | how long to wait at most: seconds, or a duration such as `90s` or `10m`; 50 seconds by default, at most 25 minutes (`25m`) |
+
+The conditions:
+
+- `finished`: the pipeline ended, whatever its status.
+- `failed`: a step failed, timed out or errored and its failure is not ignored, or a workflow or the pipeline did. Killed and canceled are not failures. A pipeline that ends without failing ends the wait too, with `met` false: the condition can no longer be met.
+- `step:<name>`: the step of the name ended, in any workflow; `step:<workflow>/<step>` names the step of one workflow. Of a matrix, whose workflows share their names, the wait ends once the step ended in each of them. The wait ends on any end of the step, also when it failed, was skipped or canceled: `step_status` tells how it ended. A pipeline whose steps are known and that has no such step answers at once with `met` false and the reason `no_such_step`.
+
+The condition is checked against the pipeline as it is when the request comes, so a condition met already answers at once, and then after every event of the pipeline that may change it. When the condition is met, or can no longer be, the answer is 200 with JSON of about 1 KB at most:
+
+```json
+{
+  "v": 1,
+  "met": true,
+  "reason": "step_failed",
+  "until": "failed",
+  "pipeline": {
+    "id": 812,
+    "repo_id": 7,
+    "repo": "owner/name",
+    "number": 345,
+    "branch": "main",
+    "status": "running",
+    "started": 1793934000,
+    "steps": 38,
+    "steps_ok": 30,
+    "steps_failed": 1,
+    "eta_s": 1500
+  },
+  "summary": "#345 running · 30/38 ok · 1 failed · ETA 25m",
+  "event": { "v": 1, "id": 1793934000000042, "type": "step.failed", "...": "..." }
+}
+```
+
+| Field         | Meaning                                                                                                                                                                                                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `met`         | whether the condition is met; `false` when it can no longer be                                                                                                                                                                                     |
+| `reason`      | `pipeline_finished`, `pipeline_failed`, `workflow_failed`, `step_failed`, `step_finished` or `no_such_step`                                                                                                                                        |
+| `until`       | the condition waited for                                                                                                                                                                                                                           |
+| `step_status` | of `step:<name>`, the status the step ended with; of steps of the name that ended differently, the one that matters most: `error`, `failure`, `timeout`, `killed`, `canceled`, `declined`, `success`, `skipped`                                    |
+| `pipeline`    | the pipeline, its `repo` and `branch` cut to 48 bytes as in the events: `steps` counts its steps that are not skipped, `steps_ok` the ones that succeeded, `steps_failed` the ones that failed and whose failure is not ignored; `eta_s` see below |
+| `summary`     | the pipeline in one line for a human                                                                                                                                                                                                               |
+| `event`       | the event after which the wait ended, as the stream has it; none when the condition was met already                                                                                                                                                |
+
+When the timeout passes first, or the server stops, the answer is 204 without a body, with the summary of the pipeline in the `X-Stratim-Summary` header; ask again to go on waiting. While the server restarts, a proxy in front of it answers 502 or 503: ask again after a backoff. The default timeout is below the minute a proxy commonly lets a request be idle; a proxy has to let a request take as long as a longer timeout given, see [long polls and streams](../30-administration/10-configuration/10-server.md#long-polls-and-streams).
+
+The summary reads `#<number> <status> · <ok>/<steps> ok · <failed> failed · ETA <time left>`: the failed part only when a step failed, the steps only when the pipeline has them. The time left, also in `eta_s`, is how long the latest successful pipeline of the same branch and event (push, pull request, …) took minus how long this one has run, rounded up to minutes; there is none when there is no such pipeline, the pipeline has no branch, it ended, or it has run longer already.

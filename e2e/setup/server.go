@@ -43,6 +43,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/services"
 	"go.woodpecker-ci.org/woodpecker/v3/server/services/permissions"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
+	"go.woodpecker-ci.org/woodpecker/v3/server/summary"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/constant"
 )
 
@@ -77,6 +78,8 @@ type ServerEnv struct {
 	PubSub pubsub.PubSub
 	// Events are the typed events of /api/v2/events; see StreamEventsV2.
 	Events *events.Hub
+	// Durations are the typical runs of the summaries of /api/v2.
+	Durations *summary.Durations
 	// WorkflowEnd is the server's end of workflows, what a cancel takes.
 	WorkflowEnd pipeline.WorkflowEnd
 
@@ -140,7 +143,10 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	ps := memory.New()
 	hub := events.NewHub(events.Options{})
 	server.Config.Services.Events = hub
-	server.Config.Services.Scheduler = scheduler.NewScheduler(t.Context(), memStore, memQueue, ps, scheduler.WithPipelineObserver(hub)) //nolint:contextcheck
+	durations := summary.NewDurations(0)
+	server.Config.Services.Durations = durations
+	server.Config.Services.Scheduler = scheduler.NewScheduler(t.Context(), memStore, memQueue, ps, //nolint:contextcheck
+		scheduler.WithPipelineObserver(hub), scheduler.WithPipelineObserver(durations))
 	server.Config.Services.Membership = cache.NewMembershipService(memStore)
 	server.Config.Services.Manager = mgr
 	server.Config.Services.LogStore = memStore
@@ -176,16 +182,17 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	grpcAddr := startGRPCServer(ctx, t, memStore, end)
 
 	return &ServerEnv{
-		GRPCAddr: grpcAddr,
-		Store:    memStore,
-		Queue:    memQueue,
-		Fixtures: fixtures,
-		Forge:    mockForge,
-		Files:    served,
-		Statuses: statuses,
-		Manager:  mgr,
-		PubSub:   ps,
-		Events:   hub,
+		GRPCAddr:  grpcAddr,
+		Store:     memStore,
+		Queue:     memQueue,
+		Fixtures:  fixtures,
+		Forge:     mockForge,
+		Files:     served,
+		Statuses:  statuses,
+		Manager:   mgr,
+		PubSub:    ps,
+		Events:    hub,
+		Durations: durations,
 
 		WorkflowEnd: end,
 

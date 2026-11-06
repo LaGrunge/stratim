@@ -100,6 +100,10 @@ type Client interface {
 	// the workflows depending on them.
 	PipelineRestartFailed(repoID, num int64, opt PipelineStartOptions) (*Pipeline, error)
 
+	// PipelineWait waits until a condition of the pipeline with the id is
+	// met, at most the timeout; see PipelineWaitResult.
+	PipelineWait(pipelineID int64, opt PipelineWaitOptions) (*PipelineWaitResult, error)
+
 	// PipelineStop stops the given pipeline.
 	PipelineStop(repoID, pipeline int64) error
 

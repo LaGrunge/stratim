@@ -16,6 +16,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,4 +94,30 @@ func TestPublishPipelineEventObserved(t *testing.T) {
 	require.NoError(t, s.StartPipeline(t.Context(), repo, &model.Pipeline{ID: 12}, nil))
 
 	assert.Equal(t, []int64{11, 12}, observer.pipelines)
+}
+
+// orderObserver notes its name on a shared log for every snapshot.
+type orderObserver struct {
+	name string
+	log  *[]string
+}
+
+func (o *orderObserver) Observe(_ *model.Repo, p *model.Pipeline) {
+	*o.log = append(*o.log, fmt.Sprintf("%s:%d", o.name, p.ID))
+}
+
+// TestPublishPipelineEventObservers hands every snapshot to each observer,
+// in the order they were given.
+func TestPublishPipelineEventObservers(t *testing.T) {
+	var log []string
+	q := queue.NewMemoryQueue(t.Context())
+	s := NewScheduler(t.Context(), nil, q, &recordingPubSub{},
+		WithPipelineObserver(&orderObserver{name: "first", log: &log}),
+		WithPipelineObserver(&orderObserver{name: "second", log: &log}))
+
+	repo := &model.Repo{ID: 3}
+	require.NoError(t, s.PublishPipelineEvent(t.Context(), repo, &model.Pipeline{ID: 11}))
+	require.NoError(t, s.StartPipeline(t.Context(), repo, &model.Pipeline{ID: 12}, nil))
+
+	assert.Equal(t, []string{"first:11", "second:11", "first:12", "second:12"}, log)
 }

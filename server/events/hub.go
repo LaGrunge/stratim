@@ -241,6 +241,13 @@ func (h *Hub) Subscribe(f Filter, c Cursor) (*Subscription, Start) {
 	return s, start
 }
 
+// Subscribers is how many subscriptions are open.
+func (h *Hub) Subscribers() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.subs)
+}
+
 // Subscription gets the events its filter selects, in order.
 type Subscription struct {
 	hub    *Hub

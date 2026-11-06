@@ -4902,6 +4902,60 @@ const docTemplate = `{
                 }
             }
         },
+        "/v2/pipelines/{pipeline_id}/wait": {
+            "get": {
+                "description": "Long-polls until the pipeline finished, failed, or one of its steps finished, at most the timeout.\n200 tells the condition is met, or that it can no longer be (met false, e.g. a pipeline that finished\nwithout failing); 204 that the timeout passed first or the server stops, with the summary of the\npipeline in the X-Stratim-Summary header. See the documentation of /api/v2/events.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Wait for a condition of a pipeline",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cpersonal access token\u003e",
+                        "description": "Insert your personal access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the id of the pipeline",
+                        "name": "pipeline_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "finished",
+                        "description": "finished, failed, or step:\u003cname\u003e (or step:\u003cworkflow\u003e/\u003cstep\u003e)",
+                        "name": "until",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "50s",
+                        "description": "how long to wait at most: seconds or a duration such as 90s or 10m, at most 25m",
+                        "name": "timeout",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.WaitResult"
+                        }
+                    },
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
         "/version": {
             "get": {
                 "description": "Endpoint returns the server version and build information.",
@@ -6318,6 +6372,81 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                }
+            }
+        },
+        "api.WaitPipeline": {
+            "type": "object",
+            "properties": {
+                "branch": {
+                    "type": "string"
+                },
+                "eta_s": {
+                    "description": "ETAS is how many seconds it will still take, if that is known.",
+                    "type": "integer"
+                },
+                "finished": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "number": {
+                    "type": "integer"
+                },
+                "repo": {
+                    "type": "string"
+                },
+                "repo_id": {
+                    "type": "integer"
+                },
+                "started": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "steps": {
+                    "description": "Steps are the steps that are not skipped, StepsOK the ones that\nsucceeded and StepsFailed the ones that failed, their failure not\nignored.",
+                    "type": "integer"
+                },
+                "steps_failed": {
+                    "type": "integer"
+                },
+                "steps_ok": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.WaitResult": {
+            "type": "object",
+            "properties": {
+                "event": {
+                    "description": "Event is the event after which the wait ended, as the event stream\nhas it; none when the condition was so already.",
+                    "type": "object"
+                },
+                "met": {
+                    "type": "boolean"
+                },
+                "pipeline": {
+                    "$ref": "#/definitions/api.WaitPipeline"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "step_status": {
+                    "description": "StepStatus is, of until=step:\u003cname\u003e, the status the steps of the name\nended with; of several that ended differently, the one that matters\nmost (error, failure, timeout, killed, canceled, declined, success,\nskipped).",
+                    "type": "string"
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "until": {
+                    "description": "Until is the condition waited for.",
+                    "type": "string"
+                },
+                "v": {
+                    "type": "integer"
                 }
             }
         },

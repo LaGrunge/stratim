@@ -208,6 +208,37 @@ You must configure the proxy to set `X-Forwarded` proxy headers:
  }
 ```
 
+### Long polls and streams
+
+`/api/v2/pipelines/{pipeline_id}/wait` answers once a condition of a pipeline is met, after up to 25 minutes, and `/api/v2/events` is a stream that stays open, sending a ping every 15 seconds. A proxy that gives up on a response after a minute, as nginx does by default, ends them with 504. Let the requests under `/api/v2/` take 26 minutes, and do not buffer their responses.
+
+With nginx, add a location for them next to the one above:
+
+```nginx
+    location /api/v2/ {
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host $http_host;
+
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 1560s;
+        proxy_send_timeout 1560s;
+    }
+```
+
+With Apache, give them their own timeout, before the `ProxyPass /` line:
+
+<!-- cspell:ignore flushpackets -->
+
+```apacheconf
+ProxyPass /api/v2/ http://127.0.0.1:8000/api/v2/ timeout=1560 flushpackets=on
+ProxyPassReverse /api/v2/ http://127.0.0.1:8000/api/v2/
+```
+
+When the server stops, it ends the waits and streams first: a wait answers 204, as when its timeout passed, and a stream ends, to be reconnected. While the server restarts, the proxy answers 502 or 503; clients ask again after a backoff.
+
 ### Caddy
 
 This guide provides a brief overview for installing Woodpecker server behind the [Caddy web-server](https://caddyserver.com/). This is an example caddyfile proxy configuration:
