@@ -317,7 +317,7 @@ func (c *Forgejo) Status(ctx context.Context, user *model.User, repo *model.Repo
 		return err
 	}
 
-	_, _, err = client.CreateStatus(
+	_, resp, err := client.CreateStatus(
 		repo.Owner,
 		repo.Name,
 		pipeline.Commit,
@@ -328,7 +328,16 @@ func (c *Forgejo) Status(ctx context.Context, user *model.User, repo *model.Repo
 			Context:     common.GetPipelineStatusContext(repo, pipeline, workflow),
 		},
 	)
-	return err
+	return statusError(resp, err)
+}
+
+// statusError tells the server whether a failed status request may pass if
+// sent again.
+func statusError(resp *forgejo.Response, err error) error {
+	if resp == nil || resp.Response == nil {
+		return common.StatusError(0, nil, err)
+	}
+	return common.StatusError(resp.StatusCode, resp.Header, err)
 }
 
 // Netrc returns a netrc file capable of authenticating Forgejo requests and

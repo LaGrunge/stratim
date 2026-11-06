@@ -32,8 +32,11 @@
 // A status the forge took is not sent again: the server marks a workflow
 // several times while its state stays the same.
 //
-// Marks live in memory; a status not yet through when the server stops is
-// not sent.
+// Marks live in memory. The statuses a forge took, or refused for good, are
+// kept in the store too: on start, Resend marks the recent workflows whose
+// forge has neither, so a status not yet through when the server stopped,
+// or given up on, is sent after all. Those go one at a time, slowly, never
+// in the way of the statuses of the moment.
 package forgestatus
 
 import (
@@ -50,7 +53,6 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge/types"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
-	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 	store_types "go.woodpecker-ci.org/woodpecker/v3/server/store/types"
 )
 
@@ -61,6 +63,13 @@ type Policy struct {
 	MaxWait   time.Duration
 	Window    time.Duration // how long a failing status is tried
 	Senders   int           // pipelines synced at once
+	// Resend sends the statuses not taken of the workflows of the pipelines
+	// created ResendSince ago at most (MaxResendSince at most), ResendMax of
+	// them at most; its requests go one every ResendEvery at most, retries
+	// included. With ResendSince or ResendMax zero it sends none.
+	ResendSince time.Duration
+	ResendMax   int
+	ResendEvery time.Duration
 }
 
 // DefaultPolicy is the policy of the server.
@@ -70,21 +79,35 @@ var DefaultPolicy = Policy{
 	MaxWait:   time.Minute,
 	Window:    10 * time.Minute, //nolint:mnd
 	Senders:   8,                //nolint:mnd
+
+	ResendSince: 3 * 24 * time.Hour,
+	ResendMax:   5000, //nolint:mnd
+	// well below the content creation limit of GitHub, 80 a minute
+	ResendEvery: time.Second,
 }
 
-// withDefaults fills the fields left zero from DefaultPolicy.
+// MaxResendSince is as far back as Resend goes: the statuses of before were
+// taken as taken when the store began recording them, by migration 031.
+const MaxResendSince = 30 * 24 * time.Hour
+
+// withDefaults fills the fields left zero from DefaultPolicy, but for
+// ResendSince and ResendMax: zero turns Resend off.
 func (p Policy) withDefaults() Policy {
 	d := DefaultPolicy
 	for _, f := range []struct {
 		v   *time.Duration
 		def time.Duration
-	}{{&p.Attempt, d.Attempt}, {&p.FirstWait, d.FirstWait}, {&p.MaxWait, d.MaxWait}, {&p.Window, d.Window}} {
+	}{{&p.Attempt, d.Attempt}, {&p.FirstWait, d.FirstWait}, {&p.MaxWait, d.MaxWait}, {&p.Window, d.Window}, {&p.ResendEvery, d.ResendEvery}} {
 		if *f.v <= 0 {
 			*f.v = f.def
 		}
 	}
 	if p.Senders <= 0 {
 		p.Senders = d.Senders
+	}
+	if p.ResendSince > MaxResendSince {
+		log.Warn().Msgf("statuses not taken by the forges: sent again from %s back at most, not %s", MaxResendSince, p.ResendSince)
+		p.ResendSince = MaxResendSince
 	}
 	return p
 }
@@ -93,37 +116,47 @@ func (p Policy) withDefaults() Policy {
 // at most one repeated request each.
 const maxSent = 10000
 
-// Store is what the sender reads.
+// Store is what the sender reads, and where it keeps the statuses taken.
 type Store interface {
 	GetPipeline(id int64) (*model.Pipeline, error)
 	GetRepo(id int64) (*model.Repo, error)
 	GetUser(id int64) (*model.User, error)
 	WorkflowList(pipeline *model.Pipeline) ([]*model.Workflow, error)
+	ForgeStatusSet(status *model.ForgeStatus) error
+	ForgeStatusCandidates(since, before int64, limit int) ([]*model.ForgeStatusCandidate, error)
 }
 
 // Sender sends the statuses of marked workflows to their forges.
 type Sender struct {
-	ctx     context.Context
-	store   Store
-	forgeOf func(*model.Repo) (forge.Forge, error)
-	refresh func(context.Context, forge.Forge, *model.User)
-	policy  Policy
-	slots   chan struct{}
+	ctx        context.Context
+	store      Store
+	forgeOf    func(*model.Repo) (forge.Forge, error)
+	refresh    func(context.Context, forge.Forge, *model.User)
+	policy     Policy
+	slots      chan struct{}
+	resendSlot chan struct{} // the one slot of resent statuses, apart
 
-	mu     sync.Mutex
-	marked map[int64]*marks // pipeline ID -> workflows to sync
-	busy   map[int64]bool   // pipelines with a sender
-	sent   map[int64]string // workflow ID -> the status its forge took
-	wg     sync.WaitGroup   // senders, for tests
+	mu        sync.Mutex
+	marked    map[int64]*marks // pipeline ID -> workflows to sync
+	busy      map[int64]bool   // pipelines with a sender
+	sent      map[int64]string // workflow ID -> the status its forge took
+	resending map[int64]int64  // workflow ID -> pipeline ID, resent and not done with
+	resent    resendCounts
+	resentAt  time.Time      // when the last resent status was marked
+	resendAt  time.Time      // when the next request of a resent status may go
+	page      int            // candidates read at once
+	wg        sync.WaitGroup // senders, for tests
 }
 
 // marks are the workflows of one pipeline to sync.
 type marks struct {
 	all       bool
 	workflows map[int64]bool
+	resend    bool // all of them are resent
 }
 
 func (m *marks) add(o *marks) {
+	m.resend = (m.empty() || m.resend) && o.resend
 	m.all = m.all || o.all
 	for id := range o.workflows {
 		m.workflows[id] = true
@@ -134,27 +167,28 @@ func (m *marks) empty() bool { return !m.all && len(m.workflows) == 0 }
 
 func newMarks() *marks { return &marks{workflows: make(map[int64]bool)} }
 
-// New returns a sender that sends statuses until ctx is done.
-func New(ctx context.Context, s store.Store, forgeOf func(*model.Repo) (forge.Forge, error), policy Policy) *Sender {
-	return newSender(ctx, s, forgeOf, func(ctx context.Context, f forge.Forge, u *model.User) {
-		forge.Refresh(ctx, f, s, u)
-	}, policy)
-}
-
-func newSender(ctx context.Context, s Store, forgeOf func(*model.Repo) (forge.Forge, error), refresh func(context.Context, forge.Forge, *model.User), policy Policy) *Sender {
+// New returns a sender that sends statuses until ctx is done; with refresh
+// it renews the token of a user if its forge needs it.
+func New(ctx context.Context, s Store, forgeOf func(*model.Repo) (forge.Forge, error), refresh func(context.Context, forge.Forge, *model.User), policy Policy) *Sender {
 	policy = policy.withDefaults()
 	return &Sender{
-		ctx:     ctx,
-		store:   s,
-		forgeOf: forgeOf,
-		refresh: refresh,
-		policy:  policy,
-		slots:   make(chan struct{}, policy.Senders),
-		marked:  make(map[int64]*marks),
-		busy:    make(map[int64]bool),
-		sent:    make(map[int64]string),
+		ctx:        ctx,
+		store:      s,
+		forgeOf:    forgeOf,
+		refresh:    refresh,
+		policy:     policy,
+		slots:      make(chan struct{}, policy.Senders),
+		resendSlot: make(chan struct{}, 1),
+		marked:     make(map[int64]*marks),
+		busy:       make(map[int64]bool),
+		sent:       make(map[int64]string),
+		resending:  make(map[int64]int64),
+		page:       resendPage,
 	}
 }
+
+// Wait waits for the senders to end, once ctx is done.
+func (s *Sender) Wait() { s.wg.Wait() }
 
 // Pipeline marks every workflow of the pipeline. A nil sender does nothing.
 func (s *Sender) Pipeline(pipelineID int64) {
@@ -179,6 +213,9 @@ func (s *Sender) Workflow(pipelineID, workflowID int64) {
 func (s *Sender) mark(pipelineID int64, m *marks) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.ctx.Err() != nil {
+		return // the server stops: nobody sends it
+	}
 	if prev, ok := s.marked[pipelineID]; ok {
 		prev.add(m)
 	} else {
@@ -208,12 +245,24 @@ func (s *Sender) take(pipelineID int64, todo *marks) bool {
 	return true
 }
 
+// takeLive adds to todo the marks of the pipeline that came meanwhile if
+// one of them is live, which makes todo live.
+func (s *Sender) takeLive(pipelineID int64, todo *marks) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if m, ok := s.marked[pipelineID]; ok && !m.resend {
+		todo.add(m)
+		delete(s.marked, pipelineID)
+	}
+}
+
 // run sends the statuses of the pipeline until none is marked or failing.
 func (s *Sender) run(pipelineID int64) {
 	defer s.wg.Done()
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error().Msgf("statuses of pipeline %d: sender panicked: %v", pipelineID, r)
+			s.donePipeline(pipelineID, gaveUp)
 			s.restart(pipelineID)
 		}
 	}()
@@ -232,15 +281,25 @@ func (s *Sender) run(pipelineID int64) {
 			waits.Reset()
 			continue
 		}
-		wait := waits.NextBackOff()
-		if after > 0 {
-			// as asked, plus a little, so that senders stalled by one rate
-			// limit do not all retry the same instant; not past the window,
-			// which would hold back newer statuses that long
-			wait = min(after+time.Duration(rand.Int64N(int64(s.policy.FirstWait)+1)), s.policy.Window) //nolint:gosec
+		if todo.resend {
+			if s.takeLive(pipelineID, todo); !todo.resend {
+				continue // a newer status came: it goes now
+			}
 		}
-		sleep(s.ctx, wait)
+		sleep(s.ctx, s.retryWait(waits.NextBackOff(), after))
 	}
+}
+
+// retryWait is how long to wait before the next attempt: the backoff, or as
+// long as the forge asked, plus a little, so that senders stalled by one
+// rate limit do not all retry the same instant; never past the window,
+// which would hold back newer statuses that long.
+func (s *Sender) retryWait(backoffWait, after time.Duration) time.Duration {
+	if after <= 0 {
+		return backoffWait
+	}
+	jitter := time.Duration(rand.Int64N(int64(s.policy.FirstWait) + 1)) //nolint:gosec
+	return min(min(after, s.policy.Window)+jitter, s.policy.Window)
 }
 
 // restart gives the pipeline a new sender if marks came while the one
@@ -284,16 +343,43 @@ func fail(f *failure, value string) *failure {
 func (f *failure) expired(window time.Duration) bool { return time.Since(f.since) > window }
 
 // syncInSlot is sync within one of the slots; ok is false when the server
-// stopped before a slot was free.
+// stopped before a slot was free. Resent statuses have a slot of their own
+// and give way to the statuses of the moment.
 func (s *Sender) syncInSlot(p *pipelineSync, todo *marks) (retry *marks, after time.Duration, ok bool) {
-	select {
-	case s.slots <- struct{}{}:
-	case <-s.ctx.Done():
+	release, ok := s.acquire(p.id, todo)
+	if !ok {
 		return newMarks(), 0, false
 	}
-	defer func() { <-s.slots }()
+	defer release()
 	retry, after = s.sync(p, todo)
 	return retry, after, true
+}
+
+func (s *Sender) acquire(pipelineID int64, todo *marks) (release func(), ok bool) {
+	for todo.resend {
+		select {
+		case s.resendSlot <- struct{}{}:
+			if !s.paceResend() {
+				<-s.resendSlot
+				return nil, false
+			}
+			s.takeLive(pipelineID, todo)
+			if todo.resend {
+				return func() { <-s.resendSlot }, true
+			}
+			<-s.resendSlot // live now: it goes in a slot of the senders
+		case <-s.ctx.Done():
+			return nil, false
+		case <-time.After(s.policy.FirstWait):
+			s.takeLive(pipelineID, todo) // a live mark does not wait for the resent ones
+		}
+	}
+	select {
+	case s.slots <- struct{}{}:
+		return func() { <-s.slots }, true
+	case <-s.ctx.Done():
+		return nil, false
+	}
 }
 
 // outcome is what a status attempt leads to.
@@ -303,6 +389,7 @@ const (
 	taken   outcome = iota // the forge has the status
 	refused                // the forge will not take it; do not send it again
 	failed                 // it may pass if sent again
+	gaveUp                 // it failed for the whole window
 )
 
 // classify tells what the error of a status attempt leads to, and how long
@@ -321,13 +408,26 @@ func classify(err error) (outcome, time.Duration) {
 	}
 }
 
+// refusedForAuth tells whether the forge refused a status for the user's
+// credentials, which a login renews: then a start sends it again.
+func refusedForAuth(err error) bool {
+	statusErr, ok := errors.AsType[*types.StatusError](err)
+	return ok && statusErr.Auth
+}
+
 // sync sends the statuses of the marked workflows of the pipeline. It
 // returns the workflows to try again, and how long a forge asked to wait.
 func (s *Sender) sync(p *pipelineSync, todo *marks) (*marks, time.Duration) {
 	retry := newMarks()
-	pipeline, user, repo, f, workflows, err := s.load(p.id)
+	retry.resend = todo.resend
+	l, err := s.load(p.id)
 	if errors.Is(err, errGone) {
-		return retry, 0
+		// recorded so that a start does not send them again
+		for _, w := range l.marked(todo) {
+			s.storeValue(l.pipeline, w)
+		}
+		s.donePipeline(p.id, refused)
+		return newMarks(), 0
 	}
 	if err != nil {
 		// nothing could be sent; try it all again, within the window
@@ -335,7 +435,8 @@ func (s *Sender) sync(p *pipelineSync, todo *marks) (*marks, time.Duration) {
 		if p.loading.expired(s.policy.Window) {
 			log.Error().Err(err).Msgf("statuses of pipeline %d: gave up after %d attempts", p.id, p.loading.attempts)
 			p.loading = nil
-			return retry, 0
+			s.donePipeline(p.id, gaveUp)
+			return newMarks(), 0
 		}
 		if p.loading.attempts == 1 {
 			log.Warn().Err(err).Msgf("statuses of pipeline %d: trying again", p.id)
@@ -345,19 +446,26 @@ func (s *Sender) sync(p *pipelineSync, todo *marks) (*marks, time.Duration) {
 	p.loading = nil
 
 	var after time.Duration
-	for _, w := range workflows {
-		if !todo.all && !todo.workflows[w.ID] {
-			continue
-		}
-		value := statusValue(pipeline, w)
+	seen := make(map[int64]bool)
+	requested := false
+	for _, w := range l.marked(todo) {
+		seen[w.ID] = true
+		value := model.ForgeStatusValue(l.pipeline.Event, w.State, l.pipeline.Status)
 		if s.sentValue(w.ID) == value {
+			s.done(w.ID, taken)
 			continue
 		}
 
+		// each request of resent statuses waits its turn; acquire waited
+		// for the first
+		if todo.resend && requested && !s.paceResend() {
+			return newMarks(), 0 // the server stops
+		}
+		requested = true
 		ctx, cancel := context.WithTimeout(s.ctx, s.policy.Attempt)
-		err := f.Status(ctx, user, repo, pipeline, w)
+		err := l.forge.Status(ctx, l.user, l.repo, l.pipeline, w)
 		cancel()
-		what := fmt.Sprintf("status %s of %s#%d %s", w.State, repo.FullName, pipeline.Number, w.Name)
+		what := fmt.Sprintf("status %s of %s#%d %s", w.State, l.repo.FullName, l.pipeline.Number, w.Name)
 
 		result, wait := classify(err)
 		if result == failed && s.ctx.Err() != nil {
@@ -366,22 +474,28 @@ func (s *Sender) sync(p *pipelineSync, todo *marks) (*marks, time.Duration) {
 		switch result {
 		case taken:
 			s.setSent(w.ID, value)
+			s.storeValue(l.pipeline, w)
 			if fl := p.failing[w.ID]; fl != nil && fl.value == value {
 				log.Info().Msgf("%s: sent after %d failed attempts in %s", what, fl.attempts, time.Since(fl.since).Round(time.Second))
 			}
 			delete(p.failing, w.ID)
 		case refused:
 			s.setSent(w.ID, "")
+			if !refusedForAuth(err) {
+				s.storeValue(l.pipeline, w) // not sent again on start
+			}
 			delete(p.failing, w.ID)
 			log.Error().Err(err).Msgf("%s: refused by the forge", what)
-		case failed:
+		default:
 			s.setSent(w.ID, "") // the forge may have stored it anyway
 			fl := fail(p.failing[w.ID], value)
 			p.failing[w.ID] = fl
 			if fl.expired(s.policy.Window) {
+				// not recorded: the next start sends it
 				log.Error().Err(err).Msgf("%s: gave up after %d attempts in %s", what, fl.attempts, time.Since(fl.since).Round(time.Second))
 				delete(p.failing, w.ID)
-				continue
+				result = gaveUp
+				break
 			}
 			if fl.attempts == 1 {
 				log.Warn().Err(err).Msgf("%s: failed, trying again", what)
@@ -389,60 +503,96 @@ func (s *Sender) sync(p *pipelineSync, todo *marks) (*marks, time.Duration) {
 			after = max(after, wait)
 			retry.workflows[w.ID] = true
 		}
+		s.done(w.ID, result)
+		countStatus(result)
+	}
+	for id := range todo.workflows {
+		if !seen[id] {
+			s.done(id, refused) // the workflow is no more
+		}
 	}
 	return retry, after
-}
-
-// statusValue is what decides the status a forge shows of the workflow:
-// its state, and the pipeline status, which a deployment shows. The rest
-// of what a forge sends (context, link, description) follows from them or
-// does not change.
-func statusValue(pipeline *model.Pipeline, w *model.Workflow) string {
-	return fmt.Sprintf("%s %s", w.State, pipeline.Status)
 }
 
 // errGone: what the statuses of a pipeline need is not in the store, so
 // they cannot be sent; load logged why.
 var errGone = errors.New("gone")
 
-// load reads what the statuses of the pipeline need, as the store holds it.
-func (s *Sender) load(pipelineID int64) (*model.Pipeline, *model.User, *model.Repo, forge.Forge, []*model.Workflow, error) {
+// loaded is what the statuses of a pipeline need, as the store holds it.
+type loaded struct {
+	pipeline  *model.Pipeline
+	workflows []*model.Workflow
+	repo      *model.Repo
+	user      *model.User
+	forge     forge.Forge
+}
+
+// marked returns the marked workflows; none of a nil loaded.
+func (l *loaded) marked(todo *marks) []*model.Workflow {
+	if l == nil {
+		return nil
+	}
+	var out []*model.Workflow
+	for _, w := range l.workflows {
+		if todo.all || todo.workflows[w.ID] {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// load reads what the statuses of the pipeline need. With errGone it
+// returns the pipeline and its workflows if they are there.
+func (s *Sender) load(pipelineID int64) (*loaded, error) {
 	pipeline, err := s.store.GetPipeline(pipelineID)
 	if errors.Is(err, store_types.ErrRecordNotExist) {
 		log.Debug().Msgf("statuses of pipeline %d: the pipeline was deleted", pipelineID)
-		return nil, nil, nil, nil, nil, errGone
+		return nil, errGone
 	}
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
-	}
-	repo, err := s.store.GetRepo(pipeline.RepoID)
-	if errors.Is(err, store_types.ErrRecordNotExist) {
-		log.Error().Msgf("statuses of pipeline %d: its repository %d is not in the store", pipelineID, pipeline.RepoID)
-		return nil, nil, nil, nil, nil, errGone
-	}
-	if err != nil {
-		return nil, nil, nil, nil, nil, err
-	}
-	user, err := s.store.GetUser(repo.UserID)
-	if errors.Is(err, store_types.ErrRecordNotExist) {
-		log.Error().Msgf("statuses of pipeline %d: user %d of repository %s is not in the store", pipelineID, repo.UserID, repo.FullName)
-		return nil, nil, nil, nil, nil, errGone
-	}
-	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 	workflows, err := s.store.WorkflowList(pipeline)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
-	f, err := s.forgeOf(repo)
+	l := &loaded{pipeline: pipeline, workflows: workflows}
+	l.repo, err = s.store.GetRepo(pipeline.RepoID)
+	if errors.Is(err, store_types.ErrRecordNotExist) {
+		log.Error().Msgf("statuses of pipeline %d: its repository %d is not in the store", pipelineID, pipeline.RepoID)
+		return l, errGone
+	}
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
+	}
+	l.user, err = s.store.GetUser(l.repo.UserID)
+	if errors.Is(err, store_types.ErrRecordNotExist) {
+		log.Error().Msgf("statuses of pipeline %d: user %d of repository %s is not in the store", pipelineID, l.repo.UserID, l.repo.FullName)
+		return l, errGone
+	}
+	if err != nil {
+		return nil, err
+	}
+	l.forge, err = s.forgeOf(l.repo)
+	if err != nil {
+		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(s.ctx, s.policy.Attempt)
 	defer cancel()
-	s.refresh(ctx, f, user)
-	return pipeline, user, repo, f, workflows, nil
+	s.refresh(ctx, l.forge, l.user)
+	return l, nil
+}
+
+// storeValue records in the store the status the forge took, or refused for
+// good, so that a start after this one does not send it again; failing that,
+// it does.
+func (s *Sender) storeValue(pipeline *model.Pipeline, w *model.Workflow) {
+	err := s.store.ForgeStatusSet(&model.ForgeStatus{
+		WorkflowID: w.ID, PipelineID: pipeline.ID, Value: model.ForgeStatusValue(pipeline.Event, w.State, pipeline.Status),
+	})
+	if err != nil {
+		log.Warn().Err(err).Msgf("statuses of pipeline %d: cannot record the one of workflow %d", pipeline.ID, w.ID)
+	}
 }
 
 func (s *Sender) sentValue(workflowID int64) string {
@@ -466,7 +616,7 @@ func (s *Sender) setSent(workflowID int64, value string) {
 }
 
 func sleep(ctx context.Context, d time.Duration) {
-	t := time.NewTimer(d)
+	t := time.NewTimer(max(d, 0))
 	defer t.Stop()
 	select {
 	case <-t.C:

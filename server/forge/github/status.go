@@ -16,11 +16,11 @@ package github
 
 import (
 	"errors"
-	"net/http"
 	"time"
 
 	"github.com/google/go-github/v93/github"
 
+	"go.woodpecker-ci.org/woodpecker/v3/server/forge/common"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge/types"
 )
 
@@ -33,17 +33,15 @@ func asStatusError(resp *github.Response, err error) error {
 	case err == nil:
 		return nil
 	case errors.As(err, &rateLimit):
-		return &types.StatusError{Err: err, RetryAfter: max(time.Until(rateLimit.Rate.Reset.Time), 0)}
+		return &types.StatusError{Err: err, RetryAfter: common.ClampRetryAfter(time.Until(rateLimit.Rate.Reset.Time))}
 	case errors.As(err, &abuse):
 		if abuse.RetryAfter != nil {
-			return &types.StatusError{Err: err, RetryAfter: *abuse.RetryAfter}
+			return &types.StatusError{Err: err, RetryAfter: common.ClampRetryAfter(*abuse.RetryAfter)}
 		}
 		return &types.StatusError{Err: err, RetryAfter: time.Minute}
 	case resp == nil || resp.Response == nil:
-		return err // no answer at all: the connection broke or timed out
-	case resp.StatusCode >= http.StatusInternalServerError, resp.StatusCode == http.StatusTooManyRequests:
-		return err
+		return common.StatusError(0, nil, err)
 	default:
-		return &types.StatusError{Err: err, Final: true}
+		return common.StatusError(resp.StatusCode, resp.Header, err)
 	}
 }

@@ -59,6 +59,7 @@ var migrationTasks = []*xormigrate.Migration{
 	&updatePipelineStructureTagsReleases,
 	&replaceZeroForgeIDsInUsers,
 	&deduplicateLogEntries,
+	&addForgeStatuses,
 }
 
 var allBeans = []any{
@@ -80,6 +81,7 @@ var allBeans = []any{
 	new(model.Forge),
 	new(model.Workflow),
 	new(model.Org),
+	new(model.ForgeStatus),
 }
 
 // TODO: make xormigrate context aware

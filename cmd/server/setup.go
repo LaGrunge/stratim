@@ -34,6 +34,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/jsonnet"
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/cache"
+	"go.woodpecker-ci.org/woodpecker/v3/server/forge"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge/setup"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forgestatus"
 	"go.woodpecker-ci.org/woodpecker/v3/server/logging"
@@ -178,7 +179,11 @@ func setupEvilGlobals(ctx context.Context, c *cli.Command, s store.Store) (err e
 	if err != nil {
 		return fmt.Errorf("could not setup service manager: %w", err)
 	}
-	server.Config.Services.Statuses = forgestatus.New(ctx, s, server.Config.Services.Manager.ForgeFromRepo, forgestatus.DefaultPolicy)
+	statusPolicy := forgestatus.DefaultPolicy
+	statusPolicy.ResendSince = c.Duration("forge-status-resend-since")
+	statusPolicy.ResendMax = c.Int("forge-status-resend-max")
+	server.Config.Services.Statuses = forgestatus.New(ctx, s, server.Config.Services.Manager.ForgeFromRepo,
+		func(ctx context.Context, f forge.Forge, u *model.User) { forge.Refresh(ctx, f, s, u) }, statusPolicy)
 	server.Config.Services.LogStore, err = setupLogStore(c, s)
 	if err != nil {
 		return fmt.Errorf("could not setup log store: %w", err)

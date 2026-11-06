@@ -21,6 +21,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"go.woodpecker-ci.org/woodpecker/v3/server/forgestatus"
 	"go.woodpecker-ci.org/woodpecker/v3/server/services/utils/hostmatcher"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/constant"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/logger"
@@ -489,6 +490,18 @@ var flags = append([]cli.Flag{
 		Name:    "forge-retry",
 		Usage:   "How many retries of fetching the Woodpecker configuration from a forge are done before we fail",
 		Value:   3,
+	},
+	&cli.DurationFlag{
+		Sources: cli.EnvVars("WOODPECKER_FORGE_STATUS_RESEND_SINCE"),
+		Name:    "forge-status-resend-since",
+		Usage:   "on start, send again the commit statuses the forges have not taken of the pipelines created this long ago at most; 0 sends none",
+		Value:   forgestatus.DefaultPolicy.ResendSince,
+	},
+	&cli.IntFlag{
+		Sources: cli.EnvVars("WOODPECKER_FORGE_STATUS_RESEND_MAX"),
+		Name:    "forge-status-resend-max",
+		Usage:   "on start, send again this many commit statuses the forges have not taken at most, newest first; 0 sends none",
+		Value:   forgestatus.DefaultPolicy.ResendMax,
 	},
 	//
 	// generic forge settings

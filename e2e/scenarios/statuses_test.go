@@ -49,6 +49,47 @@ func TestStatusesOutlastAForgeOutage(t *testing.T) {
 	assert.Zero(t, env.Statuses.FailuresLeft(), "the forge was never down")
 }
 
+// TestStatusesOutlastARestart: statuses not through when the server stops
+// are sent by the server started again, and only those.
+func TestStatusesOutlastARestart(t *testing.T) {
+	env := setup.StartServer(t.Context(), t, statusWorkflows)
+	env.Statuses.FailNext(1 << 30) // the forge is down for the whole pipeline
+	agent := setup.StartAgent(t, env.GRPCAddr)
+	setup.WaitForAgentRegistered(t, env.Store, agent)
+
+	created, err := pipeline.Create(t.Context(), env.Store, env.Fixtures.Repo, env.DummyPipeline(model.EventPush))
+	require.NoError(t, err, "create pipeline")
+	finished := setup.WaitForPipelineStatus(t, env.Store, created.ID, model.StatusSuccess, 30*time.Second)
+	workflows, err := env.Store.WorkflowGetTree(finished)
+	require.NoError(t, err)
+	require.Len(t, workflows, len(statusWorkflows))
+
+	env.StopStatuses() // the server stops while the forge is down
+	for _, w := range workflows {
+		require.Empty(t, env.Statuses.Taken(w.ID), "workflow %s", w.Name)
+	}
+	env.Statuses.FailNext(0) // the forge is back
+	env.StartStatuses(t.Context())
+
+	for _, w := range workflows {
+		env.Statuses.WaitForLast(t, w.ID, model.StatusSuccess, 10*time.Second)
+		assert.Equal(t, []model.StatusValue{model.StatusSuccess}, env.Statuses.Taken(w.ID), "workflow %s", w.Name)
+	}
+	// recorded as taken: a start after this one has none to send
+	require.Eventually(t, func() bool {
+		candidates, err := env.Store.ForgeStatusCandidates(0, 0, 100)
+		if err != nil {
+			return false
+		}
+		for _, c := range candidates {
+			if c.Unsent() {
+				return false
+			}
+		}
+		return len(candidates) == len(workflows)
+	}, 10*time.Second, 10*time.Millisecond)
+}
+
 func runAndCheckStatuses(t *testing.T, env *setup.ServerEnv) {
 	t.Helper()
 	agent := setup.StartAgent(t, env.GRPCAddr)

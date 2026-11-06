@@ -32,7 +32,7 @@ type Pipeline struct {
 	EventReason          []string                `json:"event_reason"                xorm:"json 'event_reason'"`
 	Status               StatusValue             `json:"status"                      xorm:"INDEX 'status'"`
 	Errors               []*errors.PipelineError `json:"errors"                      xorm:"json 'errors'"`
-	Created              int64                   `json:"created"                     xorm:"'created' NOT NULL DEFAULT 0 created"`
+	Created              int64                   `json:"created"                     xorm:"'created' NOT NULL DEFAULT 0 created INDEX"`
 	Updated              int64                   `json:"updated"                     xorm:"'updated' NOT NULL DEFAULT 0 updated"`
 	Started              int64                   `json:"started"                     xorm:"started"`
 	Finished             int64                   `json:"finished"                    xorm:"finished"`

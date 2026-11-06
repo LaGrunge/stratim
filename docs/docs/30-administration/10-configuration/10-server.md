@@ -1206,6 +1206,24 @@ Specify how many retries of fetching the Woodpecker configuration from a forge a
 
 ---
 
+### FORGE_STATUS_RESEND_SINCE
+
+- Name: `WOODPECKER_FORGE_STATUS_RESEND_SINCE`
+- Default: 72h
+
+On start, the server sends again the commit statuses the forges have not taken: those not through when it stopped, or given up on after the forge failed for 10 minutes (a fixed retry window, with no option). This bounds them to the pipelines created this long ago at most, 30 days at most: statuses from before the server began recording them are taken as delivered. They are sent in the background, newest first, a request a second at most, retries included, after the statuses of the moment. A status given up on is tried again on every start, until the forge takes or refuses it, while its pipeline is within this bound; so is one refused for the credentials of its user (401, 403), as a login renews them. Once they are through, one log line sums up what became of them; it is left out if the server stops first. `0` sends none. See <https://pkg.go.dev/time#ParseDuration> for syntax reference.
+
+---
+
+### FORGE_STATUS_RESEND_MAX
+
+- Name: `WOODPECKER_FORGE_STATUS_RESEND_MAX`
+- Default: 5000
+
+The most commit statuses sent again on start, see [`FORGE_STATUS_RESEND_SINCE`](#forge_status_resend_since). `0` sends none.
+
+---
+
 ### ENABLE_SWAGGER
 
 - Name: `WOODPECKER_ENABLE_SWAGGER`

@@ -341,8 +341,11 @@ func (c *client) Status(ctx context.Context, u *model.User, repo *model.Repo, pi
 		DateAdded:   bitbucket.DateTime(time.Unix(pipeline.Started, 0)),
 		Ref:         fmt.Sprintf("refs/heads/%s", pipeline.Branch),
 	}
-	_, err = bc.Projects.CreateBuildStatus(ctx, repo.Owner, repo.Name, pipeline.Commit, status)
-	return err
+	resp, err := bc.Projects.CreateBuildStatus(ctx, repo.Owner, repo.Name, pipeline.Commit, status)
+	if resp == nil || resp.Response == nil {
+		return common.StatusError(0, nil, err)
+	}
+	return common.StatusError(resp.StatusCode, resp.Header, err)
 }
 
 func (c *client) Netrc(_ *model.User, r *model.Repo) (*model.Netrc, error) {

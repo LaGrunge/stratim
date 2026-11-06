@@ -296,7 +296,8 @@ func TestRepoCrud(t *testing.T) {
 		new(model.Registry),
 		new(model.Config),
 		new(model.Redirection),
-		new(model.Workflow))
+		new(model.Workflow),
+		new(model.ForgeStatus))
 	defer closer()
 
 	repo := model.Repo{
@@ -362,7 +363,8 @@ func TestRepoDelete(t *testing.T) {
 		new(model.Registry),
 		new(model.Config),
 		new(model.Redirection),
-		new(model.Workflow))
+		new(model.Workflow),
+		new(model.ForgeStatus))
 	defer closer()
 
 	repo := model.Repo{

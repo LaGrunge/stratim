@@ -345,6 +345,7 @@ func (c *Client) do(rawURL, method string, in, out any) (*string, error) {
 		err := Error{}
 		_ = json.NewDecoder(resp.Body).Decode(&err)
 		err.Status = resp.StatusCode
+		err.Header = resp.Header
 		return nil, err
 	}
 

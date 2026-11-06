@@ -45,6 +45,17 @@ func TestStatusErrors(t *testing.T) {
 		{name: "created", reply: func(w http.ResponseWriter) { w.WriteHeader(http.StatusCreated) }},
 		{name: "server error", reply: func(w http.ResponseWriter) { w.WriteHeader(http.StatusBadGateway) }, wantErr: true},
 		{name: "too many requests", reply: func(w http.ResponseWriter) { w.WriteHeader(http.StatusTooManyRequests) }, wantErr: true},
+		{name: "request timeout", reply: func(w http.ResponseWriter) { w.WriteHeader(http.StatusRequestTimeout) }, wantErr: true},
+		{
+			name: "rate limit till year 9999",
+			reply: func(w http.ResponseWriter) {
+				w.Header().Set("X-RateLimit-Remaining", "0")
+				w.Header().Set("X-RateLimit-Reset", "253402300799")
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"message":"API rate limit exceeded"}`))
+			},
+			wantErr: true, wantAfter: 59 * time.Minute,
+		},
 		{name: "unprocessable", reply: func(w http.ResponseWriter) { w.WriteHeader(http.StatusUnprocessableEntity) }, wantErr: true, wantFinal: true},
 		{name: "not found", reply: func(w http.ResponseWriter) { w.WriteHeader(http.StatusNotFound) }, wantErr: true, wantFinal: true},
 		{
@@ -106,6 +117,7 @@ func TestStatusErrors(t *testing.T) {
 			}
 			assert.Equal(t, tt.wantFinal, se.Final, "final")
 			assert.GreaterOrEqual(t, se.RetryAfter, tt.wantAfter, "retry after")
+			assert.LessOrEqual(t, se.RetryAfter, time.Hour, "retry after")
 		})
 	}
 }

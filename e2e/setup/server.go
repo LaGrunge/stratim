@@ -74,6 +74,8 @@ type ServerEnv struct {
 	// PubSub carries the pipeline events the server publishes; see
 	// RecordEvents.
 	PubSub pubsub.PubSub
+
+	stopStatuses context.CancelCauseFunc
 }
 
 func (env *ServerEnv) DummyPipeline(event model.WebhookEvent) *model.Pipeline {
@@ -132,7 +134,9 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	server.Config.Services.Membership = cache.NewMembershipService(memStore)
 	server.Config.Services.Manager = mgr
 	server.Config.Services.LogStore = memStore
-	server.Config.Services.Statuses = forgestatus.New(ctx, memStore, mgr.ForgeFromRepo, statusPolicy)
+	statusCtx, stopStatuses := context.WithCancelCause(ctx)
+	server.Config.Services.Statuses = newStatusSender(statusCtx, memStore, mgr)
+	server.Config.Services.Statuses.Resend(statusCtx)
 
 	server.Config.Server.AgentToken = TestAgentToken
 	server.Config.Server.Host = "http://localhost"
@@ -161,7 +165,35 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 		Statuses: statuses,
 		Manager:  mgr,
 		PubSub:   ps,
+
+		stopStatuses: stopStatuses,
 	}
+}
+
+// StopStatuses stops the sender of commit statuses as a server that stops
+// does: what it has not sent by then it does not send.
+func (env *ServerEnv) StopStatuses() {
+	configLock.Lock()
+	defer configLock.Unlock()
+	env.stopStatuses(nil)
+	server.Config.Services.Statuses.Wait()
+}
+
+// StartStatuses starts a sender of commit statuses on the same store, as the
+// server started again does.
+func (env *ServerEnv) StartStatuses(ctx context.Context) {
+	configLock.Lock()
+	defer configLock.Unlock()
+	statusCtx, stopStatuses := context.WithCancelCause(ctx)
+	env.stopStatuses = stopStatuses
+	server.Config.Services.Statuses = newStatusSender(statusCtx, env.Store, env.Manager)
+	server.Config.Services.Statuses.Resend(statusCtx)
+}
+
+func newStatusSender(ctx context.Context, s store.Store, mgr services.Manager) *forgestatus.Sender {
+	return forgestatus.New(ctx, s, mgr.ForgeFromRepo, func(ctx context.Context, f forge.Forge, u *model.User) {
+		forge.Refresh(ctx, f, s, u)
+	}, statusPolicy)
 }
 
 // newTestManager builds a services.Manager whose SetupForge always returns

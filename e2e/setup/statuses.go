@@ -38,6 +38,10 @@ var statusPolicy = forgestatus.Policy{
 	MaxWait:   50 * time.Millisecond,
 	Window:    10 * time.Second,
 	Senders:   4,
+
+	ResendSince: time.Hour,
+	ResendMax:   100,
+	ResendEvery: 10 * time.Millisecond,
 }
 
 // Statuses is the mock forge's side of commit statuses: it records the

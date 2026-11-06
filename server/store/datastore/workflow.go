@@ -65,22 +65,33 @@ func (s storage) workflowsCreate(sess *xorm.Session, workflows []*model.Workflow
 }
 
 // WorkflowsReplace performs an atomic replacement of workflows and associated steps by deleting all existing workflows and steps and inserting the new ones.
+// A transaction that lost a lock conflict is tried again whole.
 func (s storage) WorkflowsReplace(pipeline *model.Pipeline, workflows []*model.Workflow) error {
-	sess := s.engine.NewSession()
-	defer sess.Close()
-	if err := sess.Begin(); err != nil {
-		return err
-	}
+	return retryWrite(func() error {
+		// the IDs a rolled back attempt gave are not theirs
+		for _, w := range workflows {
+			w.ID = 0
+			for _, step := range w.Children {
+				step.ID = 0
+			}
+		}
 
-	if err := s.workflowsDelete(sess, pipeline.ID); err != nil {
-		return err
-	}
+		sess := s.engine.NewSession()
+		defer sess.Close()
+		if err := sess.Begin(); err != nil {
+			return lockErr(err)
+		}
 
-	if err := s.workflowsCreate(sess, workflows); err != nil {
-		return err
-	}
+		if err := s.workflowsDelete(sess, pipeline.ID); err != nil {
+			return lockErr(err)
+		}
 
-	return sess.Commit()
+		if err := s.workflowsCreate(sess, workflows); err != nil {
+			return err
+		}
+
+		return lockErr(sess.Commit())
+	})
 }
 
 func (s storage) workflowsDelete(sess *xorm.Session, pipelineID int64) error {
@@ -99,6 +110,10 @@ func (s storage) workflowsDelete(sess *xorm.Session, pipelineID int64) error {
 				return err
 			}
 		}
+	}
+
+	if err := forgeStatusesDelete(sess, pipelineID); err != nil {
+		return err
 	}
 
 	_, err := sess.Where("pipeline_id = ?", pipelineID).Delete(new(model.Workflow))

@@ -323,7 +323,16 @@ func (c *config) Status(ctx context.Context, user *model.User, repo *model.Repo,
 		status.Refname = pipeline.Branch
 	}
 
-	return c.newClient(ctx, user).CreateStatus(repo.Owner, repo.Name, pipeline.Commit, &status)
+	return statusError(c.newClient(ctx, user).CreateStatus(repo.Owner, repo.Name, pipeline.Commit, &status))
+}
+
+// statusError tells the server whether a failed status request may pass if
+// sent again.
+func statusError(err error) error {
+	if bbErr, ok := errors.AsType[internal.Error](err); ok {
+		return common.StatusError(bbErr.Status, bbErr.Header, err)
+	}
+	return common.StatusError(0, nil, err)
 }
 
 // Activate activates the repository by registering repository push hooks with

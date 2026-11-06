@@ -295,8 +295,9 @@ func (s *RPC) Init(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 		}
 	}
 
+	event := currentPipeline.Event
 	defer func() {
-		server.Config.Services.Statuses.Workflow(workflow.PipelineID, workflow.ID)
+		markStatuses(event, workflow.PipelineID, workflow.ID)
 		currentPipeline.Workflows, _ = s.store.WorkflowGetTree(currentPipeline)
 
 		if err := s.scheduler.PublishPipelineEvent(c, repo, currentPipeline); err != nil {
@@ -395,6 +396,7 @@ func (s *RPC) Done(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 		return err
 	}
 
+	event := currentPipeline.Event
 	if !model.IsThereRunningStage(currentPipeline.Workflows) {
 		// use the latest finish time of all workflows
 		finished := workflow.Finished
@@ -410,7 +412,7 @@ func (s *RPC) Done(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 		}
 	}
 
-	server.Config.Services.Statuses.Workflow(workflow.PipelineID, workflow.ID)
+	markStatuses(event, workflow.PipelineID, workflow.ID)
 
 	// make sure writes to pubsub are non blocking (https://github.com/woodpecker-ci/woodpecker/blob/c919f32e0b6432a95e1a6d3d0ad662f591adf73f/server/logging/log.go#L9)
 	go func() {
@@ -630,4 +632,14 @@ func (s *RPC) updateAgentLastWork(agent *model.Agent) error {
 	}
 
 	return nil
+}
+
+// markStatuses has the status of the workflow sent to its forge; of every
+// workflow of the pipeline for a deployment, whose status they show.
+func markStatuses(event model.WebhookEvent, pipelineID, workflowID int64) {
+	if event == model.EventDeploy {
+		server.Config.Services.Statuses.Pipeline(pipelineID)
+		return
+	}
+	server.Config.Services.Statuses.Workflow(pipelineID, workflowID)
 }
