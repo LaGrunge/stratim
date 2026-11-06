@@ -146,7 +146,7 @@ func (m *Metadata) Environ() map[string]string {
 	setNonEmptyEnvVar(params, "CI_PREV_COMMIT_URL", prevPipeline.ForgeURL) // why commit url?
 	setNonEmptyEnvVar(params, "CI_PREV_PIPELINE_DEPLOY_TARGET", prevPipeline.DeployTo)
 	setNonEmptyEnvVar(params, "CI_PREV_PIPELINE_DEPLOY_TASK", prevPipeline.DeployTask)
-	setNonEmptyEnvVar(params, "CI_PREV_PIPELINE_STATUS", prevPipeline.Status)
+	setNonEmptyEnvVar(params, "CI_PREV_PIPELINE_STATUS", envPipelineStatus(prevPipeline.Status))
 	setNonEmptyEnvVar(params, "CI_PREV_PIPELINE_CREATED", strconv.FormatInt(prevPipeline.Created, 10))
 	setNonEmptyEnvVar(params, "CI_PREV_PIPELINE_STARTED", strconv.FormatInt(prevPipeline.Started, 10))
 	setNonEmptyEnvVar(params, "CI_PREV_PIPELINE_FINISHED", strconv.FormatInt(prevPipeline.Finished, 10))
@@ -204,4 +204,14 @@ func setNonEmptyEnvVar(env map[string]string, key, value string) {
 	} else {
 		log.Trace().Str("variable", key).Msg("env var is filtered as it's empty")
 	}
+}
+
+// envPipelineStatus is a pipeline status as the environment gives it: a
+// timeout reads as failure, the value plugins and evaluate compare with,
+// as CI_PIPELINE_STATUS does in the runtime.
+func envPipelineStatus(status string) string {
+	if status == "timeout" {
+		return "failure"
+	}
+	return status
 }

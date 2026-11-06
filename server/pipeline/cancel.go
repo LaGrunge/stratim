@@ -29,7 +29,7 @@ import (
 
 // Cancel the pipeline and returns the status.
 func Cancel(ctx context.Context, _forge forge.Forge, store store.Store, repo *model.Repo, user *model.User, pipeline *model.Pipeline, cancelInfo *model.CancelInfo) error {
-	if pipeline.Status != model.StatusRunning && pipeline.Status != model.StatusPending && pipeline.Status != model.StatusBlocked {
+	if !pipelineCancelable(pipeline) {
 		return &ErrBadRequest{Msg: "Cannot cancel a non-running or non-pending or non-blocked pipeline"}
 	}
 
@@ -160,4 +160,10 @@ func cancelPreviousPipelines(
 	}
 
 	return nil
+}
+
+// pipelineCancelable reports whether a pipeline can still be canceled: it is
+// running, pending or blocked.
+func pipelineCancelable(pipeline *model.Pipeline) bool {
+	return pipeline.Status == model.StatusRunning || pipeline.Status == model.StatusPending || pipeline.Status == model.StatusBlocked
 }

@@ -37,6 +37,8 @@ func TestStepStatus(t *testing.T) {
 	step.Failure = FailureFail
 	step.State = StatusError
 	assert.Equal(t, step.Failing(), true)
+	step.State = StatusTimeout
+	assert.Equal(t, step.Failing(), true)
 	step.State = StatusFailure
 	assert.Equal(t, step.Failing(), true)
 	step.State = StatusPending

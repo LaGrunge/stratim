@@ -34,6 +34,11 @@ type (
 		Error    string `json:"error"`
 		Canceled bool   `json:"canceled"`
 		Skipped  bool   `json:"skipped"`
+		// TimedOut tells a timeout, which the exit code cannot: a command may
+		// exit 124 by itself. Alone, with Exited, the step ended by its own
+		// timeout; with Canceled, the workflow's timeout stopped it. A
+		// skipped step never timed out.
+		TimedOut bool `json:"timed_out"`
 	}
 
 	// WorkflowState defines the workflow state.
@@ -42,6 +47,9 @@ type (
 		Finished int64  `json:"finished"`
 		Error    string `json:"error"`
 		Canceled bool   `json:"canceled"`
+		// TimedOut is set for a workflow ended by its timeout. It implies
+		// Canceled: the workflow was stopped, and that is why.
+		TimedOut bool `json:"timed_out"`
 	}
 
 	// Workflow defines the workflow execution details.

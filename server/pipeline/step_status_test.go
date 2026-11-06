@@ -15,6 +15,7 @@
 package pipeline
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -216,6 +217,121 @@ func TestUpdateStepStatus(t *testing.T) {
 			assert.Equal(t, 1, step.ExitCode)
 			assert.Equal(t, "canceled", step.Error)
 		})
+	})
+
+	t.Run("TimedOut", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("ByItsOwnTimeout", func(t *testing.T) {
+			t.Parallel()
+			step := &model.Step{State: model.StatusRunning, Started: 42}
+			state := rpc.StepState{Exited: true, Finished: 100, ExitCode: 124, Error: "step timed out", TimedOut: true}
+
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+
+			assert.NoError(t, err)
+			assert.Equal(t, model.StatusTimeout, step.State)
+			assert.Equal(t, int64(100), step.Finished)
+			assert.Equal(t, 124, step.ExitCode)
+		})
+
+		t.Run("FromPending", func(t *testing.T) {
+			t.Parallel()
+			step := &model.Step{State: model.StatusPending}
+			state := rpc.StepState{Started: 42, Exited: true, Finished: 100, ExitCode: 124, Error: "step timed out", TimedOut: true}
+
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+
+			assert.NoError(t, err)
+			assert.Equal(t, model.StatusTimeout, step.State)
+		})
+
+		t.Run("ByTheWorkflowTimeout", func(t *testing.T) {
+			t.Parallel()
+			step := &model.Step{State: model.StatusRunning, Started: 42}
+			state := rpc.StepState{Canceled: true, TimedOut: true, Exited: true, Finished: 100, ExitCode: 137, Error: "Canceled"}
+
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+
+			assert.NoError(t, err)
+			assert.Equal(t, model.StatusTimeout, step.State)
+			assert.Equal(t, int64(100), step.Finished)
+		})
+
+		t.Run("ByTheWorkflowTimeoutNotExited", func(t *testing.T) {
+			t.Parallel()
+			step := &model.Step{State: model.StatusRunning, Started: 42}
+			state := rpc.StepState{Canceled: true, TimedOut: true}
+
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+
+			assert.NoError(t, err)
+			assert.Equal(t, model.StatusTimeout, step.State)
+			assert.Greater(t, step.Finished, int64(0))
+		})
+
+		// timeout(1) exits 124 too: a command may exit with it by itself
+		t.Run("ExitCode124ByItselfIsFailure", func(t *testing.T) {
+			t.Parallel()
+			step := &model.Step{State: model.StatusRunning, Started: 42}
+			state := rpc.StepState{Exited: true, Finished: 100, ExitCode: 124}
+
+			err := UpdateStepStatus(t.Context(), mockStoreStep(t), step, state)
+
+			assert.NoError(t, err)
+			assert.Equal(t, model.StatusFailure, step.State)
+		})
+
+		// a timeout is a failure of the step: failure: cancel cancels the pipeline
+		t.Run("FailureCancel", func(t *testing.T) {
+			t.Parallel()
+			step := model.Step{State: model.StatusRunning, Started: 42, Failure: model.FailureCancel}
+			state := rpc.StepState{Exited: true, Finished: 100, ExitCode: 124, Error: "step timed out", TimedOut: true}
+
+			newStep, cancelPipeline, err := CalcStepStatus(step, state)
+
+			assert.NoError(t, err)
+			assert.Equal(t, model.StatusTimeout, newStep.State)
+			assert.True(t, cancelPipeline)
+		})
+	})
+
+	// Two steps with failure: cancel time out together: the second finds the
+	// pipeline canceled already, which must not lose its own update.
+	t.Run("FailureCancelOnCanceledPipeline", func(t *testing.T) {
+		t.Parallel()
+		s := mocks.NewMockStore(t)
+		s.On("StepUpdate", mock.MatchedBy(func(step *model.Step) bool {
+			return step.State == model.StatusTimeout
+		})).Return(nil).Once()
+		s.On("GetPipeline", int64(7)).Return(&model.Pipeline{ID: 7, Status: model.StatusKilled}, nil)
+		step := &model.Step{State: model.StatusRunning, Started: 42, PipelineID: 7, Failure: model.FailureCancel}
+		state := rpc.StepState{Exited: true, Finished: 100, ExitCode: 124, Error: "step timed out", TimedOut: true}
+
+		err := UpdateStepStatus(t.Context(), s, step, state)
+
+		assert.NoError(t, err)
+		assert.Equal(t, model.StatusTimeout, step.State)
+	})
+
+	// The step is stored before the pipeline is canceled: a failing cancel
+	// does not lose it.
+	t.Run("FailureCancelStoresStepFirst", func(t *testing.T) {
+		t.Parallel()
+		s := mocks.NewMockStore(t)
+		s.On("StepUpdate", mock.MatchedBy(func(step *model.Step) bool {
+			return step.State == model.StatusTimeout
+		})).Return(nil).Once()
+		s.On("GetPipeline", int64(7)).Return(&model.Pipeline{ID: 7, RepoID: 3, Status: model.StatusRunning}, nil)
+		s.On("GetRepo", int64(3)).Return(nil, errors.New("store unavailable"))
+		step := &model.Step{State: model.StatusRunning, Started: 42, PipelineID: 7, Failure: model.FailureCancel}
+		state := rpc.StepState{Exited: true, Finished: 100, ExitCode: 124, Error: "step timed out", TimedOut: true}
+
+		err := UpdateStepStatus(t.Context(), s, step, state)
+
+		assert.Error(t, err, "the cancel failed")
+		assert.Equal(t, model.StatusTimeout, step.State)
+		s.AssertCalled(t, "StepUpdate", mock.Anything)
 	})
 
 	t.Run("Skipped", func(t *testing.T) {

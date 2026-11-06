@@ -74,6 +74,7 @@ func TestPersistentQueuePollDropsTerminalWorkflowTask(t *testing.T) {
 	terminalStates := []model.StatusValue{
 		model.StatusSuccess,
 		model.StatusFailure,
+		model.StatusTimeout,
 		model.StatusKilled,
 		model.StatusCanceled,
 		model.StatusSkipped,

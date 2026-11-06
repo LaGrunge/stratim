@@ -36,6 +36,7 @@ func TestGetStatus(t *testing.T) {
 		{model.StatusRunning, gitlab.Running},
 		{model.StatusSuccess, gitlab.Success},
 		{model.StatusFailure, gitlab.Failed},
+		{model.StatusTimeout, gitlab.Failed},
 		{model.StatusError, gitlab.Failed},
 		{model.StatusKilled, gitlab.Canceled},
 		{model.StatusDeclined, gitlab.Failed},

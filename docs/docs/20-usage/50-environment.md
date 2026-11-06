@@ -57,6 +57,8 @@ The **Scope** column documents when each variable can be used:
 
 Most variables are available in both scopes. Variables scoped only to `runtime` (e.g. the step-specific variables and `CI_PIPELINE_STATUS`) are not populated while the configuration is evaluated, so they cannot be used in `when` filters or substitutions.
 
+A pipeline or step that timed out reads as `failure` in `CI_PIPELINE_STATUS` and `CI_PREV_PIPELINE_STATUS`, though the web UI and the API show it as `timeout`.
+
 | NAME                               | Scope             | Description                                                                                                                                      | Example                                                                                                                         |
 | ---------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | `CI`                               | `config, runtime` | CI environment name                                                                                                                              | `woodpecker`                                                                                                                    |

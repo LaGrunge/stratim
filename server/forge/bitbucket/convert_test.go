@@ -32,6 +32,7 @@ func TestConvertStatus(t *testing.T) {
 	assert.Equal(t, statusPending, convertStatus(model.StatusRunning))
 	assert.Equal(t, statusPending, convertStatus(model.StatusCreated))
 	assert.Equal(t, statusFailure, convertStatus(model.StatusFailure))
+	assert.Equal(t, statusFailure, convertStatus(model.StatusTimeout))
 	assert.Equal(t, statusFailure, convertStatus(model.StatusKilled))
 	assert.Equal(t, statusFailure, convertStatus(model.StatusError))
 	assert.Equal(t, statusFailure, convertStatus(model.StatusDeclined))

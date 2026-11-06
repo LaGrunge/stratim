@@ -209,7 +209,7 @@ func (r *Runner) Run(runnerCtx context.Context) error {
 		pipeline_runtime.WithContext(workflowCtx),
 		pipeline_runtime.WithTaskUUID(fmt.Sprint(workflow.ID)),
 		pipeline_runtime.WithLogger(r.createLogger(logger, workflow)),
-		pipeline_runtime.WithTracer(r.createTracer(ctxMeta, logger, workflow)),
+		pipeline_runtime.WithTracer(r.createTracer(ctxMeta, workflowCtx, logger, workflow)),
 		pipeline_runtime.WithDescription(map[string]string{
 			"workflow_id":     workflow.ID,
 			"repo":            repoName,
@@ -223,8 +223,9 @@ func (r *Runner) Run(runnerCtx context.Context) error {
 		if errors.Is(err, pipeline_errors.ErrCancel) {
 			// A canceled workflow did not fail. The server stores Error as the
 			// workflow error and shows it as a runtime error, so only report
-			// the cancellation itself.
+			// the cancellation itself, and whether the timeout caused it.
 			state.Canceled = true
+			state.TimedOut = workflowTimedOut(workflowCtx)
 		} else {
 			state.Error = err.Error()
 		}
@@ -233,6 +234,7 @@ func (r *Runner) Run(runnerCtx context.Context) error {
 	logger.Debug().
 		Str("error", state.Error).
 		Bool("canceled", state.Canceled).
+		Bool("timed_out", state.TimedOut).
 		Msg("workflow finished")
 
 	// Update workflow state

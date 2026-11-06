@@ -53,7 +53,7 @@ func pollUntil(timeout time.Duration, condition func() bool) bool {
 // isTerminal returns true if the status is a final (non-running) state.
 func isTerminal(s model.StatusValue) bool {
 	switch s {
-	case model.StatusSuccess, model.StatusFailure, model.StatusKilled,
+	case model.StatusSuccess, model.StatusFailure, model.StatusTimeout, model.StatusKilled,
 		model.StatusError, model.StatusDeclined, model.StatusCanceled:
 		return true
 	}

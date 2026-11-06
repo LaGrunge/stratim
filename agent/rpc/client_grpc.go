@@ -302,6 +302,7 @@ func (c *client) Done(ctx context.Context, workflowID string, state rpc.Workflow
 			Finished: state.Finished,
 			Error:    state.Error,
 			Canceled: state.Canceled,
+			TimedOut: state.TimedOut,
 		},
 	}
 
@@ -342,6 +343,7 @@ func (c *client) Update(ctx context.Context, workflowID string, state rpc.StepSt
 			Error:    state.Error,
 			Canceled: state.Canceled,
 			Skipped:  state.Skipped,
+			TimedOut: state.TimedOut,
 		},
 	}
 

@@ -134,6 +134,7 @@ func TestCheckWorkflowState(t *testing.T) {
 		for _, s := range []model.StatusValue{
 			model.StatusSuccess,
 			model.StatusFailure,
+			model.StatusTimeout,
 			model.StatusKilled,
 			model.StatusError,
 			model.StatusSkipped,
@@ -176,7 +177,7 @@ func TestIsDoneState(t *testing.T) {
 	t.Parallel()
 
 	done := []model.StatusValue{
-		model.StatusSuccess, model.StatusFailure, model.StatusKilled,
+		model.StatusSuccess, model.StatusFailure, model.StatusTimeout, model.StatusKilled,
 		model.StatusCanceled, model.StatusSkipped, model.StatusError,
 		model.StatusDeclined,
 	}
@@ -351,6 +352,11 @@ func TestCheckAgentReportedInitState(t *testing.T) {
 		assert.ErrorIs(t, checkAgentReportedInitState(1, rpc.WorkflowState{Started: time.Now().Unix(), Canceled: true}), ErrAgentImpossibleWorkflowState)
 	})
 
+	t.Run("timed out on init is rejected", func(t *testing.T) {
+		t.Parallel()
+		assert.ErrorIs(t, checkAgentReportedInitState(1, rpc.WorkflowState{Started: time.Now().Unix(), TimedOut: true}), ErrAgentImpossibleWorkflowState)
+	})
+
 	t.Run("pre proto version 16 init signature is rejected", func(t *testing.T) {
 		t.Parallel()
 		assert.ErrorIs(t, checkAgentReportedInitState(1, rpc.WorkflowState{Canceled: true}), ErrAgentImpossibleWorkflowState)
@@ -372,6 +378,21 @@ func TestCheckAgentReportedDoneState(t *testing.T) {
 		assert.NoError(t, checkAgentReportedDoneState(1, rpc.WorkflowState{Started: now, Finished: now, Canceled: true}))
 	})
 
+	t.Run("timed out workflow with started set is allowed", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, checkAgentReportedDoneState(1, rpc.WorkflowState{Started: now, Finished: now, Canceled: true, TimedOut: true}))
+	})
+
+	t.Run("timed out workflow without started is rejected", func(t *testing.T) {
+		t.Parallel()
+		assert.ErrorIs(t, checkAgentReportedDoneState(1, rpc.WorkflowState{Canceled: true, TimedOut: true}), ErrAgentImpossibleWorkflowState)
+	})
+
+	t.Run("timed out workflow not canceled is rejected", func(t *testing.T) {
+		t.Parallel()
+		assert.ErrorIs(t, checkAgentReportedDoneState(1, rpc.WorkflowState{Started: now, Finished: now, TimedOut: true}), ErrAgentImpossibleWorkflowState)
+	})
+
 	t.Run("zero-value state used to finalize skipped workflows is allowed", func(t *testing.T) {
 		t.Parallel()
 		assert.NoError(t, checkAgentReportedDoneState(1, rpc.WorkflowState{}))
@@ -381,4 +402,31 @@ func TestCheckAgentReportedDoneState(t *testing.T) {
 		t.Parallel()
 		assert.ErrorIs(t, checkAgentReportedDoneState(1, rpc.WorkflowState{Canceled: true}), ErrAgentImpossibleWorkflowState)
 	})
+}
+
+func TestCheckAgentReportedStepState(t *testing.T) {
+	t.Parallel()
+
+	for name, state := range map[string]rpc.StepState{
+		"own timeout":      {Exited: true, ExitCode: 124, TimedOut: true},
+		"workflow timeout": {Canceled: true, TimedOut: true},
+		"canceled":         {Canceled: true},
+		"exited":           {Exited: true, ExitCode: 124},
+		"started":          {Started: 100},
+	} {
+		t.Run(name+" is allowed", func(t *testing.T) {
+			t.Parallel()
+			assert.NoError(t, checkAgentReportedStepState(1, state))
+		})
+	}
+
+	for name, state := range map[string]rpc.StepState{
+		"timed out while running": {Started: 100, TimedOut: true},
+		"timed out and skipped":   {Skipped: true, Exited: true, TimedOut: true},
+	} {
+		t.Run(name+" is rejected", func(t *testing.T) {
+			t.Parallel()
+			assert.ErrorIs(t, checkAgentReportedStepState(1, state), ErrAgentImpossibleStepState)
+		})
+	}
 }

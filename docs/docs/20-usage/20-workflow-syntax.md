@@ -201,7 +201,7 @@ If you would like to cancel the full pipeline once the step fails, you can set `
 
 ### `timeout`
 
-A step that runs longer than its `timeout` is stopped and fails with exit code 124, as after any failure: the steps after it run or not as their `when` and its `failure` say. The timeout counts from when the step runs: pulling its image or waiting for a node does not count. A timeout is a duration (`90s`, `1h30m`) or a number of minutes. A detached step and a service have none: they run as long as the workflow. Agents older than this release ignore a step's timeout.
+A step that runs longer than its `timeout` is stopped and ends as `timeout`, with exit code 124. A timeout is a failure: the steps after it run or not as their `when` and its `failure` say, and the workflow and the pipeline end as `timeout` too, unless its failure is ignored or a kill or an error takes priority. The timeout counts from when the step runs: pulling its image or waiting for a node does not count. A timeout is a duration (`90s`, `1h30m`) or a number of minutes. A detached step and a service have none: they run as long as the workflow. An agent from before step timeouts ignores them; one from before the `timeout` status reports a step timeout as a failure.
 
 ```diff
  steps:
@@ -362,7 +362,7 @@ By default, steps only run when the workflow has succeeded up to that point,<br>
 which is equivalent to `status: [ success ]`.
 
 The `status` filter lets you override this behavior.
-The only accepted values are `success` and `failure`.
+The only accepted values are `success` and `failure`; a step that timed out counts as a failure.
 
 A common use case is executing a step on failure, such as sending notifications for a failed workflow/pipeline.
 To run a step regardless of outcome, list both values:
@@ -781,7 +781,7 @@ skip_clone: true
 
 ## `timeout`
 
-A workflow that runs longer than its `timeout` is stopped. It takes the place of the [repository's timeout](./75-project-settings.md#timeout), which is also its ceiling: a config can make a workflow's limit shorter, not longer. Give a long workflow room by raising the repository's timeout, and the quick ones a shorter `timeout` of their own. A duration (`90s`, `1h30m`) is rounded up to whole minutes; a number is minutes.
+A workflow that runs longer than its `timeout` is stopped: it, the steps it stopped and its pipeline end as `timeout`, not `killed` as after a cancel, unless a kill or an error takes priority; steps it never started end as `canceled`. An agent from before the `timeout` status reports a workflow timeout as `killed`. It takes the place of the [repository's timeout](./75-project-settings.md#timeout), which is also its ceiling: a config can make a workflow's limit shorter, not longer. Give a long workflow room by raising the repository's timeout, and the quick ones a shorter `timeout` of their own. A duration (`90s`, `1h30m`) is rounded up to whole minutes; a number is minutes.
 
 ```yaml
 timeout: 3h

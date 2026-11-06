@@ -30,21 +30,24 @@ watch(
   { immediate: true },
 );
 
+// every pipeline status has its favicon: a new status fails the type check
+const faviconStatuses: Record<PipelineStatus, Status> = {
+  declined: 'error',
+  error: 'error',
+  failure: 'error',
+  timeout: 'error',
+  killed: 'error',
+  blocked: 'pending',
+  started: 'pending',
+  running: 'pending',
+  pending: 'pending',
+  success: 'success',
+  skipped: 'default',
+  canceled: 'default',
+};
+
 function convertStatus(status: PipelineStatus): Status {
-  if (['declined', 'error', 'failure', 'killed'].includes(status)) {
-    return 'error';
-  }
-
-  if (['blocked', 'started', 'running', 'pending'].includes(status)) {
-    return 'pending';
-  }
-
-  if (status === 'success') {
-    return 'success';
-  }
-
-  // skipped
-  return 'default';
+  return faviconStatuses[status] ?? 'default';
 }
 
 // number of component/effect scopes currently consuming the favicon status;

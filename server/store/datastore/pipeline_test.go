@@ -203,6 +203,35 @@ func TestPipelineListFilter(t *testing.T) {
 	assert.Equal(t, model.StatusSuccess, pipelines[0].Status)
 }
 
+// A timeout is a failure: status=failure lists the timed out pipelines too,
+// status=timeout only those.
+func TestPipelineListFilterTimeout(t *testing.T) {
+	store, closer := newTestStore(t, new(model.Repo), new(model.Step), new(model.Pipeline))
+	defer closer()
+
+	repo := &model.Repo{UserID: 1, FullName: "o/r", Owner: "o", Name: "r"}
+	require.NoError(t, store.CreateRepo(repo))
+	failed := &model.Pipeline{RepoID: repo.ID, Status: model.StatusFailure}
+	timedOut := &model.Pipeline{RepoID: repo.ID, Status: model.StatusTimeout}
+	succeeded := &model.Pipeline{RepoID: repo.ID, Status: model.StatusSuccess}
+	for _, p := range []*model.Pipeline{failed, timedOut, succeeded} {
+		require.NoError(t, store.CreatePipeline(p))
+	}
+
+	pipelines, err := store.GetPipelineList(repo, nil, &model.PipelineFilter{Status: model.StatusFailure})
+	require.NoError(t, err)
+	ids := make([]int64, 0, len(pipelines))
+	for _, p := range pipelines {
+		ids = append(ids, p.ID)
+	}
+	assert.ElementsMatch(t, []int64{failed.ID, timedOut.ID}, ids)
+
+	pipelines, err = store.GetPipelineList(repo, nil, &model.PipelineFilter{Status: model.StatusTimeout})
+	require.NoError(t, err)
+	require.Len(t, pipelines, 1)
+	assert.Equal(t, timedOut.ID, pipelines[0].ID)
+}
+
 func TestPipelineIncrement(t *testing.T) {
 	store, closer := newTestStore(t, new(model.Pipeline), new(model.Repo))
 	defer closer()

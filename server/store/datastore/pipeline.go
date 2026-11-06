@@ -82,7 +82,12 @@ func (s storage) GetPipelineList(repo *model.Repo, p *model.ListOptionsWithAll, 
 			cond = cond.And(builder.Eq{"branch": f.Branch})
 		}
 
-		if f.Status != "" {
+		switch f.Status {
+		case "":
+		case model.StatusFailure:
+			// a timeout is a failure with a known cause
+			cond = cond.And(builder.In("status", model.StatusFailure, model.StatusTimeout))
+		default:
 			cond = cond.And(builder.Eq{"status": f.Status})
 		}
 

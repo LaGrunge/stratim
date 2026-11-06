@@ -46,6 +46,7 @@ type StepState struct {
 	Error         string                 `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`
 	Canceled      bool                   `protobuf:"varint,7,opt,name=canceled,proto3" json:"canceled,omitempty"`
 	Skipped       bool                   `protobuf:"varint,8,opt,name=skipped,proto3" json:"skipped,omitempty"`
+	TimedOut      bool                   `protobuf:"varint,9,opt,name=timed_out,json=timedOut,proto3" json:"timed_out,omitempty"` // ended by its own or its workflow's timeout
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -136,12 +137,20 @@ func (x *StepState) GetSkipped() bool {
 	return false
 }
 
+func (x *StepState) GetTimedOut() bool {
+	if x != nil {
+		return x.TimedOut
+	}
+	return false
+}
+
 type WorkflowState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Started       int64                  `protobuf:"varint,1,opt,name=started,proto3" json:"started,omitempty"`
 	Finished      int64                  `protobuf:"varint,2,opt,name=finished,proto3" json:"finished,omitempty"`
 	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
 	Canceled      bool                   `protobuf:"varint,4,opt,name=canceled,proto3" json:"canceled,omitempty"`
+	TimedOut      bool                   `protobuf:"varint,5,opt,name=timed_out,json=timedOut,proto3" json:"timed_out,omitempty"` // ended by its timeout
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -200,6 +209,13 @@ func (x *WorkflowState) GetError() string {
 func (x *WorkflowState) GetCanceled() bool {
 	if x != nil {
 		return x.Canceled
+	}
+	return false
+}
+
+func (x *WorkflowState) GetTimedOut() bool {
+	if x != nil {
+		return x.TimedOut
 	}
 	return false
 }
@@ -1216,7 +1232,7 @@ var File_woodpecker_proto protoreflect.FileDescriptor
 
 const file_woodpecker_proto_rawDesc = "" +
 	"\n" +
-	"\x10woodpecker.proto\x12\x05proto\"\xdf\x01\n" +
+	"\x10woodpecker.proto\x12\x05proto\"\xfc\x01\n" +
 	"\tStepState\x12\x1b\n" +
 	"\tstep_uuid\x18\x01 \x01(\tR\bstepUuid\x12\x18\n" +
 	"\astarted\x18\x02 \x01(\x03R\astarted\x12\x1a\n" +
@@ -1225,12 +1241,14 @@ const file_woodpecker_proto_rawDesc = "" +
 	"\texit_code\x18\x05 \x01(\x05R\bexitCode\x12\x14\n" +
 	"\x05error\x18\x06 \x01(\tR\x05error\x12\x1a\n" +
 	"\bcanceled\x18\a \x01(\bR\bcanceled\x12\x18\n" +
-	"\askipped\x18\b \x01(\bR\askipped\"w\n" +
+	"\askipped\x18\b \x01(\bR\askipped\x12\x1b\n" +
+	"\ttimed_out\x18\t \x01(\bR\btimedOut\"\x94\x01\n" +
 	"\rWorkflowState\x12\x18\n" +
 	"\astarted\x18\x01 \x01(\x03R\astarted\x12\x1a\n" +
 	"\bfinished\x18\x02 \x01(\x03R\bfinished\x12\x14\n" +
 	"\x05error\x18\x03 \x01(\tR\x05error\x12\x1a\n" +
-	"\bcanceled\x18\x04 \x01(\bR\bcanceled\"w\n" +
+	"\bcanceled\x18\x04 \x01(\bR\bcanceled\x12\x1b\n" +
+	"\ttimed_out\x18\x05 \x01(\bR\btimedOut\"w\n" +
 	"\bLogEntry\x12\x1b\n" +
 	"\tstep_uuid\x18\x01 \x01(\tR\bstepUuid\x12\x12\n" +
 	"\x04time\x18\x02 \x01(\x03R\x04time\x12\x12\n" +

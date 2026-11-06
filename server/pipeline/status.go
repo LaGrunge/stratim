@@ -35,7 +35,10 @@ var statusPriorityOrder = []model.StatusValue{
 	model.StatusRunning,
 	model.StatusPending,
 
-	// finished states
+	// finished states. A timeout is a failure with a known cause, one that
+	// rarely lies in the change itself (a hang, a slow machine): it is named
+	// over a plain failure so it is not hidden behind it.
+	model.StatusTimeout,
 	model.StatusFailure,
 	model.StatusSuccess,
 
@@ -65,5 +68,15 @@ func MergeStatusValues(s, t model.StatusValue) model.StatusValue {
 	if t == model.StatusCanceled {
 		t = model.StatusKilled
 	}
-	return statusPriorityOrder[min(priorityMap[s], priorityMap[t])]
+	return statusPriorityOrder[min(priority(s), priority(t))]
+}
+
+// priority is the rank of s in statusPriorityOrder. A status it does not
+// know (one a newer release wrote, say) ranks as a failure: it must not
+// read as the highest priority, declined.
+func priority(s model.StatusValue) int {
+	if p, ok := priorityMap[s]; ok {
+		return p
+	}
+	return priorityMap[model.StatusFailure]
 }

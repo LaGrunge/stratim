@@ -58,5 +58,8 @@ func UpdateWorkflowStatusToDone(store store.Store, workflow model.Workflow, stat
 	if state.Canceled {
 		workflow.State = model.StatusKilled
 	}
+	if state.TimedOut {
+		workflow.State = model.StatusTimeout
+	}
 	return &workflow, store.WorkflowUpdate(&workflow)
 }

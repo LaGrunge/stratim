@@ -68,7 +68,7 @@ func New(r *model.Repo, b *model.Pipeline, url string) *CCProjects {
 		proj.LastBuildStatus = "Exception"
 	case model.StatusSuccess:
 		proj.LastBuildStatus = "Success"
-	case model.StatusFailure:
+	case model.StatusFailure, model.StatusTimeout:
 		proj.LastBuildStatus = "Failure"
 	}
 

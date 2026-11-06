@@ -35,6 +35,7 @@ const (
 	StatusRunning = "running"
 	StatusSuccess = "success"
 	StatusFailure = "failure"
+	StatusTimeout = "timeout" // ended by a timeout; it counts as a failure
 	StatusKilled  = "killed"
 	StatusError   = "error"
 )

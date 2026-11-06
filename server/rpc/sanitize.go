@@ -100,18 +100,7 @@ func isActiveState(state model.StatusValue) bool {
 
 // isDoneState returns true for terminal states where no further work will happen.
 func isDoneState(state model.StatusValue) bool {
-	switch state {
-	case model.StatusSuccess,
-		model.StatusFailure,
-		model.StatusKilled,
-		model.StatusCanceled,
-		model.StatusSkipped,
-		model.StatusError,
-		model.StatusDeclined:
-		return true
-	default:
-		return false
-	}
+	return state.IsDone()
 }
 
 // checkWorkflowAllowsStepUpdate validates whether the workflow state permits
@@ -140,10 +129,10 @@ func checkWorkflowAllowsStepUpdate(workflowState model.StatusValue, step *model.
 
 // checkAgentReportedInitState validates the workflow state an agent reports
 // on Init. An agent always stamps Started before calling Init and cannot know
-// a cancel result yet, so a zero Started or a set Canceled flag cannot come
-// from a compatible agent.
+// a cancel or timeout result yet, so a zero Started or a set Canceled or
+// TimedOut flag cannot come from a compatible agent.
 func checkAgentReportedInitState(agentID int64, state rpc.WorkflowState) error {
-	if state.Started == 0 || state.Canceled {
+	if state.Started == 0 || state.Canceled || state.TimedOut {
 		retErr := ErrAgentImpossibleWorkflowState
 		log.Error().Err(retErr).Int64("agentID", agentID).Msgf("init: impossible workflow state reported: %#v", state)
 		return retErr
@@ -152,10 +141,13 @@ func checkAgentReportedInitState(agentID int64, state rpc.WorkflowState) error {
 }
 
 // checkAgentReportedDoneState validates the workflow state an agent reports
-// on Done. A canceled workflow was necessarily started, so Canceled combined
-// with a zero Started timestamp cannot come from a compatible agent.
+// on Done. A canceled or timed out workflow was necessarily started, so
+// Canceled or TimedOut combined with a zero Started timestamp cannot come from
+// a compatible agent.
+// A timed out workflow is a canceled one, so TimedOut without Canceled
+// cannot come from one either.
 func checkAgentReportedDoneState(agentID int64, state rpc.WorkflowState) error {
-	if state.Canceled && state.Started == 0 {
+	if ((state.Canceled || state.TimedOut) && state.Started == 0) || (state.TimedOut && !state.Canceled) {
 		retErr := ErrAgentImpossibleWorkflowState
 		log.Error().Err(retErr).Int64("agentID", agentID).Msgf("done: impossible workflow state reported: %#v", state)
 		return retErr
@@ -200,4 +192,17 @@ func allowAppendingLogs(currPipeline *model.Pipeline, currStep *model.Step) erro
 	err := ErrAgentIllegalLogStreaming
 	log.Error().Err(err).Msg("caught agent performing illegal instruction")
 	return err
+}
+
+// checkAgentReportedStepState validates a step state an agent reports on
+// Update. A step its own timeout ended has exited, one the workflow's timeout
+// stopped is canceled, and a skipped step never ran to time out: TimedOut
+// with neither, or with Skipped, cannot come from a compatible agent.
+func checkAgentReportedStepState(agentID int64, state rpc.StepState) error {
+	if state.TimedOut && (state.Skipped || !state.Exited && !state.Canceled) {
+		retErr := ErrAgentImpossibleStepState
+		log.Error().Err(retErr).Int64("agentID", agentID).Msgf("update: impossible step state reported: %#v", state)
+		return retErr
+	}
+	return nil
 }

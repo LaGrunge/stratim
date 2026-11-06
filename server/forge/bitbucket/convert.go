@@ -42,7 +42,7 @@ func convertStatus(status model.StatusValue) string {
 		return statusPending
 	case model.StatusSuccess:
 		return statusSuccess
-	case model.StatusFailure, model.StatusKilled, model.StatusError, model.StatusDeclined, model.StatusSkipped, model.StatusCanceled:
+	case model.StatusFailure, model.StatusTimeout, model.StatusKilled, model.StatusError, model.StatusDeclined, model.StatusSkipped, model.StatusCanceled:
 		return statusFailure
 	default:
 		log.Warn().Str("status", string(status)).Msg("unknown pipeline status")

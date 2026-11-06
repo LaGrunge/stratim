@@ -65,6 +65,8 @@ func GetPipelineStatusDescription(status model.StatusValue) string {
 		return "Pipeline was successful"
 	case model.StatusFailure, model.StatusError:
 		return "Pipeline failed"
+	case model.StatusTimeout:
+		return "Pipeline timed out"
 	case model.StatusKilled:
 		return "Pipeline was canceled"
 	case model.StatusBlocked:

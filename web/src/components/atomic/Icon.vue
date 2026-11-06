@@ -34,6 +34,7 @@
     :path="mdiCloseCircle"
     size="1.3rem"
   />
+  <SvgIcon v-else-if="name === 'status-timeout'" :path="mdiClockAlert" size="1.3rem" />
   <SvgIcon v-else-if="name === 'status-pending' || name === 'status-created'" :path="mdiRadioboxBlank" size="1.3rem" />
   <SvgIcon
     v-else-if="name === 'status-running' || name === 'status-started'"
@@ -120,6 +121,7 @@ import {
   mdiCalendarClockOutline,
   mdiCheckCircle,
   mdiChevronRight,
+  mdiClockAlert,
   mdiClockTimeEightOutline,
   mdiClose,
   mdiCloseCircle,
@@ -203,6 +205,7 @@ export type IconNames =
   | 'status-declined'
   | 'status-error'
   | 'status-failure'
+  | 'status-timeout'
   | 'status-killed'
   | 'status-pending'
   | 'status-created'

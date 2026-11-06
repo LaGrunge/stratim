@@ -5839,6 +5839,7 @@ const docTemplate = `{
                 "running",
                 "success",
                 "failure",
+                "timeout",
                 "killed",
                 "canceled",
                 "error",
@@ -5857,7 +5858,8 @@ const docTemplate = `{
                 "StatusPending": "pending to be executed",
                 "StatusRunning": "currently running",
                 "StatusSkipped": "skipped as per condition of current workflow failed/success state",
-                "StatusSuccess": "successfully finished"
+                "StatusSuccess": "successfully finished",
+                "StatusTimeout": "ended by its own or its workflow's timeout"
             },
             "x-enum-descriptions": [
                 "skipped as per condition of current workflow failed/success state",
@@ -5865,6 +5867,7 @@ const docTemplate = `{
                 "currently running",
                 "successfully finished",
                 "failed to finish (exit code != 0)",
+                "ended by its own or its workflow's timeout",
                 "killed by user",
                 "canceled but hasn't been started",
                 "error with the config / while parsing / some other system problem",
@@ -5878,6 +5881,7 @@ const docTemplate = `{
                 "StatusRunning",
                 "StatusSuccess",
                 "StatusFailure",
+                "StatusTimeout",
                 "StatusKilled",
                 "StatusCanceled",
                 "StatusError",

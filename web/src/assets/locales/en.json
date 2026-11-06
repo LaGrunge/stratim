@@ -288,6 +288,7 @@
         "declined": "declined",
         "error": "error",
         "failure": "failure",
+        "timeout": "timed out",
         "killed": "killed"
       },
       "errors": "Errors",
