@@ -1,0 +1,15 @@
+# want: ninja
+# exit: 1
+# state: failure
+---
+[40/900] Building CXX object sql/dbcon/execplan/CMakeFiles/execplan.dir/obj40.cpp.o
+[41/900] Building CXX object sql/dbcon/execplan/CMakeFiles/execplan.dir/obj41.cpp.o
+[42/900] Building CXX object sql/dbcon/execplan/CMakeFiles/execplan.dir/obj42.cpp.o
+[43/900] Building CXX object sql/dbcon/execplan/CMakeFiles/execplan.dir/obj43.cpp.o
+FAILED: [code=1] sql/CMakeFiles/sql.dir/sql_select.cc.o
+/usr/bin/clang++ -DHAVE_CONFIG_H -I/src/include -O2 -g -std=c++17 -c /src/sql/sql_select.cc -o sql/CMakeFiles/sql.dir/sql_select.cc.o
+/src/sql/sql_select.cc:30211:10: error: use of undeclared identifier 'join_tab_cmp'
+  return join_tab_cmp(jt1, jt2);
+         ^
+1 error generated.
+ninja: build stopped: subcommand failed.

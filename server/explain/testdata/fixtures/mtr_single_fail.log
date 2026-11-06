@@ -1,0 +1,60 @@
+# want: mtr
+# exit: 1
+# state: failure
+---
++ ./mtr --force --parallel=4 --suite=main,innodb,columnstore/basic
+Logging: ./mariadb-test-run.pl  --force --parallel=4 --suite=main,innodb,columnstore/basic
+VS config:
+vardir: /home/buildbot/build/mysql-test/var
+Checking leftover processes...
+Removing old var directory...
+Creating var directory '/home/buildbot/build/mysql-test/var'...
+Checking supported features...
+MariaDB Version 11.8.2-MariaDB
+ - SSL connections supported
+ - binaries built with wsrep patch
+Collecting tests...
+Installing system database...
+
+==============================================================================
+
+TEST                                  WORKER RESULT   TIME (ms) or COMMENT
+--------------------------------------------------------------------------
+
+worker[01] Using MTR_BUILD_THREAD 300, with reserved ports 16000..16019
+worker[02] Using MTR_BUILD_THREAD 301, with reserved ports 16020..16039
+main.alias                               w1 [ pass ]    132
+main.alter_table_online                  w2 [ pass ]   4012
+innodb.alter_algorithm                   w3 [ pass ]    810
+main.subselect_sj                        w1 [ pass ]   2210
+columnstore/basic.mcs76_having           w4 [ fail ]
+        Test ended at 2026-11-05 12:04:11
+
+CURRENT_TEST: columnstore/basic.mcs76_having
+mysqltest: At line 47: query 'SELECT col1, SUM(col2) FROM t1 GROUP BY col1 HAVING SUM(col2) > 10' failed: ER_INTERNAL_ERROR (1815): Internal error: MCS-2021: 'HAVING' is not supported in this context.
+
+The result from queries just before the failure was:
+< snip >
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (col1 INT, col2 INT) ENGINE=Columnstore;
+INSERT INTO t1 VALUES (1,5),(1,7),(2,3);
+
+ - saving '/home/buildbot/build/mysql-test/var/4/log/columnstore/basic.mcs76_having/' to '/home/buildbot/build/mysql-test/var/log/columnstore/basic.mcs76_having/'
+main.view                                w2 [ pass ]   1520
+innodb.purge                             w3 [ pass ]    901
+--------------------------------------------------------------------------
+The servers were restarted 12 times
+Spent 812.345 of 220 seconds executing testcases
+
+Check of testcase failed for: main.not_existing
+
+Completed: Failed 1/1834 tests, 99.95% were successful.
+
+Failing test(s): columnstore/basic.mcs76_having
+
+The log files in var/log may give you some hint of what went wrong.
+
+If you want to report this error, please read first the documentation
+at https://mariadb.com/kb/en/mariadb-test-run-pl/
+
+mysql-test-run: *** ERROR: there were failing test cases

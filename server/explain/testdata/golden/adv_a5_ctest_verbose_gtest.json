@@ -1,0 +1,66 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "gtest",
+      "title": "gtest: RowGroup.Nulls failed at rowgroup-tests.cpp:211",
+      "line": 3,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 3,
+          "text": "/src/tests/rowgroup-tests.cpp:211: Failure"
+        },
+        {
+          "n": 4,
+          "text": "Expected equality of these values:"
+        },
+        {
+          "n": 5,
+          "text": "[  FAILED  ] RowGroup.Nulls (1 ms)"
+        }
+      ]
+    },
+    {
+      "kind": "ctest",
+      "title": "ctest: rowgroup_tests failed (Failed)",
+      "line": 8,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 8,
+          "text": "3/3 Test #3: rowgroup_tests ...................***Failed    0.05 sec"
+        },
+        {
+          "n": 9,
+          "text": ""
+        },
+        {
+          "n": 10,
+          "text": "67% tests passed, 1 tests failed out of 3"
+        },
+        {
+          "n": 11,
+          "text": ""
+        },
+        {
+          "n": 12,
+          "text": "The following tests FAILED:"
+        },
+        {
+          "n": 13,
+          "text": "\t  3 - rowgroup_tests (Failed)"
+        },
+        {
+          "n": 14,
+          "text": "Errors while running CTest"
+        }
+      ]
+    }
+  ],
+  "lines": 14,
+  "from": 1,
+  "untrusted": true
+}

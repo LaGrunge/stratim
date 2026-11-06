@@ -22,6 +22,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server/events"
+	"go.woodpecker-ci.org/woodpecker/v3/server/explain/worker"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forgestatus"
 	"go.woodpecker-ci.org/woodpecker/v3/server/services/utils/hostmatcher"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/constant"
@@ -350,6 +351,18 @@ var flags = append([]cli.Flag{
 		Name:    "events-buffer-size",
 		Usage:   "how many of the latest pipeline events /api/v2/events keeps to replay to a client that reconnects, at most 100000",
 		Value:   events.DefaultBufferSize,
+	},
+	&cli.IntFlag{
+		Sources: cli.EnvVars("STRATIM_EXPLAIN_WORKERS"),
+		Name:    "explain-workers",
+		Usage:   "how many failed steps are explained at once in the background for step.explained events, at most 16; 0 turns them off",
+		Value:   worker.DefaultWorkers,
+	},
+	&cli.DurationFlag{
+		Sources: cli.EnvVars("STRATIM_EXPLAIN_TIMEOUT"),
+		Name:    "explain-timeout",
+		Usage:   "the longest explaining one failed step in the background may take",
+		Value:   worker.DefaultTimeout,
 	},
 	&cli.DurationFlag{
 		Sources: cli.EnvVars("STRATIM_JSONNET_TIMEOUT"),

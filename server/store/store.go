@@ -140,6 +140,8 @@ type Store interface {
 
 	// Steps
 	StepLoad(pipelineID, stepID int64) (*model.Step, error)
+	// StepGet gives the step with the id, of whatever pipeline.
+	StepGet(stepID int64) (*model.Step, error)
 	StepByUUID(uuid string) (*model.Step, error)
 	StepList(pipelineID int64) ([]*model.Step, error)
 	StepUpdate(*model.Step) error
@@ -148,6 +150,8 @@ type Store interface {
 	// Logs
 	LogFind(context.Context, *model.Step) ([]*model.LogEntry, error)
 	LogStream(context.Context, *model.Step, func(*model.LogEntry) error) error
+	LogStreamFrom(context.Context, *model.Step, int, func(*model.LogEntry) error) error
+	LogLastLine(context.Context, *model.Step) (int, error)
 	LogAppend(context.Context, *model.Step, []*model.LogEntry) error
 	LogDelete(context.Context, *model.Step) error
 	StepFinished(context.Context, *model.Step) error

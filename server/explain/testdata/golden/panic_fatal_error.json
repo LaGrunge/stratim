@@ -1,0 +1,42 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 2,
+  "causes": [
+    {
+      "kind": "panic",
+      "title": "Go fatal error: concurrent map writes",
+      "line": 3,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 3,
+          "text": "fatal error: concurrent map writes"
+        },
+        {
+          "n": 5,
+          "text": "goroutine 88 [running]:"
+        },
+        {
+          "n": 6,
+          "text": "example.com/ci/server/cache.(*Cache).Set(0xc0001b2000, {0xc000312000, 0x8}, {0x9b1e20, 0xc0003a0010})"
+        },
+        {
+          "n": 7,
+          "text": "\t/src/server/cache/cache.go:41 +0x8d"
+        },
+        {
+          "n": 8,
+          "text": "created by example.com/ci/server.Start in goroutine 1"
+        },
+        {
+          "n": 9,
+          "text": "\t/src/server/server.go:120 +0x2a5"
+        }
+      ]
+    }
+  ],
+  "lines": 9,
+  "from": 1,
+  "untrusted": true
+}

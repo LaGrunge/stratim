@@ -1,0 +1,26 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "cmake",
+      "title": "cmake: The source directory \"/src/server\" does not appear to contain CMakeLists.txt.",
+      "line": 2,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 2,
+          "text": "CMake Error: The source directory \"/src/server\" does not appear to contain CMakeLists.txt."
+        },
+        {
+          "n": 3,
+          "text": "Specify --help for usage, or press the help button on the CMake GUI."
+        }
+      ]
+    }
+  ],
+  "lines": 3,
+  "from": 1,
+  "untrusted": true
+}

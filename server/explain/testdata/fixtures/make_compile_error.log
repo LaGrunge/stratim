@@ -1,0 +1,14 @@
+# want: compile
+# exit: 2
+# state: failure
+---
++ make -j8
+[  2%] Building C object libmariadb/CMakeFiles/mariadb_obj.dir/ma_array.c.o
+[  3%] Building C object libmariadb/CMakeFiles/mariadb_obj.dir/ma_charset.c.o
+[  5%] Building CXX object storage/columnstore/columnstore/utils/funcexp/CMakeFiles/funcexp.dir/func_add_time.cpp.o
+/src/storage/columnstore/columnstore/utils/funcexp/func_add_time.cpp:154:7: error: 'dataconvert' has not been declared
+  154 |       dataconvert::DataConvert::timeToInt(val);
+      |       ^~~~~~~~~~~
+make[2]: *** [storage/columnstore/columnstore/utils/funcexp/CMakeFiles/funcexp.dir/build.make:76: storage/columnstore/columnstore/utils/funcexp/CMakeFiles/funcexp.dir/func_add_time.cpp.o] Error 1
+make[1]: *** [CMakeFiles/Makefile2:9210: storage/columnstore/columnstore/utils/funcexp/CMakeFiles/funcexp.dir/all] Error 2
+make: *** [Makefile:166: all] Error 2

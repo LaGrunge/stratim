@@ -1,0 +1,71 @@
+# want: mtr
+# exit: 1
+# state: failure
+---
++ ./mtr --force --parallel=4 --suite=main,innodb,columnstore/basic
+Logging: ./mariadb-test-run.pl  --force --parallel=4 --suite=main,innodb,columnstore/basic
+VS config:
+vardir: /home/buildbot/build/mysql-test/var
+Checking leftover processes...
+Removing old var directory...
+Creating var directory '/home/buildbot/build/mysql-test/var'...
+Checking supported features...
+MariaDB Version 11.8.2-MariaDB
+ - SSL connections supported
+ - binaries built with wsrep patch
+Collecting tests...
+Installing system database...
+
+==============================================================================
+
+TEST                                  WORKER RESULT   TIME (ms) or COMMENT
+--------------------------------------------------------------------------
+
+worker[01] Using MTR_BUILD_THREAD 300, with reserved ports 16000..16019
+worker[02] Using MTR_BUILD_THREAD 301, with reserved ports 16020..16039
+main.alias                               w1 [ pass ]    132
+main.alter_table_online                  w2 [ pass ]   4012
+innodb.alter_algorithm                   w3 [ pass ]    810
+main.flush_logs_not_windows              w1 [ fail ]
+        Test ended at 2026-11-05 12:05:01
+
+CURRENT_TEST: main.flush_logs_not_windows
+mysqltest: At line 18: query 'flush logs' failed: 1 (Operation not permitted)
+
+Retrying test main.flush_logs_not_windows, attempt(2/3)...
+
+main.flush_logs_not_windows              w1 [ retry-pass ]    215
+innodb.innodb_bug53756                   w2 [ fail ]
+        Test ended at 2026-11-05 12:05:44
+
+CURRENT_TEST: innodb.innodb_bug53756
+--- /home/buildbot/server/mysql-test/suite/innodb/r/innodb_bug53756.result
++++ /home/buildbot/server/mysql-test/suite/innodb/r/innodb_bug53756.reject
+@@ -79,7 +79,7 @@
+ SELECT * FROM bug_53756;
+ pk	c1
+ 1	ABC
+-2	DEF
++2	XYZ
+
+mysqltest: Result content mismatch
+
+Retrying test innodb.innodb_bug53756, attempt(2/3)...
+
+innodb.innodb_bug53756                   w2 [ retry-fail ]
+--------------------------------------------------------------------------
+The servers were restarted 12 times
+Spent 812.345 of 220 seconds executing testcases
+
+Check of testcase failed for: main.not_existing
+
+Completed: Failed 1/1834 tests, 99.95% were successful.
+
+Failing test(s): innodb.innodb_bug53756
+
+The log files in var/log may give you some hint of what went wrong.
+
+If you want to report this error, please read first the documentation
+at https://mariadb.com/kb/en/mariadb-test-run-pl/
+
+mysql-test-run: *** ERROR: there were failing test cases

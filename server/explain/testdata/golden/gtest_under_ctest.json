@@ -1,0 +1,82 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 8,
+  "causes": [
+    {
+      "kind": "gtest",
+      "title": "gtest: ColumnstoreRowgroup.SerializeNulls failed at rowgroup-tests.cpp:211",
+      "line": 15,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 15,
+          "text": "/src/storage/columnstore/columnstore/tests/rowgroup-tests.cpp:211: Failure"
+        },
+        {
+          "n": 16,
+          "text": "Expected equality of these values:"
+        },
+        {
+          "n": 17,
+          "text": "  rg.getRowCount()"
+        },
+        {
+          "n": 18,
+          "text": "    Which is: 7"
+        },
+        {
+          "n": 19,
+          "text": "  8U"
+        },
+        {
+          "n": 20,
+          "text": "[  FAILED  ] ColumnstoreRowgroup.SerializeNulls (3 ms)"
+        }
+      ]
+    },
+    {
+      "kind": "ctest",
+      "title": "ctest: rowgroup_tests failed (Failed)",
+      "line": 6,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 6,
+          "text": " 2/12 Test  #1: rowgroup_tests ...................***Failed    0.21 sec"
+        },
+        {
+          "n": 7,
+          "text": "[==========] Running 42 tests from 6 test suites."
+        },
+        {
+          "n": 8,
+          "text": "[----------] Global test environment set-up."
+        },
+        {
+          "n": 9,
+          "text": "[----------] 8 tests from ColumnstoreRowgroup"
+        },
+        {
+          "n": 10,
+          "text": "[ RUN      ] ColumnstoreRowgroup.InitRows"
+        },
+        {
+          "n": 11,
+          "text": "[       OK ] ColumnstoreRowgroup.InitRows (1 ms)"
+        },
+        {
+          "n": 12,
+          "text": "[ RUN      ] ColumnstoreRowgroup.Append"
+        },
+        {
+          "n": 13,
+          "text": "[       OK ] ColumnstoreRowgroup.Append (0 ms)"
+        }
+      ]
+    }
+  ],
+  "lines": 37,
+  "from": 1,
+  "untrusted": true
+}

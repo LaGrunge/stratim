@@ -1,0 +1,66 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "mtr",
+      "title": "MTR: innodb.innodb_bug53756 failed: Result content mismatch",
+      "line": 34,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 34,
+          "text": "innodb.innodb_bug53756                   w2 [ fail ]"
+        },
+        {
+          "n": 35,
+          "text": "        Test ended at 2026-11-05 12:05:44"
+        },
+        {
+          "n": 37,
+          "text": "CURRENT_TEST: innodb.innodb_bug53756"
+        },
+        {
+          "n": 38,
+          "text": "--- /home/buildbot/server/mysql-test/suite/innodb/r/innodb_bug53756.result"
+        },
+        {
+          "n": 39,
+          "text": "+++ /home/buildbot/server/mysql-test/suite/innodb/r/innodb_bug53756.reject"
+        },
+        {
+          "n": 40,
+          "text": "@@ -79,7 +79,7 @@"
+        },
+        {
+          "n": 41,
+          "text": " SELECT * FROM bug_53756;"
+        },
+        {
+          "n": 42,
+          "text": " pk\tc1"
+        },
+        {
+          "n": 43,
+          "text": " 1\tABC"
+        },
+        {
+          "n": 44,
+          "text": "-2\tDEF"
+        },
+        {
+          "n": 45,
+          "text": "+2\tXYZ"
+        },
+        {
+          "n": 47,
+          "text": "mysqltest: Result content mismatch"
+        }
+      ]
+    }
+  ],
+  "lines": 67,
+  "from": 1,
+  "untrusted": true
+}

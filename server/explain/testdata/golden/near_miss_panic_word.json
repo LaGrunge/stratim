@@ -1,0 +1,22 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "exit",
+      "title": "exit code 1: Error: the artifact mariadb-11.8.2-linux-x86_64.tar.gz is missing from the release",
+      "line": 5,
+      "confidence": "low",
+      "excerpt": [
+        {
+          "n": 5,
+          "text": "Error: the artifact mariadb-11.8.2-linux-x86_64.tar.gz is missing from the release"
+        }
+      ]
+    }
+  ],
+  "lines": 5,
+  "from": 1,
+  "untrusted": true
+}

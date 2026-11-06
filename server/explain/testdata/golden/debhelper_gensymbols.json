@@ -1,0 +1,42 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 2,
+  "causes": [
+    {
+      "kind": "debhelper",
+      "title": "dpkg-gensymbols: error: some symbols or patterns disappeared in the symbols file",
+      "line": 35,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 33,
+          "text": "  mariadb_field_attr@libmariadb.so.3 3.1.8"
+        },
+        {
+          "n": 34,
+          "text": "- mariadb_get_charset_by_name@libmariadb.so.3 3.0.0"
+        },
+        {
+          "n": 35,
+          "text": "dpkg-gensymbols: error: some symbols or patterns disappeared in the symbols file"
+        },
+        {
+          "n": 36,
+          "text": "dh_makeshlibs: error: failing due to earlier errors"
+        },
+        {
+          "n": 37,
+          "text": "make: *** [debian/rules:205: binary] Error 25"
+        },
+        {
+          "n": 38,
+          "text": "dpkg-buildpackage: error: debian/rules binary subprocess returned exit status 2"
+        }
+      ]
+    }
+  ],
+  "lines": 38,
+  "from": 1,
+  "untrusted": true
+}

@@ -50,12 +50,19 @@ const (
 	// Maximum amount of time between sending consecutive batched log messages.
 	// Controls the delay between the CI job generating a log record, and web users receiving it.
 	maxLogFlushPeriod time.Duration = time.Second
+
+	// The end of a step waits at most maxLogFlushWait for the log lines
+	// queued before it to be sent.
+	maxLogFlushWait = 30 * time.Second
 )
 
 type client struct {
 	client proto.WoodpeckerClient
 	conn   *grpc.ClientConn
 	logs   chan *proto.LogEntry
+	// flushes asks processLogs to send what is queued and to close the
+	// channel given once it did.
+	flushes chan chan struct{}
 	// connectionRetryTimeout is the maximum time to wait for a connection to be
 	// restored before the agent gives up and exits. Zero means infinite.
 	// Maps directly onto backoff.WithMaxElapsedTime.
@@ -77,6 +84,7 @@ func NewGrpcClient(ctx context.Context, conn *grpc.ClientConn, opts ...ClientOpt
 	}
 
 	client.logs = make(chan *proto.LogEntry, client.logEntryBufferSize) // max memory use: buffer count * 1 MiB
+	client.flushes = make(chan chan struct{})
 
 	go client.processLogs(ctx)
 	return client
@@ -362,6 +370,11 @@ func (c *client) extendWith(ctx context.Context, newReq func() *proto.ExtendRequ
 
 // Update let agent updates the step state at the server.
 func (c *client) Update(ctx context.Context, workflowID string, state rpc.StepState) error {
+	if state.Exited {
+		// the server reads the log of a step that ended, e.g. for why it
+		// failed: it gets all of it first
+		c.flushLogs(ctx)
+	}
 	req := &proto.UpdateRequest{
 		Id: workflowID,
 		State: &proto.StepState{
@@ -395,6 +408,26 @@ func (c *client) EnqueueLog(logEntry *rpc.LogEntry) {
 		Line:     int32(logEntry.Line),
 		Time:     logEntry.Time,
 		Type:     int32(logEntry.Type),
+	}
+}
+
+// flushLogs sends the log entries queued so far, waiting at most
+// maxLogFlushWait.
+func (c *client) flushLogs(ctx context.Context) {
+	if c.flushes == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, maxLogFlushWait)
+	defer cancel()
+	done := make(chan struct{})
+	select {
+	case c.flushes <- done:
+	case <-ctx.Done():
+		return
+	}
+	select {
+	case <-done:
+	case <-ctx.Done():
 	}
 }
 
@@ -445,6 +478,26 @@ func (c *client) processLogs(ctx context.Context) {
 
 		case <-ticker.C:
 			send()
+
+		case done := <-c.flushes:
+			for queued := true; queued; {
+				select {
+				case entry, ok := <-c.logs:
+					if !ok {
+						queued = false
+						break
+					}
+					entries = append(entries, entry)
+					bytes += grpc_proto.Size(entry)
+					if bytes >= maxLogBatchSize {
+						send()
+					}
+				default:
+					queued = false
+				}
+			}
+			send()
+			close(done)
 		}
 	}
 }

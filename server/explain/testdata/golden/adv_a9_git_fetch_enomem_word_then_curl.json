@@ -1,0 +1,26 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "exit",
+      "title": "exit code 1: checking ulimit -v ... ok (test: \"Cannot allocate memory\" expected on 2G limit)",
+      "line": 3,
+      "confidence": "low",
+      "excerpt": [
+        {
+          "n": 2,
+          "text": "checking ulimit -v ... ok (test: \"Cannot allocate memory\" expected on 2G limit)"
+        },
+        {
+          "n": 3,
+          "text": "curl: (22) The requested URL returned error: 503"
+        }
+      ]
+    }
+  ],
+  "lines": 3,
+  "from": 1,
+  "untrusted": true
+}

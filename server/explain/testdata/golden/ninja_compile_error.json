@@ -1,0 +1,86 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "ninja",
+      "title": "ninja: calpontsystemcatalog.cpp.o failed: calpontsystemcatalog.cpp:812: 'class execplan::CalpontSelectExecutionPlan' has no member named 'sessionID_'; did you …",
+      "line": 26,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 23,
+          "text": "FAILED: storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/calpontsystemcatalog.cpp.o"
+        },
+        {
+          "n": 26,
+          "text": "/home/buildbot/server/storage/columnstore/columnstore/dbcon/execplan/calpontsystemcatalog.cpp:812:22: error: 'class execplan::CalpontSelectExecutionPlan' has no member named 'sessionID_'; did you mean 'sessionID'?"
+        },
+        {
+          "n": 27,
+          "text": "  812 |   csep.sessionID_ = fSessionID;"
+        },
+        {
+          "n": 28,
+          "text": "      |        ^~~~~~~~~~"
+        },
+        {
+          "n": 29,
+          "text": "      |        sessionID"
+        },
+        {
+          "n": 30,
+          "text": "/home/buildbot/server/storage/columnstore/columnstore/dbcon/execplan/calpontsystemcatalog.cpp:845:3: warning: unused variable 'rc' [-Wunused-variable]"
+        }
+      ]
+    },
+    {
+      "kind": "compile",
+      "title": "compile error: calpontsystemcatalog.cpp:812: 'class execplan::CalpontSelectExecutionPlan' has no member named 'sessionID_'; did you mean 'sessionID'?",
+      "line": 26,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 25,
+          "text": "/home/buildbot/server/storage/columnstore/columnstore/dbcon/execplan/calpontsystemcatalog.cpp: In member function 'void execplan::CalpontSystemCatalog::getSysData(execplan::CalpontSelectExecutionPlan\u0026, execplan::NJLSysDataList\u0026, const st…"
+        },
+        {
+          "n": 26,
+          "text": "/home/buildbot/server/storage/columnstore/columnstore/dbcon/execplan/calpontsystemcatalog.cpp:812:22: error: 'class execplan::CalpontSelectExecutionPlan' has no member named 'sessionID_'; did you mean 'sessionID'?"
+        },
+        {
+          "n": 27,
+          "text": "  812 |   csep.sessionID_ = fSessionID;"
+        },
+        {
+          "n": 28,
+          "text": "      |        ^~~~~~~~~~"
+        },
+        {
+          "n": 29,
+          "text": "      |        sessionID"
+        },
+        {
+          "n": 30,
+          "text": "/home/buildbot/server/storage/columnstore/columnstore/dbcon/execplan/calpontsystemcatalog.cpp:845:3: warning: unused variable 'rc' [-Wunused-variable]"
+        },
+        {
+          "n": 31,
+          "text": "[9/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj9.cpp.o"
+        },
+        {
+          "n": 32,
+          "text": "[10/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj10.cpp.o"
+        },
+        {
+          "n": 33,
+          "text": "[11/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj11.cpp.o"
+        }
+      ]
+    }
+  ],
+  "lines": 34,
+  "from": 1,
+  "untrusted": true
+}

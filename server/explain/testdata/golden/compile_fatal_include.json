@@ -1,0 +1,42 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 2,
+  "causes": [
+    {
+      "kind": "compile",
+      "title": "compile error: mysql_conn.c:3: mysql.h: No such file or directory",
+      "line": 3,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 2,
+          "text": "gcc -O2 -Wall -Werror -c -o mysql_conn.o mysql_conn.c"
+        },
+        {
+          "n": 3,
+          "text": "mysql_conn.c:3:10: fatal error: mysql.h: No such file or directory"
+        },
+        {
+          "n": 4,
+          "text": "    3 | #include \u003cmysql.h\u003e"
+        },
+        {
+          "n": 5,
+          "text": "      |          ^~~~~~~~~"
+        },
+        {
+          "n": 6,
+          "text": "compilation terminated."
+        },
+        {
+          "n": 7,
+          "text": "make: *** [\u003cbuiltin\u003e: mysql_conn.o] Error 1"
+        }
+      ]
+    }
+  ],
+  "lines": 7,
+  "from": 1,
+  "untrusted": true
+}

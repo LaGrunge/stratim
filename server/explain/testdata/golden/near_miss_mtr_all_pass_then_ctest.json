@@ -1,0 +1,46 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 8,
+  "causes": [
+    {
+      "kind": "ctest",
+      "title": "ctest: unit_lru failed (Failed)",
+      "line": 30,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 30,
+          "text": "1/1 Test #1: unit_lru .........................***Failed    0.01 sec"
+        },
+        {
+          "n": 31,
+          "text": ""
+        },
+        {
+          "n": 32,
+          "text": "0% tests passed, 1 tests failed out of 1"
+        },
+        {
+          "n": 33,
+          "text": ""
+        },
+        {
+          "n": 34,
+          "text": "The following tests FAILED:"
+        },
+        {
+          "n": 35,
+          "text": "\t  1 - unit_lru (Failed)"
+        },
+        {
+          "n": 36,
+          "text": "Errors while running CTest"
+        }
+      ]
+    }
+  ],
+  "lines": 36,
+  "from": 1,
+  "untrusted": true
+}

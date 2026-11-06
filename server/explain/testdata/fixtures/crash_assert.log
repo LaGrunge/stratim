@@ -1,0 +1,10 @@
+# want: crash
+# exit: 134
+# state: failure
+---
++ ./build/sql/mariadbd --bootstrap --datadir=/tmp/data < scripts/mysql_system_tables.sql
+2026-11-05 12:00:01 0 [Note] Starting MariaDB 11.8.2-MariaDB-debug source revision 1a2b3c4d as process 77
+2026-11-05 12:00:01 0 [Note] InnoDB: Initializing buffer pool, total size = 128.000MiB
+mariadbd: /src/storage/innobase/buf/buf0buf.cc:1431: void buf_pool_t::create(): Assertion `n_chunks > 0' failed.
+251105 12:00:01 [ERROR] mariadbd got signal 6 ;
+Sorry, we probably made a mistake, and this is a bug.

@@ -1,0 +1,13 @@
+# want: panic
+# exit: 2
+# state: failure
+---
++ ./bin/server --config /etc/server.yaml
+{"level":"info","message":"starting server"}
+fatal error: concurrent map writes
+
+goroutine 88 [running]:
+example.com/ci/server/cache.(*Cache).Set(0xc0001b2000, {0xc000312000, 0x8}, {0x9b1e20, 0xc0003a0010})
+	/src/server/cache/cache.go:41 +0x8d
+created by example.com/ci/server.Start in goroutine 1
+	/src/server/server.go:120 +0x2a5

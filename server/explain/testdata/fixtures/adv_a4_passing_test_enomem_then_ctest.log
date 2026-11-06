@@ -1,0 +1,16 @@
+# want: ctest
+---
+    Start 12: unit_os_alloc
+12/40 Test #12: unit_os_alloc ....................   Passed    0.02 sec
+    Start 13: unit_rowgroup
+13/40 Test #13: unit_rowgroup ....................***Failed    0.31 sec
+mmap(1TB) failed as expected: Cannot allocate memory
+expected 3 rows, got 2
+
+95% tests passed, 1 tests failed out of 40
+
+Total Test time (real) =  12.02 sec
+
+The following tests FAILED:
+	 13 - unit_rowgroup (Failed)
+Errors while running CTest

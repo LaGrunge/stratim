@@ -1,0 +1,23 @@
+# want: ninja
+# exit: 1
+# state: failure
+---
+-- Running cmake version 3.28.3
+CMake Deprecation Warning at storage/columnstore/columnstore/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.5 will be removed from a future version of
+  CMake.
+
+CMake Warning at cmake/plugin.cmake:211 (MESSAGE):
+  Plugin ROCKSDB is disabled: error: unsupported compiler
+-- Configuring done (14.2s)
+-- Generating done (1.1s)
+[10/1500] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj10.cpp.o
+[11/1500] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj11.cpp.o
+[12/1500] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj12.cpp.o
+[13/1500] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj13.cpp.o
+FAILED: storage/columnstore/columnstore/dbcon/mysql/CMakeFiles/ha_columnstore.dir/ha_mcs_execplan.cpp.o
+/usr/bin/c++ -O2 -g -c /src/storage/columnstore/columnstore/dbcon/mysql/ha_mcs_execplan.cpp
+/src/storage/columnstore/columnstore/dbcon/mysql/ha_mcs_execplan.cpp:4411:46: error: invalid conversion from 'const Item*' to 'Item*' [-fpermissive]
+ 4411 |   Item* item = ifp->arguments()[0];
+      |                                              ^
+ninja: build stopped: subcommand failed.

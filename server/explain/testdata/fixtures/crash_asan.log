@@ -1,0 +1,13 @@
+# want: crash
+# exit: 1
+# state: failure
+---
++ ./build/storage/columnstore/columnstore/utils/rowgroup/rowgroup_bench --rows 100000
+generating 100000 rows
+=================================================================
+==4242==ERROR: AddressSanitizer: heap-use-after-free on address 0x60b0000001f0 at pc 0x55d1c2 bp 0x7ffd sp 0x7ffd
+READ of size 8 at 0x60b0000001f0 thread T0
+    #0 0x55d1c1 in rowgroup::RowGroup::getRow(unsigned int, rowgroup::Row*) /src/utils/rowgroup/rowgroup.cpp:1290
+    #1 0x55a0e2 in main /src/utils/rowgroup/bench.cpp:77
+SUMMARY: AddressSanitizer: heap-use-after-free /src/utils/rowgroup/rowgroup.cpp:1290 in rowgroup::RowGroup::getRow(unsigned int, rowgroup::Row*)
+==4242==ABORTING

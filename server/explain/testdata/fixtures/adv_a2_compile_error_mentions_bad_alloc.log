@@ -1,0 +1,12 @@
+# want: ninja
+---
+[812/2412] Building CXX object storage/columnstore/columnstore/utils/common/CMakeFiles/common.dir/poolallocator.cpp.o
+[813/2412] Building CXX object storage/columnstore/columnstore/utils/rowgroup/CMakeFiles/rowgroup.dir/rowgroup.cpp.o
+FAILED: storage/columnstore/columnstore/utils/rowgroup/CMakeFiles/rowgroup.dir/rowgroup.cpp.o
+/usr/bin/c++ -DHAVE_CONFIG_H -I/src/include -O2 -g -std=gnu++20 -c /src/storage/columnstore/columnstore/utils/rowgroup/rowgroup.cpp
+/src/storage/columnstore/columnstore/utils/rowgroup/rowgroup.cpp: In member function 'void rowgroup::RGData::reinit(const RowGroup&)':
+/src/storage/columnstore/columnstore/utils/rowgroup/rowgroup.cpp:301:13: error: no matching function for call to 'logAlloc(std::bad_alloc&)'
+  301 |     logAlloc(e);
+      |     ~~~~~~~~^~~
+/src/storage/columnstore/columnstore/utils/common/allocator.h:44:6: note: candidate: 'void logAlloc(const std::exception_ptr&)'
+ninja: build stopped: subcommand failed.

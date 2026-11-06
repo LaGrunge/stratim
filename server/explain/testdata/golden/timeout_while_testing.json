@@ -1,0 +1,38 @@
+{
+  "step_id": 1,
+  "status": "timeout",
+  "exit_code": 124,
+  "causes": [
+    {
+      "kind": "timeout",
+      "title": "the step ran into its timeout of 30m0s",
+      "line": 8,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 4,
+          "text": "[ RUN      ] ColumnstoreRowgroup.InitRows"
+        },
+        {
+          "n": 5,
+          "text": "[       OK ] ColumnstoreRowgroup.InitRows (1 ms)"
+        },
+        {
+          "n": 6,
+          "text": "[ RUN      ] ColumnstoreRowgroup.Append"
+        },
+        {
+          "n": 7,
+          "text": "[       OK ] ColumnstoreRowgroup.Append (0 ms)"
+        },
+        {
+          "n": 8,
+          "text": "[ RUN      ] ThreadPoolTest.Drain"
+        }
+      ]
+    }
+  ],
+  "lines": 8,
+  "from": 1,
+  "untrusted": true
+}

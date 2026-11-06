@@ -17,13 +17,16 @@ package file
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
+	"slices"
+	"sync"
 
 	"github.com/rs/zerolog/log"
 
@@ -39,7 +42,12 @@ const (
 
 type logStore struct {
 	base string
+	// appends orders the appends to a step's log, by its id.
+	appends *[appendLocks]sync.Mutex
 }
+
+// appendLocks are the locks the appends of all steps share.
+const appendLocks = 64
 
 func NewLogStore(base string) (service_log.Service, error) {
 	if base == "" {
@@ -51,7 +59,7 @@ func NewLogStore(base string) (service_log.Service, error) {
 			return nil, err
 		}
 	}
-	return logStore{base: base}, nil
+	return logStore{base: base, appends: new([appendLocks]sync.Mutex)}, nil
 }
 
 func (l logStore) filePath(id int64) string {
@@ -71,22 +79,28 @@ func (l logStore) LogFind(ctx context.Context, step *model.Step) ([]*model.LogEn
 // time. It reads the file as long as it was when opened, and a last record
 // without its newline is still being written by LogAppend, so it is left out.
 func (l logStore) LogStream(ctx context.Context, step *model.Step, fn func(*model.LogEntry) error) error {
-	filename := l.filePath(step.ID)
-	file, err := os.Open(filename)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
+	return l.LogStreamFrom(ctx, step, 0, fn)
+}
+
+// LogStreamFrom is LogStream from the entry with the line from on. The
+// records follow the lines, so it finds the first one by a binary search over
+// the file and reads only from there.
+func (l logStore) LogStreamFrom(ctx context.Context, step *model.Step, from int, fn func(*model.LogEntry) error) error {
+	file, size, err := l.open(step)
+	if file == nil || err != nil {
 		return err
 	}
 	defer file.Close()
-	info, err := file.Stat()
-	if err != nil {
-		return err
+
+	offset := int64(0)
+	if from > 0 {
+		if offset, err = firstRecordOf(file, size, from); err != nil {
+			return err
+		}
 	}
 
 	buf := make([]byte, 0, bufio.MaxScanTokenSize)
-	s := bufio.NewScanner(io.LimitReader(file, info.Size()))
+	s := bufio.NewScanner(io.NewSectionReader(file, offset, size-offset))
 	s.Buffer(buf, maxLineLength)
 	s.Split(scanWrittenLines)
 
@@ -94,13 +108,16 @@ func (l logStore) LogStream(ctx context.Context, step *model.Step, fn func(*mode
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		j := s.Text()
-		if len(strings.TrimSpace(j)) == 0 {
+		j := s.Bytes()
+		if len(bytes.TrimSpace(j)) == 0 {
 			continue
 		}
 		entry := &model.LogEntry{}
-		if err := json.Unmarshal([]byte(j), entry); err != nil {
+		if err := json.Unmarshal(j, entry); err != nil {
 			return err
+		}
+		if entry.Line < from {
+			continue
 		}
 		if err := fn(entry); err != nil {
 			return err
@@ -108,6 +125,185 @@ func (l logStore) LogStream(ctx context.Context, step *model.Step, fn func(*mode
 	}
 
 	return s.Err()
+}
+
+// LogLastLine gives the line of the file's last whole record, read from its
+// end; -1 when there is none.
+func (l logStore) LogLastLine(_ context.Context, step *model.Step) (int, error) {
+	file, size, err := l.open(step)
+	if file == nil || err != nil {
+		return -1, err
+	}
+	defer file.Close()
+	return lastLine(file, size)
+}
+
+// open opens the step's log file and gives its size now; no file when the
+// step has none.
+func (l logStore) open(step *model.Step) (*os.File, int64, error) {
+	file, err := os.Open(l.filePath(step.ID))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, 0, nil
+		}
+		return nil, 0, err
+	}
+	info, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, 0, err
+	}
+	return file, info.Size(), nil
+}
+
+// recordLine is the line of a record.
+type recordLine struct {
+	Line int `json:"line"`
+}
+
+// recordChunk is how much of a record is read at a time from where a search
+// lands: most records are shorter.
+const recordChunk = 4096
+
+// tailChunk is how much of a file is read at a time from its end.
+const tailChunk = 64 * 1024
+
+var errRecordTooLong = fmt.Errorf("a record of the log is longer than %d bytes", maxLineLength)
+
+// lastLine reads back from the end of a file of records to its last whole
+// one: the part after the last newline is still being written.
+func lastLine(r io.ReaderAt, size int64) (int, error) {
+	var tail []byte // the end of the file read so far
+	pos := size
+	end := -1 // in tail, the newline the last record ends with
+	for {
+		if end < 0 {
+			end = bytes.LastIndexByte(tail, '\n')
+		}
+		if end >= 0 {
+			start := bytes.LastIndexByte(tail[:end], '\n')
+			if start >= 0 || pos == 0 {
+				record := tail[start+1 : end]
+				if len(bytes.TrimSpace(record)) == 0 { // a blank one: the one before
+					if start < 0 {
+						return -1, nil
+					}
+					end = start
+					continue
+				}
+				var rec recordLine
+				if err := json.Unmarshal(record, &rec); err != nil {
+					return 0, err
+				}
+				return rec.Line, nil
+			}
+		}
+		if pos == 0 {
+			return -1, nil
+		}
+		if len(tail) > maxLineLength+tailChunk {
+			return 0, errRecordTooLong
+		}
+		n := min(int64(tailChunk), pos)
+		pos -= n
+		chunk := make([]byte, n, int(n)+len(tail))
+		if _, err := r.ReadAt(chunk, pos); err != nil {
+			return 0, err
+		}
+		if end >= 0 {
+			end += int(n)
+		}
+		tail = append(chunk, tail...)
+	}
+}
+
+// firstRecordOf finds the offset of the first record whose line is at least
+// line, by a binary search over the offsets of the file: a search that lands
+// within a record goes on from the next one.
+func firstRecordOf(r io.ReaderAt, size int64, line int) (int64, error) {
+	lo, hi := int64(0), size
+	for lo < hi {
+		mid := lo + (hi-lo)>>1
+		_, recLine, ok, err := recordAfter(r, size, mid)
+		if err != nil {
+			return 0, err
+		}
+		if !ok || recLine >= line {
+			hi = mid
+		} else {
+			lo = mid + 1
+		}
+	}
+	start, _, ok, err := recordAfter(r, size, lo)
+	if !ok {
+		return size, err
+	}
+	return start, err
+}
+
+// recordAfter gives the start and the line of the first whole record that
+// starts at off or after it; not ok when there is none.
+func recordAfter(r io.ReaderAt, size, off int64) (int64, int, bool, error) {
+	start := off
+	if off > 0 {
+		var prev [1]byte
+		if _, err := r.ReadAt(prev[:], off-1); err != nil {
+			return 0, 0, false, err
+		}
+		if prev[0] != '\n' { // within a record: skip its rest
+			skipped, ok, err := readRecord(r, size, off, nil)
+			if err != nil || !ok {
+				return 0, 0, false, err
+			}
+			start = off + skipped
+		}
+	}
+	for start < size {
+		var rec []byte
+		n, ok, err := readRecord(r, size, start, &rec)
+		if err != nil || !ok {
+			return 0, 0, false, err
+		}
+		if len(bytes.TrimSpace(rec)) > 0 {
+			var line recordLine
+			if err := json.Unmarshal(rec, &line); err != nil {
+				return 0, 0, false, err
+			}
+			return start, line.Line, true, nil
+		}
+		start += n
+	}
+	return 0, 0, false, nil
+}
+
+// readRecord reads from off to the next newline: how many bytes that takes
+// with the newline, and into rec, if given, the record without it. Not ok
+// when the file ends first.
+func readRecord(r io.ReaderAt, size, off int64, rec *[]byte) (int64, bool, error) {
+	br := bufio.NewReaderSize(io.NewSectionReader(r, off, size-off), recordChunk)
+	var n int64
+	for {
+		part, err := br.ReadSlice('\n')
+		n += int64(len(part))
+		if rec != nil {
+			*rec = append(*rec, part...)
+		}
+		switch {
+		case err == nil:
+			if rec != nil {
+				*rec = (*rec)[:len(*rec)-1]
+			}
+			return n, true, nil
+		case errors.Is(err, bufio.ErrBufferFull):
+			if n > int64(maxLineLength) {
+				return 0, false, errRecordTooLong
+			}
+		case errors.Is(err, io.EOF):
+			return n, false, nil
+		default:
+			return 0, false, err
+		}
+	}
 }
 
 // scanWrittenLines is bufio.ScanLines without the final line that lacks its newline.
@@ -122,24 +318,54 @@ func scanWrittenLines(data []byte, atEOF bool) (int, []byte, error) {
 	return 0, nil, nil
 }
 
+// LogAppend appends the entries to the step's log file in the order of their
+// lines, so the file stays in that order, which LogStreamFrom and
+// LogLastLine read it by. An entry whose line is not after the last line of
+// the file is dropped, as the database refuses a line it has: a batch sent
+// again, or the output of a workflow run again from line 0, adds nothing.
 func (l logStore) LogAppend(_ context.Context, step *model.Step, logEntries []*model.LogEntry) error {
 	path := l.filePath(step.ID)
+	lock := &l.appends[uint64(step.ID)%appendLocks]
+	lock.Lock()
+	defer lock.Unlock()
 
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		log.Error().Err(err).Msgf("could not open log file %s", path)
 		return err
 	}
+	info, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return err
+	}
+	last, err := lastLine(file, info.Size())
+	if err != nil {
+		// a log whose end cannot be read still gets what comes
+		log.Warn().Err(err).Int64("step", step.ID).Msg("could not read the last line of a log file")
+		last = -1
+	}
+	entries := slices.Clone(logEntries)
+	slices.SortStableFunc(entries, func(a, b *model.LogEntry) int { return cmp.Compare(a.Line, b.Line) })
 
 	var data []byte
-
-	for _, logEntry := range logEntries {
+	dropped := 0
+	for _, logEntry := range entries {
+		if logEntry.Line <= last {
+			dropped++
+			continue
+		}
+		last = logEntry.Line
 		if jsonLine, err := json.Marshal(logEntry); err == nil {
 			data = append(data, jsonLine...)
 			data = append(data, byte('\n'))
 		} else {
 			log.Error().Err(err).Msg("could not convert log entry to JSON")
 		}
+	}
+
+	if dropped > 0 {
+		log.Debug().Int64("step", step.ID).Int("dropped", dropped).Msg("log entries of lines the log has are dropped")
 	}
 
 	if _, err = file.Write(data); err != nil {

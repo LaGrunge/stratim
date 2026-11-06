@@ -20,6 +20,7 @@ import (
 
 	"go.woodpecker-ci.org/woodpecker/v3/server/cache"
 	"go.woodpecker-ci.org/woodpecker/v3/server/events"
+	"go.woodpecker-ci.org/woodpecker/v3/server/explain"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forgestatus"
 	"go.woodpecker-ci.org/woodpecker/v3/server/logging"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
@@ -43,6 +44,11 @@ var Config = struct {
 		// Durations are the typical runs of the pipelines of a branch, for
 		// the summaries of /api/v2.
 		Durations *summary.Durations
+		// Explain tells why steps failed, for /api/v2 and step.explained
+		// events.
+		Explain *explain.Explainer
+		// LogWindows gives windows of steps' logs for /api/v2.
+		LogWindows *explain.Windows
 	}
 	Server struct {
 		JWTSecret             string

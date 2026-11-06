@@ -235,6 +235,72 @@ func (_c *MockService_LogFind_Call) RunAndReturn(run func(ctx context.Context, s
 	return _c
 }
 
+// LogLastLine provides a mock function for the type MockService
+func (_mock *MockService) LogLastLine(ctx context.Context, step *model.Step) (int, error) {
+	ret := _mock.Called(ctx, step)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogLastLine")
+	}
+
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *model.Step) (int, error)); ok {
+		return returnFunc(ctx, step)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *model.Step) int); ok {
+		r0 = returnFunc(ctx, step)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *model.Step) error); ok {
+		r1 = returnFunc(ctx, step)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockService_LogLastLine_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogLastLine'
+type MockService_LogLastLine_Call struct {
+	*mock.Call
+}
+
+// LogLastLine is a helper method to define mock.On call
+//   - ctx context.Context
+//   - step *model.Step
+func (_e *MockService_Expecter) LogLastLine(ctx any, step any) *MockService_LogLastLine_Call {
+	return &MockService_LogLastLine_Call{Call: _e.mock.On("LogLastLine", ctx, step)}
+}
+
+func (_c *MockService_LogLastLine_Call) Run(run func(ctx context.Context, step *model.Step)) *MockService_LogLastLine_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *model.Step
+		if args[1] != nil {
+			arg1 = args[1].(*model.Step)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_LogLastLine_Call) Return(n int, err error) *MockService_LogLastLine_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockService_LogLastLine_Call) RunAndReturn(run func(ctx context.Context, step *model.Step) (int, error)) *MockService_LogLastLine_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LogStream provides a mock function for the type MockService
 func (_mock *MockService) LogStream(ctx context.Context, step *model.Step, fn func(*model.LogEntry) error) error {
 	ret := _mock.Called(ctx, step, fn)
@@ -294,6 +360,75 @@ func (_c *MockService_LogStream_Call) Return(err error) *MockService_LogStream_C
 }
 
 func (_c *MockService_LogStream_Call) RunAndReturn(run func(ctx context.Context, step *model.Step, fn func(*model.LogEntry) error) error) *MockService_LogStream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LogStreamFrom provides a mock function for the type MockService
+func (_mock *MockService) LogStreamFrom(ctx context.Context, step *model.Step, from int, fn func(*model.LogEntry) error) error {
+	ret := _mock.Called(ctx, step, from, fn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogStreamFrom")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *model.Step, int, func(*model.LogEntry) error) error); ok {
+		r0 = returnFunc(ctx, step, from, fn)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_LogStreamFrom_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogStreamFrom'
+type MockService_LogStreamFrom_Call struct {
+	*mock.Call
+}
+
+// LogStreamFrom is a helper method to define mock.On call
+//   - ctx context.Context
+//   - step *model.Step
+//   - from int
+//   - fn func(*model.LogEntry) error
+func (_e *MockService_Expecter) LogStreamFrom(ctx any, step any, from any, fn any) *MockService_LogStreamFrom_Call {
+	return &MockService_LogStreamFrom_Call{Call: _e.mock.On("LogStreamFrom", ctx, step, from, fn)}
+}
+
+func (_c *MockService_LogStreamFrom_Call) Run(run func(ctx context.Context, step *model.Step, from int, fn func(*model.LogEntry) error)) *MockService_LogStreamFrom_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *model.Step
+		if args[1] != nil {
+			arg1 = args[1].(*model.Step)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		var arg3 func(*model.LogEntry) error
+		if args[3] != nil {
+			arg3 = args[3].(func(*model.LogEntry) error)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_LogStreamFrom_Call) Return(err error) *MockService_LogStreamFrom_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_LogStreamFrom_Call) RunAndReturn(run func(ctx context.Context, step *model.Step, from int, fn func(*model.LogEntry) error) error) *MockService_LogStreamFrom_Call {
 	_c.Call.Return(run)
 	return _c
 }

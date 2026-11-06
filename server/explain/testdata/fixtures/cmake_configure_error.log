@@ -1,0 +1,22 @@
+# want: cmake
+# exit: 1
+# state: failure
+---
++ cmake -S server -B build -G Ninja -DPLUGIN_COLUMNSTORE=YES -DCMAKE_BUILD_TYPE=RelWithDebInfo
+-- The C compiler identification is GNU 12.2.0
+-- The CXX compiler identification is GNU 12.2.0
+-- Running cmake version 3.25.1
+-- MariaDB 11.8.2
+-- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.74.0/BoostConfig.cmake (found suitable version "1.74.0", minimum required is "1.74.0")
+CMake Warning (dev) at storage/columnstore/columnstore/CMakeLists.txt:40 (find_package):
+  Policy CMP0167 is not set: The FindBoost module is removed.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Error at storage/columnstore/columnstore/cmake/ColumnstoreLibrary.cmake:77 (message):
+  Could not find the snappy library: install libsnappy-dev
+Call Stack (most recent call first):
+  storage/columnstore/columnstore/CMakeLists.txt:112 (include)
+
+
+-- Configuring incomplete, errors occurred!
+See also "/home/buildbot/build/CMakeFiles/CMakeOutput.log".

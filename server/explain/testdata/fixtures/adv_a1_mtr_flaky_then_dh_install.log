@@ -1,0 +1,23 @@
+# want: dh_install
+---
+Logging: ./mysql-test-run.pl  --force --retry=3 --parallel=4
+==============================================================================
+TEST                                  WORKER RESULT   TIME (ms) or COMMENT
+--------------------------------------------------------------------------
+main.alter_table                         w1 [ pass ]   1203
+main.flush_logs_not_windows              w2 [ fail ]
+        Test ended at 2026-11-01 10:00:01
+CURRENT_TEST: main.flush_logs_not_windows
+mysqltest: At line 12: query 'flush logs' failed: 1290
+main.flush_logs_not_windows              w2 [ retry-pass ]    215
+main.xa                                  w3 [ pass ]    412
+--------------------------------------------------------------------------
+The servers were restarted 3 times
+Completed: All 1834 tests were successful.
+1 tests failed but passed on retry.
+   dh_install -pmariadb-plugin-orthus
+dh_install: warning: Cannot find (any matches for) "usr/lib/mysql/plugin/ha_orthus.so" (tried in ., debian/tmp)
+dh_install: warning: mariadb-plugin-orthus missing files: usr/lib/mysql/plugin/ha_orthus.so
+dh_install: error: missing files, aborting
+make: *** [debian/rules:12: binary] Error 25
+dpkg-buildpackage: error: debian/rules binary subprocess returned exit status 2

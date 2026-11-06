@@ -1,0 +1,10 @@
+# want: ninja
+---
+[1500/2412] Building CXX object sql/CMakeFiles/sql.dir/signal_handler.cc.o
+FAILED: sql/CMakeFiles/sql.dir/signal_handler.cc.o
+/usr/bin/c++ -DHAVE_CONFIG_H -I/src/include -O2 -g -c /src/sql/signal_handler.cc
+/src/sql/signal_handler.cc: In function 'void handle_fatal_signal(int)':
+/src/sql/signal_handler.cc:188:3: error: 'my_safe_printf_stderrr' was not declared in this scope; did you mean 'my_safe_printf_stderr'?
+  188 |   my_safe_printf_stderrr("Segmentation fault: got signal 11 ;\n");
+      |   ^~~~~~~~~~~~~~~~~~~~~~
+ninja: build stopped: subcommand failed.

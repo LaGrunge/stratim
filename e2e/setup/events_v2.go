@@ -47,9 +47,10 @@ type EventsV2Stream struct {
 	frames chan SSEFrame
 }
 
-// eventsV2URL serves /api/v2/events and /api/v2/pipelines/{id}/wait of the
-// test server over HTTP, once, to the fixture owner, who may pull the fixture
-// repo (a private one).
+// eventsV2URL serves /api/v2 of the test server over HTTP, once, to the
+// fixture owner, who may pull the fixture repo (a private one): the events,
+// /api/v2/pipelines/{id}/wait, and the explanations and windows of the
+// steps' logs.
 func (env *ServerEnv) eventsV2URL(t *testing.T) string {
 	t.Helper()
 	env.eventsV2Once.Do(func() {
@@ -62,6 +63,8 @@ func (env *ServerEnv) eventsV2URL(t *testing.T) string {
 		})
 		e.GET("/api/v2/events", session.MustUser(), api.EventStreamV2(env.Events))
 		e.GET("/api/v2/pipelines/:pipeline_id/wait", session.MustUser(), api.WaitPipelineV2(env.Events, env.Durations))
+		e.GET("/api/v2/steps/:step_id/explain", session.MustUser(), api.StepExplainV2(env.Explain))
+		e.GET("/api/v2/steps/:step_id/log", session.MustUser(), api.StepLogV2(env.LogWindows))
 		srv := httptest.NewServer(e)
 		t.Cleanup(srv.Close)
 		env.eventsV2Base = srv.URL
@@ -86,6 +89,20 @@ func (env *ServerEnv) WaitV2(t *testing.T, pipelineID int64, query string) *http
 func (env *ServerEnv) WaitV2Client(t *testing.T) woodpecker.Client {
 	t.Helper()
 	return woodpecker.NewClient(env.eventsV2URL(t), http.DefaultClient)
+}
+
+// GetV2 gets the path of /api/v2, e.g. "steps/12/explain", and decodes the
+// JSON it answers with into out, failing the test on a status other than
+// 200.
+func (env *ServerEnv) GetV2(t *testing.T, path string, out any) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, env.eventsV2URL(t)+"/api/v2/"+path, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode, "GET %s", path)
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(out))
 }
 
 // StreamEventsV2 opens a stream of /api/v2/events with the query, from the

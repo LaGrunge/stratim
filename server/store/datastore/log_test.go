@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/store/types"
 )
 
 func TestLogCreateFindDelete(t *testing.T) {
@@ -253,10 +254,10 @@ func TestLogStreamBatchesByBytes(t *testing.T) {
 	var got []*model.LogEntry
 	var batches [][2]int
 	// pages of 4 lines, batches of up to 10 bytes
-	require.NoError(t, store.logStream(t.Context(), step, func(entry *model.LogEntry) error {
+	require.NoError(t, store.logStream(t.Context(), step, 0, func(entry *model.LogEntry) error {
 		got = append(got, entry)
 		return nil
-	}, 4, 10, func(first, last int) {
+	}, 4, 4, 10, func(first, last int) {
 		batches = append(batches, [2]int{first, last})
 	}))
 	require.Len(t, got, len(sizes))
@@ -284,14 +285,14 @@ func TestLogStreamSnapshot(t *testing.T) {
 	}))
 
 	var lines []int
-	require.NoError(t, store.logStream(t.Context(), step, func(entry *model.LogEntry) error {
+	require.NoError(t, store.logStream(t.Context(), step, 0, func(entry *model.LogEntry) error {
 		if entry.Line == 0 {
 			// the step is still running; no query is open while fn runs
 			require.NoError(t, store.LogAppend(t.Context(), step, []*model.LogEntry{{StepID: step.ID, Line: 2}}))
 		}
 		lines = append(lines, entry.Line)
 		return nil
-	}, 1, logStreamBatchBytes, nil))
+	}, 1, 1, logStreamBatchBytes, nil))
 	assert.Equal(t, []int{0, 1}, lines)
 }
 
@@ -311,4 +312,64 @@ func TestLogStreamStopsOnError(t *testing.T) {
 	})
 	assert.ErrorIs(t, err, assert.AnError)
 	assert.Equal(t, 1, calls)
+}
+
+func TestLogStreamFromAndLastLine(t *testing.T) {
+	store, closer := newTestStore(t, new(model.Step), new(model.LogEntry))
+	defer closer()
+
+	step := &model.Step{ID: 1}
+	empty := &model.Step{ID: 2}
+	last, err := store.LogLastLine(t.Context(), empty)
+	require.NoError(t, err)
+	assert.Equal(t, -1, last, "no log")
+
+	var entries []*model.LogEntry
+	for i := range 2*logStreamPage + 10 {
+		entries = append(entries, &model.LogEntry{StepID: step.ID, Line: i, Data: []byte{byte(i)}})
+	}
+	require.NoError(t, store.LogAppend(t.Context(), step, entries))
+	last, err = store.LogLastLine(t.Context(), step)
+	require.NoError(t, err)
+	assert.Equal(t, 2*logStreamPage+9, last)
+
+	for _, from := range []int{0, 5, logStreamPage, 2*logStreamPage + 9, 2*logStreamPage + 10} {
+		var lines []int
+		require.NoError(t, store.LogStreamFrom(t.Context(), step, from, func(entry *model.LogEntry) error {
+			lines = append(lines, entry.Line)
+			return nil
+		}))
+		require.Len(t, lines, 2*logStreamPage+10-from, "from %d", from)
+		if len(lines) > 0 {
+			assert.Equal(t, from, lines[0])
+			assert.Equal(t, last, lines[len(lines)-1])
+		}
+	}
+}
+
+// A line the log has is refused: a batch sent again, or the output of a
+// workflow run again from line 0, adds nothing; the file store drops the
+// same lines.
+func TestLogAppendRefusesTheLinesItHas(t *testing.T) {
+	store, closer := newTestStore(t, new(model.Step), new(model.LogEntry))
+	defer closer()
+
+	step := &model.Step{ID: 1}
+	batch := func(lines ...int) []*model.LogEntry {
+		var out []*model.LogEntry
+		for _, l := range lines {
+			out = append(out, &model.LogEntry{StepID: step.ID, Line: l, Data: []byte{byte(l)}})
+		}
+		return out
+	}
+	require.NoError(t, store.LogAppend(t.Context(), step, batch(0, 1, 2, 3)))
+	assert.ErrorIs(t, store.LogAppend(t.Context(), step, batch(0, 1)), types.ErrInsertDuplicateDetected)
+	require.NoError(t, store.LogAppend(t.Context(), step, batch(4, 5)))
+
+	var got []int
+	require.NoError(t, store.LogStream(t.Context(), step, func(e *model.LogEntry) error {
+		got = append(got, e.Line)
+		return nil
+	}))
+	assert.Equal(t, []int{0, 1, 2, 3, 4, 5}, got)
 }

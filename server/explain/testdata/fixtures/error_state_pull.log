@@ -1,0 +1,5 @@
+# want: error
+# exit: 0
+# state: error
+# error: Error response from daemon: pull access denied for mariadb/columnstore-build, repository does not exist or may require 'docker login'
+---

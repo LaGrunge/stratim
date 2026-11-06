@@ -1,0 +1,9 @@
+# want: mtr
+---
+main.alter_table 'innodb'                w1 [ pass ]   1203
+main.xa 'innodb'                         w1 [ fail ]
+        Test ended at 2026-11-01 10:00:01
+mysqltest: At line 3: query 'xa start' failed: 1399
+main.xa 'innodb'                         w1 [ retry-fail ]
+Completed: Failed 1/2 tests, 50.00% were successful.
+Failing test(s): main.xa

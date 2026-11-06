@@ -1,0 +1,22 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 22,
+  "causes": [
+    {
+      "kind": "exit",
+      "title": "exit code 22: curl: (22) The requested URL returned error: 404",
+      "line": 2,
+      "confidence": "low",
+      "excerpt": [
+        {
+          "n": 2,
+          "text": "curl: (22) The requested URL returned error: 404"
+        }
+      ]
+    }
+  ],
+  "lines": 2,
+  "from": 1,
+  "untrusted": true
+}

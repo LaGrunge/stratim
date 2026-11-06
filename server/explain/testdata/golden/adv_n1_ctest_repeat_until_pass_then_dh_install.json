@@ -1,0 +1,54 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "dh_install",
+      "title": "dh_install: 1 file not found: usr/lib/mysql/plugin/ha_orthus.so",
+      "line": 28,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 28,
+          "text": "dh_install: warning: Cannot find (any matches for) \"usr/lib/mysql/plugin/ha_orthus.so\" (tried in ., debian/tmp)"
+        },
+        {
+          "n": 30,
+          "text": "dh_install: error: missing files, aborting"
+        }
+      ]
+    },
+    {
+      "kind": "debhelper",
+      "title": "dh_install: error: missing files, aborting",
+      "line": 30,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 28,
+          "text": "dh_install: warning: Cannot find (any matches for) \"usr/lib/mysql/plugin/ha_orthus.so\" (tried in ., debian/tmp)"
+        },
+        {
+          "n": 29,
+          "text": "dh_install: warning: mariadb-plugin-orthus missing files: usr/lib/mysql/plugin/ha_orthus.so"
+        },
+        {
+          "n": 30,
+          "text": "dh_install: error: missing files, aborting"
+        },
+        {
+          "n": 31,
+          "text": "make: *** [debian/rules:12: binary] Error 25"
+        },
+        {
+          "n": 32,
+          "text": "dpkg-buildpackage: error: debian/rules binary subprocess returned exit status 2"
+        }
+      ]
+    }
+  ],
+  "lines": 32,
+  "from": 1,
+  "untrusted": true
+}

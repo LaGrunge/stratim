@@ -1,0 +1,14 @@
+# want: oom
+# exit: 1
+# state: failure
+---
+[2400/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj2400.cpp.o
+[2401/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj2401.cpp.o
+[2402/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj2402.cpp.o
+FAILED: sql/mariadbd
+: && /usr/bin/c++ -O2 -g -flto=auto sql/CMakeFiles/mariadbd.dir/main.cc.o -o sql/mariadbd sql/libsql.a && :
+lto-wrapper: fatal error: /usr/bin/c++ terminated with signal 9 [Killed]
+compilation terminated.
+/usr/bin/ld: error: lto-wrapper failed
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.

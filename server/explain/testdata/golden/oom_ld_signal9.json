@@ -1,0 +1,94 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "oom",
+      "title": "out of memory: lto-wrapper: fatal error: /usr/bin/c++ terminated with signal 9 [Killed]",
+      "line": 6,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 4,
+          "text": "FAILED: sql/mariadbd"
+        },
+        {
+          "n": 5,
+          "text": ": \u0026\u0026 /usr/bin/c++ -O2 -g -flto=auto sql/CMakeFiles/mariadbd.dir/main.cc.o -o sql/mariadbd sql/libsql.a \u0026\u0026 :"
+        },
+        {
+          "n": 6,
+          "text": "lto-wrapper: fatal error: /usr/bin/c++ terminated with signal 9 [Killed]"
+        },
+        {
+          "n": 7,
+          "text": "compilation terminated."
+        },
+        {
+          "n": 8,
+          "text": "/usr/bin/ld: error: lto-wrapper failed"
+        },
+        {
+          "n": 9,
+          "text": "collect2: error: ld returned 1 exit status"
+        }
+      ]
+    },
+    {
+      "kind": "ninja",
+      "title": "ninja: mariadbd failed: lto-wrapper: fatal error: /usr/bin/c++ terminated with signal 9 [Killed]",
+      "line": 6,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 4,
+          "text": "FAILED: sql/mariadbd"
+        },
+        {
+          "n": 6,
+          "text": "lto-wrapper: fatal error: /usr/bin/c++ terminated with signal 9 [Killed]"
+        },
+        {
+          "n": 7,
+          "text": "compilation terminated."
+        },
+        {
+          "n": 8,
+          "text": "/usr/bin/ld: error: lto-wrapper failed"
+        },
+        {
+          "n": 9,
+          "text": "collect2: error: ld returned 1 exit status"
+        }
+      ]
+    },
+    {
+      "kind": "compile",
+      "title": "link error: /usr/bin/ld: error: lto-wrapper failed",
+      "line": 8,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 7,
+          "text": "compilation terminated."
+        },
+        {
+          "n": 8,
+          "text": "/usr/bin/ld: error: lto-wrapper failed"
+        },
+        {
+          "n": 9,
+          "text": "collect2: error: ld returned 1 exit status"
+        },
+        {
+          "n": 10,
+          "text": "ninja: build stopped: subcommand failed."
+        }
+      ]
+    }
+  ],
+  "lines": 10,
+  "from": 1,
+  "untrusted": true
+}

@@ -1,0 +1,50 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 8,
+  "causes": [
+    {
+      "kind": "ctest",
+      "title": "ctest: cluster_connectivity failed (Failed)",
+      "line": 8,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 8,
+          "text": "2/2 Test #2: cluster_connectivity .............***Failed    3.02 sec"
+        },
+        {
+          "n": 9,
+          "text": "connect: Connection refused"
+        },
+        {
+          "n": 10,
+          "text": ""
+        },
+        {
+          "n": 11,
+          "text": "50% tests passed, 1 tests failed out of 2"
+        },
+        {
+          "n": 12,
+          "text": ""
+        },
+        {
+          "n": 13,
+          "text": "The following tests FAILED:"
+        },
+        {
+          "n": 14,
+          "text": "\t  2 - cluster_connectivity (Failed)"
+        },
+        {
+          "n": 15,
+          "text": "Errors while running CTest"
+        }
+      ]
+    }
+  ],
+  "lines": 15,
+  "from": 1,
+  "untrusted": true
+}

@@ -1,0 +1,41 @@
+# want: gtest
+# exit: 8
+# state: failure
+---
++ ctest --test-dir build --output-on-failure -j4
+Test project /home/buildbot/build
+      Start  1: rowgroup_tests
+      Start  2: arithmetic_operators
+ 1/12 Test  #2: arithmetic_operators .............   Passed    0.05 sec
+ 2/12 Test  #1: rowgroup_tests ...................***Failed    0.21 sec
+[==========] Running 42 tests from 6 test suites.
+[----------] Global test environment set-up.
+[----------] 8 tests from ColumnstoreRowgroup
+[ RUN      ] ColumnstoreRowgroup.InitRows
+[       OK ] ColumnstoreRowgroup.InitRows (1 ms)
+[ RUN      ] ColumnstoreRowgroup.Append
+[       OK ] ColumnstoreRowgroup.Append (0 ms)
+[ RUN      ] ColumnstoreRowgroup.SerializeNulls
+/src/storage/columnstore/columnstore/tests/rowgroup-tests.cpp:211: Failure
+Expected equality of these values:
+  rg.getRowCount()
+    Which is: 7
+  8U
+[  FAILED  ] ColumnstoreRowgroup.SerializeNulls (3 ms)
+[==========] 42 tests from 6 test suites ran. (88 ms total)
+[  PASSED  ] 41 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] ColumnstoreRowgroup.SerializeNulls
+
+ 1 FAILED TEST
+
+      Start  3: comparators_tests
+ 3/12 Test  #3: comparators_tests ................   Passed    0.02 sec
+
+92% tests passed, 1 tests failed out of 12
+
+Total Test time (real) =   1.94 sec
+
+The following tests FAILED:
+	  1 - rowgroup_tests (Failed)
+Errors while running CTest

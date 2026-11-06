@@ -1,0 +1,27 @@
+# want: ctest
+# exit: 8
+# state: failure
+---
++ ctest --output-on-failure
+Test project /build
+    Start 1: brm_tests
+1/4 Test #1: brm_tests ........................   Passed    0.31 sec
+    Start 2: dataconvert_tests
+2/4 Test #2: dataconvert_tests ................***Exception: SegFault  0.02 sec
+Running dataconvert tests
+loading fixtures from /src/tests/fixtures/dataconvert
+
+    Start 3: idbdatafile_tests
+3/4 Test #3: idbdatafile_tests ................   Passed    0.11 sec
+    Start 4: joblist_tests
+4/4 Test #4: joblist_tests ....................   Passed    1.20 sec
+
+75% tests passed, 1 tests failed out of 4
+
+Total Test time (real) =   1.66 sec
+
+The following tests FAILED:
+	  2 - dataconvert_tests (SEGFAULT)
+Errors while running CTest
+Output from these tests are in: /build/Testing/Temporary/LastTest.log
+Use "--rerun-failed --output-on-failure" to re-run the failed cases verbosely.

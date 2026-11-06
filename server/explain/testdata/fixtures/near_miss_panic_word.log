@@ -1,0 +1,9 @@
+# want: exit
+# exit: 1
+# state: failure
+---
++ ./scripts/check-release.sh
+checking the release notes
+panic: is not a word the release notes use
+checking the artifacts
+Error: the artifact mariadb-11.8.2-linux-x86_64.tar.gz is missing from the release

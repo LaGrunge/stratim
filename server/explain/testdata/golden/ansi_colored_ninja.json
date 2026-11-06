@@ -1,0 +1,46 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "ninja",
+      "title": "ninja: auth_pam.c.o failed: auth_pam.c:21: security/pam_appl.h: No such file or directory",
+      "line": 6,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 4,
+          "text": "FAILED: plugin/auth_pam/CMakeFiles/auth_pam.dir/auth_pam.c.o"
+        },
+        {
+          "n": 6,
+          "text": "/src/plugin/auth_pam/auth_pam.c:21:10: fatal error: security/pam_appl.h: No such file or directory"
+        }
+      ]
+    },
+    {
+      "kind": "compile",
+      "title": "compile error: auth_pam.c:21: security/pam_appl.h: No such file or directory",
+      "line": 6,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 5,
+          "text": "/usr/bin/cc -O2 -c /src/plugin/auth_pam/auth_pam.c"
+        },
+        {
+          "n": 6,
+          "text": "/src/plugin/auth_pam/auth_pam.c:21:10: fatal error: security/pam_appl.h: No such file or directory"
+        },
+        {
+          "n": 7,
+          "text": "ninja: build stopped: subcommand failed."
+        }
+      ]
+    }
+  ],
+  "lines": 7,
+  "from": 1,
+  "untrusted": true
+}

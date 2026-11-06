@@ -273,6 +273,8 @@ func apiRoutes(e *gin.RouterGroup) {
 		{
 			v2.GET("/events", session.MustUser(), api.EventStreamV2(server.Config.Services.Events))
 			v2.GET("/pipelines/:pipeline_id/wait", session.MustUser(), api.WaitPipelineV2(server.Config.Services.Events, server.Config.Services.Durations))
+			v2.GET("/steps/:step_id/explain", session.MustUser(), api.StepExplainV2(server.Config.Services.Explain))
+			v2.GET("/steps/:step_id/log", session.MustUser(), api.StepLogV2(server.Config.Services.LogWindows))
 		}
 
 		if zerolog.GlobalLevel() <= zerolog.DebugLevel {

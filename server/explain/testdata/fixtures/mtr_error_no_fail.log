@@ -1,0 +1,11 @@
+# want: mtr
+# exit: 1
+# state: failure
+---
++ ./mtr --suite=columnstore/basic
+Logging: ./mariadb-test-run.pl  --suite=columnstore/basic
+vardir: /build/mysql-test/var
+Checking leftover processes...
+Removing old var directory...
+Creating var directory '/build/mysql-test/var'...
+mysql-test-run: *** ERROR: Could not find 'mariadbd' in '/build/sql /build/libexec /build/bin /build/sbin', used for 'mysqld'

@@ -87,6 +87,19 @@ func (g *RPC) LogStream(ctx context.Context, step *model.Step, fn func(*model.Lo
 	return service_log.StreamFound(ctx, g.LogFind, step, fn)
 }
 
+// LogStreamFrom hands out the entries of LogFind from the line from on.
+func (g *RPC) LogStreamFrom(ctx context.Context, step *model.Step, from int, fn func(*model.LogEntry) error) error {
+	return service_log.StreamFoundFrom(ctx, g.LogFind, step, from, fn)
+}
+
+// ReadsWhole is true: the addon protocol finds a log only whole.
+func (g *RPC) ReadsWhole() bool { return true }
+
+// LogLastLine gives the last line of the entries of LogFind.
+func (g *RPC) LogLastLine(ctx context.Context, step *model.Step) (int, error) {
+	return service_log.LastLineFound(ctx, g.LogFind, step)
+}
+
 func (g *RPC) LogAppend(ctx context.Context, step *model.Step, logEntries []*model.LogEntry) error {
 	args, err := json.Marshal(&argumentsAppend{
 		Step:       step,

@@ -3746,6 +3746,72 @@ func (_c *MockStore_LogFind_Call) RunAndReturn(run func(context1 context.Context
 	return _c
 }
 
+// LogLastLine provides a mock function for the type MockStore
+func (_mock *MockStore) LogLastLine(context1 context.Context, step *model.Step) (int, error) {
+	ret := _mock.Called(context1, step)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogLastLine")
+	}
+
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *model.Step) (int, error)); ok {
+		return returnFunc(context1, step)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *model.Step) int); ok {
+		r0 = returnFunc(context1, step)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *model.Step) error); ok {
+		r1 = returnFunc(context1, step)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_LogLastLine_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogLastLine'
+type MockStore_LogLastLine_Call struct {
+	*mock.Call
+}
+
+// LogLastLine is a helper method to define mock.On call
+//   - context1 context.Context
+//   - step *model.Step
+func (_e *MockStore_Expecter) LogLastLine(context1 any, step any) *MockStore_LogLastLine_Call {
+	return &MockStore_LogLastLine_Call{Call: _e.mock.On("LogLastLine", context1, step)}
+}
+
+func (_c *MockStore_LogLastLine_Call) Run(run func(context1 context.Context, step *model.Step)) *MockStore_LogLastLine_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *model.Step
+		if args[1] != nil {
+			arg1 = args[1].(*model.Step)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_LogLastLine_Call) Return(n int, err error) *MockStore_LogLastLine_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockStore_LogLastLine_Call) RunAndReturn(run func(context1 context.Context, step *model.Step) (int, error)) *MockStore_LogLastLine_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LogStream provides a mock function for the type MockStore
 func (_mock *MockStore) LogStream(context1 context.Context, step *model.Step, fn func(*model.LogEntry) error) error {
 	ret := _mock.Called(context1, step, fn)
@@ -3805,6 +3871,75 @@ func (_c *MockStore_LogStream_Call) Return(err error) *MockStore_LogStream_Call 
 }
 
 func (_c *MockStore_LogStream_Call) RunAndReturn(run func(context1 context.Context, step *model.Step, fn func(*model.LogEntry) error) error) *MockStore_LogStream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LogStreamFrom provides a mock function for the type MockStore
+func (_mock *MockStore) LogStreamFrom(context1 context.Context, step *model.Step, n int, fn func(*model.LogEntry) error) error {
+	ret := _mock.Called(context1, step, n, fn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogStreamFrom")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *model.Step, int, func(*model.LogEntry) error) error); ok {
+		r0 = returnFunc(context1, step, n, fn)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockStore_LogStreamFrom_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogStreamFrom'
+type MockStore_LogStreamFrom_Call struct {
+	*mock.Call
+}
+
+// LogStreamFrom is a helper method to define mock.On call
+//   - context1 context.Context
+//   - step *model.Step
+//   - n int
+//   - fn func(*model.LogEntry) error
+func (_e *MockStore_Expecter) LogStreamFrom(context1 any, step any, n any, fn any) *MockStore_LogStreamFrom_Call {
+	return &MockStore_LogStreamFrom_Call{Call: _e.mock.On("LogStreamFrom", context1, step, n, fn)}
+}
+
+func (_c *MockStore_LogStreamFrom_Call) Run(run func(context1 context.Context, step *model.Step, n int, fn func(*model.LogEntry) error)) *MockStore_LogStreamFrom_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *model.Step
+		if args[1] != nil {
+			arg1 = args[1].(*model.Step)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		var arg3 func(*model.LogEntry) error
+		if args[3] != nil {
+			arg3 = args[3].(func(*model.LogEntry) error)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_LogStreamFrom_Call) Return(err error) *MockStore_LogStreamFrom_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockStore_LogStreamFrom_Call) RunAndReturn(run func(context1 context.Context, step *model.Step, n int, fn func(*model.LogEntry) error) error) *MockStore_LogStreamFrom_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -6392,6 +6527,68 @@ func (_c *MockStore_StepFinished_Call) Return(err error) *MockStore_StepFinished
 }
 
 func (_c *MockStore_StepFinished_Call) RunAndReturn(run func(context1 context.Context, step *model.Step) error) *MockStore_StepFinished_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StepGet provides a mock function for the type MockStore
+func (_mock *MockStore) StepGet(stepID int64) (*model.Step, error) {
+	ret := _mock.Called(stepID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StepGet")
+	}
+
+	var r0 *model.Step
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64) (*model.Step, error)); ok {
+		return returnFunc(stepID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64) *model.Step); ok {
+		r0 = returnFunc(stepID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.Step)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64) error); ok {
+		r1 = returnFunc(stepID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_StepGet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StepGet'
+type MockStore_StepGet_Call struct {
+	*mock.Call
+}
+
+// StepGet is a helper method to define mock.On call
+//   - stepID int64
+func (_e *MockStore_Expecter) StepGet(stepID any) *MockStore_StepGet_Call {
+	return &MockStore_StepGet_Call{Call: _e.mock.On("StepGet", stepID)}
+}
+
+func (_c *MockStore_StepGet_Call) Run(run func(stepID int64)) *MockStore_StepGet_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_StepGet_Call) Return(step *model.Step, err error) *MockStore_StepGet_Call {
+	_c.Call.Return(step, err)
+	return _c
+}
+
+func (_c *MockStore_StepGet_Call) RunAndReturn(run func(stepID int64) (*model.Step, error)) *MockStore_StepGet_Call {
 	_c.Call.Return(run)
 	return _c
 }

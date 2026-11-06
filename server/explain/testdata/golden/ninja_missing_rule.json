@@ -1,0 +1,30 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "ninja",
+      "title": "ninja: error: 'storage/columnstore/columnstore/utils/libmarias3/libmarias3.so', needed by 'storage/columnstore/columnstore/storage-manager/libstoragemanager.so…",
+      "line": 15,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 13,
+          "text": "-- Build files have been written to: /home/buildbot/build"
+        },
+        {
+          "n": 14,
+          "text": "+ ninja -j16 columnstore"
+        },
+        {
+          "n": 15,
+          "text": "ninja: error: 'storage/columnstore/columnstore/utils/libmarias3/libmarias3.so', needed by 'storage/columnstore/columnstore/storage-manager/libstoragemanager.so', missing and no known rule to make it"
+        }
+      ]
+    }
+  ],
+  "lines": 15,
+  "from": 1,
+  "untrusted": true
+}

@@ -1,0 +1,54 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "mtr",
+      "title": "MTR: columnstore/basic.mcs232_window_functions failed: timeout after 900 seconds",
+      "line": 25,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 25,
+          "text": "columnstore/basic.mcs232_window_functions w2 [ fail ]  timeout after 900 seconds"
+        },
+        {
+          "n": 26,
+          "text": "        Test ended at 2026-11-05 12:21:12"
+        },
+        {
+          "n": 28,
+          "text": "Test case timeout after 900 seconds"
+        },
+        {
+          "n": 30,
+          "text": "== /home/buildbot/build/mysql-test/var/2/log/current_test =="
+        },
+        {
+          "n": 31,
+          "text": "CURRENT_TEST: columnstore/basic.mcs232_window_functions"
+        },
+        {
+          "n": 32,
+          "text": "--------------------------------------------------------------------------"
+        },
+        {
+          "n": 33,
+          "text": "The servers were restarted 12 times"
+        },
+        {
+          "n": 34,
+          "text": "Spent 812.345 of 220 seconds executing testcases"
+        },
+        {
+          "n": 36,
+          "text": "Check of testcase failed for: main.not_existing"
+        }
+      ]
+    }
+  ],
+  "lines": 47,
+  "from": 1,
+  "untrusted": true
+}

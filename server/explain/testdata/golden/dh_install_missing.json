@@ -1,0 +1,58 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 2,
+  "causes": [
+    {
+      "kind": "dh_install",
+      "title": "dh_install: 2 files not found: usr/lib/mysql/plugin/ha_columnstore.so (+1 more)",
+      "line": 27,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 27,
+          "text": "dh_install: warning: Cannot find (any matches for) \"usr/lib/mysql/plugin/ha_columnstore.so\" (tried in ., debian/tmp)"
+        },
+        {
+          "n": 30,
+          "text": "dh_install: warning: Cannot find (any matches for) \"usr/bin/mcsSetConfig\" (tried in ., debian/tmp)"
+        },
+        {
+          "n": 33,
+          "text": "dh_install: error: missing files, aborting"
+        }
+      ]
+    },
+    {
+      "kind": "debhelper",
+      "title": "dh_install: error: missing files, aborting",
+      "line": 33,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 31,
+          "text": ""
+        },
+        {
+          "n": 32,
+          "text": "dh_install: warning: mariadb-plugin-columnstore missing files: usr/bin/mcsSetConfig"
+        },
+        {
+          "n": 33,
+          "text": "dh_install: error: missing files, aborting"
+        },
+        {
+          "n": 34,
+          "text": "make: *** [debian/rules:205: binary] Error 25"
+        },
+        {
+          "n": 35,
+          "text": "dpkg-buildpackage: error: debian/rules binary subprocess returned exit status 2"
+        }
+      ]
+    }
+  ],
+  "lines": 35,
+  "from": 1,
+  "untrusted": true
+}

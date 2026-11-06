@@ -1,0 +1,110 @@
+{
+  "step_id": 1,
+  "status": "failure",
+  "exit_code": 1,
+  "causes": [
+    {
+      "kind": "mtr",
+      "title": "MTR: main.join_cache failed: At line 1012: query 'SELECT * FROM t1, t2 WHERE t1.a = t2.a' failed: \u003cUnknown\u003e (2013): Lost connection to server during query",
+      "line": 25,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 25,
+          "text": "main.join_cache                          w3 [ fail ]"
+        },
+        {
+          "n": 26,
+          "text": "        Test ended at 2026-11-05 12:08:51"
+        },
+        {
+          "n": 28,
+          "text": "CURRENT_TEST: main.join_cache"
+        },
+        {
+          "n": 29,
+          "text": "mysqltest: At line 1012: query 'SELECT * FROM t1, t2 WHERE t1.a = t2.a' failed: \u003cUnknown\u003e (2013): Lost connection to server during query"
+        },
+        {
+          "n": 30,
+          "text": "251105 12:08:50 [ERROR] mariadbd got signal 11 ;"
+        },
+        {
+          "n": 31,
+          "text": "Sorry, we probably made a mistake, and this is a bug."
+        },
+        {
+          "n": 32,
+          "text": "Server version: 11.8.2-MariaDB-debug-log source revision: 1a2b3c4d"
+        },
+        {
+          "n": 33,
+          "text": "Thread pointer: 0x7f12a4000c58"
+        },
+        {
+          "n": 34,
+          "text": "stack_bottom = 0x7f12c45fdc30 thread_stack 0x49000"
+        },
+        {
+          "n": 35,
+          "text": "mariadbd: /home/buildbot/server/sql/sql_join_cache.cc:2410: bool JOIN_CACHE::get_record(): Assertion `pos \u003c end' failed."
+        },
+        {
+          "n": 36,
+          "text": "--------------------------------------------------------------------------"
+        },
+        {
+          "n": 37,
+          "text": "The servers were restarted 12 times"
+        }
+      ]
+    },
+    {
+      "kind": "crash",
+      "title": "crash: 251105 12:08:50 [ERROR] mariadbd got signal 11 ;",
+      "line": 30,
+      "confidence": "high",
+      "excerpt": [
+        {
+          "n": 29,
+          "text": "mysqltest: At line 1012: query 'SELECT * FROM t1, t2 WHERE t1.a = t2.a' failed: \u003cUnknown\u003e (2013): Lost connection to server during query"
+        },
+        {
+          "n": 30,
+          "text": "251105 12:08:50 [ERROR] mariadbd got signal 11 ;"
+        },
+        {
+          "n": 31,
+          "text": "Sorry, we probably made a mistake, and this is a bug."
+        },
+        {
+          "n": 32,
+          "text": "Server version: 11.8.2-MariaDB-debug-log source revision: 1a2b3c4d"
+        },
+        {
+          "n": 33,
+          "text": "Thread pointer: 0x7f12a4000c58"
+        },
+        {
+          "n": 34,
+          "text": "stack_bottom = 0x7f12c45fdc30 thread_stack 0x49000"
+        },
+        {
+          "n": 35,
+          "text": "mariadbd: /home/buildbot/server/sql/sql_join_cache.cc:2410: bool JOIN_CACHE::get_record(): Assertion `pos \u003c end' failed."
+        },
+        {
+          "n": 36,
+          "text": "--------------------------------------------------------------------------"
+        },
+        {
+          "n": 37,
+          "text": "The servers were restarted 12 times"
+        }
+      ]
+    }
+  ],
+  "lines": 51,
+  "from": 1,
+  "untrusted": true
+}

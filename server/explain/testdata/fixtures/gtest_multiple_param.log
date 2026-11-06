@@ -1,0 +1,35 @@
+# want: gtest
+# exit: 1
+# state: failure
+---
+[==========] Running 42 tests from 6 test suites.
+[----------] Global test environment set-up.
+[----------] 8 tests from ColumnstoreRowgroup
+[ RUN      ] ColumnstoreRowgroup.InitRows
+[       OK ] ColumnstoreRowgroup.InitRows (1 ms)
+[ RUN      ] ColumnstoreRowgroup.Append
+[       OK ] ColumnstoreRowgroup.Append (0 ms)
+[ RUN      ] SimdTypes/SimdFilterTest.Equal/3
+/src/storage/columnstore/columnstore/tests/simd_processors.cpp:96: Failure
+Value of: result == expected
+  Actual: false
+Expected: true
+[  FAILED  ] SimdTypes/SimdFilterTest.Equal/3, where TypeParam = long (0 ms)
+[ RUN      ] SimdTypes/SimdFilterTest.Equal/4
+/src/storage/columnstore/columnstore/tests/simd_processors.cpp:96: Failure
+Value of: result == expected
+  Actual: false
+Expected: true
+[  FAILED  ] SimdTypes/SimdFilterTest.Equal/4, where TypeParam = unsigned long (0 ms)
+[ RUN      ] DecimalTest.Overflow
+unknown file: Failure
+C++ exception with description "decimal overflow" thrown in the test body.
+[  FAILED  ] DecimalTest.Overflow (1 ms)
+[==========] 42 tests from 6 test suites ran. (61 ms total)
+[  PASSED  ] 39 tests.
+[  FAILED  ] 3 tests, listed below:
+[  FAILED  ] SimdTypes/SimdFilterTest.Equal/3, where TypeParam = long
+[  FAILED  ] SimdTypes/SimdFilterTest.Equal/4, where TypeParam = unsigned long
+[  FAILED  ] DecimalTest.Overflow
+
+ 3 FAILED TESTS

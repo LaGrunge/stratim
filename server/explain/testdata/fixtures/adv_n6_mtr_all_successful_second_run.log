@@ -1,0 +1,9 @@
+# want: mtr
+---
+Logging: ./mysql-test-run.pl --suite=orthus
+orthus.basic                             w1 [ fail ]
+mysqltest: At line 10: query 'CREATE TABLE t (a INT) ENGINE=orthus' failed: 1286: Unknown storage engine 'orthus'
+Aborting: orthus.basic failed in default mode.
++ ./mysql-test-run.pl --suite=main --do-test=select
+main.select                              w1 [ pass ]   1200
+Completed: All 1 tests were successful.

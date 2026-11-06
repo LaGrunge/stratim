@@ -1,0 +1,30 @@
+# want: ninja
+# exit: 1
+# state: failure
+---
+-- The C compiler identification is GNU 12.2.0
+-- The CXX compiler identification is GNU 12.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Running cmake version 3.25.1
+-- MariaDB 11.8.2
+-- Found Threads: TRUE
+-- Looking for include file pthread.h - found
+-- Performing Test HAVE_IB_GCC_ATOMIC_BUILTINS - Success
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/buildbot/build
++ cmake --build . -j 16
+[2300/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj2300.cpp.o
+[2301/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj2301.cpp.o
+[2302/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj2302.cpp.o
+[2303/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj2303.cpp.o
+[2304/2412] Building CXX object storage/columnstore/columnstore/dbcon/execplan/CMakeFiles/execplan.dir/obj2304.cpp.o
+FAILED: storage/columnstore/columnstore/tools/clearShm/clearShm
+: && /usr/bin/c++ -O2 -g -DNDEBUG -Wl,-z,relro,-z,now storage/columnstore/columnstore/tools/clearShm/CMakeFiles/clearShm.dir/main.cpp.o -o storage/columnstore/columnstore/tools/clearShm/clearShm  -Wl,-rpath,/home/buildbot/build/storage/columnstore/columnstore/utils/rwlock  storage/columnstore/columnstore/utils/rwlock/librwlock.a && :
+/usr/bin/ld: storage/columnstore/columnstore/tools/clearShm/CMakeFiles/clearShm.dir/main.cpp.o: in function `main':
+/home/buildbot/server/storage/columnstore/columnstore/tools/clearShm/main.cpp:120: undefined reference to `BRM::ShmKeys::ShmKeys()'
+/usr/bin/ld: /home/buildbot/server/storage/columnstore/columnstore/tools/clearShm/main.cpp:121: undefined reference to `BRM::ShmKeys::keyRangeSize'
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
