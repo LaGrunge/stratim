@@ -173,8 +173,9 @@ Only build steps can define commands. You cannot use commands with plugins or se
 
 Allows you to specify the entrypoint for containers. Note that this must be a list of the command and its arguments (e.g. `["/bin/sh", "-c"]`).
 
-If you define [`commands`](#commands), the default entrypoint will be `["/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d | /bin/sh -e"]`.
-You can also use a custom shell with `CI_SCRIPT` (Base64-encoded) if you set `commands`.
+If you define [`commands`](#commands), the default entrypoint will be `["/bin/sh", "-e", "-c", "CI_SCRIPT=\"$(echo \"$CI_SCRIPT\" | base64 -d && echo .)\"; eval \"${CI_SCRIPT%.}\""]`: the script is decoded whole before it runs, so a command that reads stdin reads the container's, not the rest of the script.
+An image whose shell has no `base64` fails such a step.
+You can also use a custom shell with `CI_SCRIPT` (Base64-encoded) if you set `commands`. Decode it whole before running it, as the default does, rather than piping it into the shell: a command that reads stdin would read the rest of the script.
 
 ### `environment`
 
