@@ -258,6 +258,9 @@ func TestSweepCanceledWorkflow(t *testing.T) {
 	workflows := setup.WaitForWorkflowsDone(t, env.Store, created)
 	require.Len(t, workflows, 1)
 	assert.Equal(t, model.StatusKilled, workflows[0].State)
+	// the sweep ends the workflow first and its steps right after
+	setup.WaitForStepStatus(t, env.Store, created, "build", model.StatusKilled, 30*time.Second)
+	setup.WaitForStepStatus(t, env.Store, created, "logs", model.StatusCanceled, 30*time.Second)
 	steps, err := env.Store.StepList(created.ID)
 	require.NoError(t, err)
 	byName := make(map[string]model.StatusValue, len(steps))
