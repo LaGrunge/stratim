@@ -1,0 +1,14 @@
+retry: 3000
+
+id: 1793934000000040
+event: hello
+data: {"v":1,"server":"https://ci.example.test"}
+
+id: 1793934000000042
+event: step.failed
+data: {"v":1,"id":1793934000000042,"type":"step.failed","severity":"notice","ts":"2026-11-06T03:11:00Z","repo_id":7,"repo":"owner/name","pipeline_id":812,"number":345,"branch":"main","workflow":"build","workflow_id":4410,"step":"lint","step_id":9910,"exit_code":1,"ignored":true,"duration_s":5,"status":"failure","summary":"#345 build/lint failure after 5s, exit 1, ignored"}
+
+id: 1793934000000043
+event: pipeline.finished
+data: {"v":1,"id":1793934000000043,"type":"pipeline.finished","severity":"notice","ts":"2026-11-06T03:12:02Z","repo_id":7,"repo":"owner/name","pipeline_id":812,"number":345,"branch":"main","duration_s":122,"status":"success","summary":"#345 success after 122s"}
+

@@ -1,0 +1,4 @@
+03:09:59  watch              -  running  owner/name #345 (pipeline 812) until failed
+03:09:59  cause              build/test  failure  cause gtest/high: gtest: Rowgroup.SerializeNulls failed at rowgroup-tests.cpp:211
+          untrusted log| ?[31m/src/tests/rowgroup-tests.cpp:211: Failure?[0m see below
+03:09:59  done               -  failure  exit 1: #345 build/test failure after 31s, exit 1

@@ -1,0 +1,8 @@
+03:09:59  watch              -  running  owner/name #345 (pipeline 812) until failed, events from notice
+03:10:00  pipeline.started   -  running  #345 started
+03:11:00  step.failed        build/lint  failure  #345 build/lint failure after 5s, exit 1, ignored
+03:12:08  step.failed        build/test  failure  #345 build/test failure after 31s, exit 1
+03:12:09  workflow.finished  build  failure  #345 build failure after 130s
+03:12:10  step.explained     build/test  failure  cause gtest/high: gtest: Rowgroup.SerializeNulls failed at rowgroup-tests.cpp:211
+          untrusted log| ?[31m/src/tests/rowgroup-tests.cpp:211: Failure?[0m see below
+03:09:59  done               -  failure  exit 1: #345 build/test failure after 31s, exit 1

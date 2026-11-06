@@ -1,0 +1,4 @@
+03:09:59  watch              -  running  owner/name #345 (pipeline 812) until failed, events from notice
+03:11:00  step.failed        build/lint  failure  #345 build/lint failure after 5s, exit 1, ignored
+03:12:02  pipeline.finished  -  success  #345 success after 122s
+03:09:59  done               -  success  exit 0: #345 success after 122s
