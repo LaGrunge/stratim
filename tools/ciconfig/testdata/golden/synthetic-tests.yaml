@@ -18,7 +18,7 @@ steps:
   image: docker.io/alpine:3.24
   name: service-messages
 when:
-- cron: synthetic
+- cron: synthetic-check/nightly
   event: cron
 - evaluate: TASK == "synthetic"
   event: manual

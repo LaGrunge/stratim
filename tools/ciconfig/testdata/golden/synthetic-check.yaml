@@ -1,3 +1,6 @@
+crons:
+  nightly:
+    schedule: 0 3 * * *
 depends_on:
 - synthetic-logs
 - synthetic-parallel-a
@@ -14,7 +17,7 @@ steps:
   image: docker.io/golang:1.27
   name: check
 when:
-- cron: synthetic
+- cron: synthetic-check/nightly
   event: cron
   status:
   - success

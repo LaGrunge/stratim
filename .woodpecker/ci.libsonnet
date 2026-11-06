@@ -50,5 +50,7 @@ local images = {
   },
 
   // synthetic: the triggers of the synthetic workflows (see synthetic.jsonnet)
-  synthetic:: [s.when.cron('synthetic'), s.when.manual('synthetic')],
+  // synthetic-check/nightly is the cron synthetic-check declares; the event
+  // and cron here keep the workflows off pushes and the settings' crons
+  synthetic:: [s.when.cron('synthetic-check/nightly'), s.when.manual('synthetic')],
 }

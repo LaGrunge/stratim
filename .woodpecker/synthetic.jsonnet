@@ -1,6 +1,7 @@
 // Synthetic load (S0-3): workflows that load the CI the way real projects do,
 // and a last one that checks how it coped against
-// .woodpecker/synthetic/budgets.json. They run only on the "synthetic" cron
+// .woodpecker/synthetic/budgets.json. They run only on the nightly cron
+// synthetic-check declares, which runs it and every workflow it depends on,
 // or a manual run with TASK=synthetic, never on pushes or pull requests.
 local ci = import 'ci.libsonnet';
 local s = import 'stratim.libsonnet';
@@ -49,6 +50,7 @@ workflows {
       },
     }),
   ], {
+    crons: { nightly: { schedule: '0 3 * * *' } },  // UTC
     // every outcome when.status knows: the check also reports workflows that
     // failed, and a missing or skipped one shows up as a broken budget
     when: [w + s.when.status(['success', 'failure']) for w in ci.synthetic],
