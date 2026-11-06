@@ -365,6 +365,37 @@ steps:
 	assert.ElementsMatchf(t, []string{"success", "failure"}, items[0].RunsOn, "Should run on failure")
 }
 
+// TestPriority: the item carries the workflow's priority; an out of range
+// one fails the workflow.
+func TestPriority(t *testing.T) {
+	t.Parallel()
+
+	build := func(priority string) ([]*Item, error) {
+		b := PipelineBuilder{
+			GetWorkflowMetadata: (&testMetadata{pipelineEvent: "push"}).GetWorkflowMetadata,
+			RepoTrusted:         &metadata.TrustedConfiguration{},
+			Yamls: []*YamlFile{{Data: []byte(`
+when:
+  event: push
+priority: ` + priority + `
+steps:
+  - name: deploy
+    image: scratch
+`)}},
+		}
+		return b.Build()
+	}
+
+	items, err := build("5")
+	assert.NoError(t, err)
+	if assert.Len(t, items, 1) {
+		assert.Equal(t, 5, items[0].Priority)
+	}
+
+	_, err = build("11")
+	assert.ErrorContains(t, err, "`priority` must be from -10 to 10, not 11")
+}
+
 func TestRunsOnStatus(t *testing.T) {
 	t.Parallel()
 

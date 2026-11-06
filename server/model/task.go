@@ -46,6 +46,18 @@ type Task struct {
 	// FinalizeTimeout is how long, in seconds, the workflow's finalizers
 	// may run in all: the queue holds it no longer for them once canceled.
 	FinalizeTimeout int64 `json:"finalize_timeout" xorm:"NOT NULL DEFAULT 0 'finalize_timeout'"`
+	// Priority is the workflow's priority: of the pending tasks of one
+	// repository, one of a higher priority is handed out first.
+	Priority int `json:"priority" xorm:"NOT NULL DEFAULT 0 'priority'"`
+	// Queued is when the task was queued, a unique, increasing stamp (unix
+	// nanoseconds): the queue's order, kept over a restart. 0 for a task
+	// stored before it was set.
+	Queued int64 `json:"-" xorm:"NOT NULL DEFAULT 0 'queued'"`
+	// Boost is set when an admin moves its pipeline to the top of the queue:
+	// a pending task of a higher one is handed out first, before any other.
+	// A unique, increasing stamp, the latest move the highest; 0 if it was
+	// not moved.
+	Boost int64 `json:"-" xorm:"NOT NULL DEFAULT 0 'boost'"`
 } //	@name	Task
 
 // TableName return database table name for xorm.

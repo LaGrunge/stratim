@@ -41,6 +41,11 @@
               :is-loading="isCancelingPipeline"
               @click="cancelPipeline"
             />
+            <PipelinePrioritizeButton
+              :pipeline="pipeline"
+              :is-prioritizing="isPrioritizingPipeline"
+              @prioritize="prioritizePipeline"
+            />
             <PipelineRestartButton
               :can-restart-failed="pipeline.can_restart_failed === true"
               :is-restarting="isRestartingPipeline"
@@ -153,6 +158,7 @@ import RenderMarkdown from '~/components/atomic/RenderMarkdown.vue';
 import DeployPipelinePopup from '~/components/layout/popups/DeployPipelinePopup.vue';
 import Scaffold from '~/components/layout/scaffold/Scaffold.vue';
 import Tab from '~/components/layout/scaffold/Tab.vue';
+import PipelinePrioritizeButton from '~/components/repo/pipeline/PipelinePrioritizeButton.vue';
 import PipelineRestartButton from '~/components/repo/pipeline/PipelineRestartButton.vue';
 import PipelineStatusIcon from '~/components/repo/pipeline/PipelineStatusIcon.vue';
 import useApiClient from '~/compositions/useApiClient';
@@ -225,6 +231,15 @@ const { doSubmit: cancelPipeline, isLoading: isCancelingPipeline } = useAsyncAct
 
   await apiClient.cancelPipeline(repo.value.id, pipeline.value.number);
   notifications.notify({ title: i18n.t('repo.pipeline.actions.cancel_success'), type: 'success' });
+});
+
+const { doSubmit: prioritizePipeline, isLoading: isPrioritizingPipeline } = useAsyncAction(async () => {
+  if (!pipeline.value?.number) {
+    throw new Error('Unexpected: Pipeline number not found');
+  }
+
+  await apiClient.prioritizePipeline(repo.value.id, pipeline.value.number);
+  notifications.notify({ title: i18n.t('repo.pipeline.actions.prioritize_success'), type: 'success' });
 });
 
 const { doSubmit: restartPipeline, isLoading: isRestartingPipeline } = useAsyncAction(async () => {

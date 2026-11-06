@@ -219,3 +219,42 @@ concurrency:
   limit: 1
   group: deploy-${CI_COMMIT_BRANCH}
 ```
+
+## Priority
+
+Workflows waiting in the queue are handed to agents in the order they were queued; a workflow waiting for its dependencies is queued once they are done. A workflow can ask to go before the other workflows of its repository with `priority`: an integer from `-10` to `10`, `0` if left out.
+
+```yaml title=".woodpecker/hotfix.yaml"
+priority: 5
+
+steps:
+  - name: build
+    image: golang
+    commands:
+      - go build
+```
+
+A priority orders the workflows of one repository, not those of other repositories:
+
+- The queue keeps, for each repository, the places its waiting workflows were queued at. They fill these places by their priority, the highest first, ties in the order they were queued. A workflow of another repository keeps its place: one queued before a high priority workflow is still handed out before it.
+- A repository has as many places ahead of another repository's workflow as it had workflows queued before it: once a workflow is handed out, its place is gone. Workflows of a higher priority queued later do not keep a low one's place for themselves.
+- A negative priority lets the repository's other workflows go first, for example a nightly job that should not hold up its repository's pushes.
+
+A priority orders the queue and nothing more:
+
+- A workflow still waits for its [`depends_on`](#flow-control) workflows; once they are done it goes before the lower ones of its repository.
+- It still runs only on an agent its [labels](./20-workflow-syntax.md#labels) match. A workflow of a higher priority that no idle agent may take does not hold up a lower one an agent may take.
+- It does not stop a workflow that is running already.
+- It does not order a [concurrency group](#concurrency): the free slot of a group goes to the earliest pipeline (after a pipeline moved to the top, see below), whatever the priority of its workflows.
+
+A priority out of range fails the pipeline with a linter error.
+
+:::note
+Priorities are not fair within a repository: while workflows of a higher priority keep coming, one of a lower priority of the same repository waits. Other repositories are not held up by them.
+:::
+
+### Move to the top
+
+A server admin can move a pipeline to the top of the queue, server-wide: the **Move to top** button of the pipeline, shown to server admins while some of its workflows wait in the queue. Its waiting workflows then go before all others waiting, of every repository and whatever their priority; the pipeline moved last goes first. Among themselves they keep their priority and dependencies, and in a concurrency group the moved pipeline gets the next free slot. Moving does not touch the workflows already running, and a workflow restarted later is queued anew. The queue keeps the move over a server restart.
+
+The API does the same, for server admins: `POST /api/repos/{repo_id}/pipelines/{pipeline_number}/prioritize` answers `204` once the pipeline was moved, `400` if nothing of it waits in the queue and `403` for a user who is not a server admin.

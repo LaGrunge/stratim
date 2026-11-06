@@ -172,6 +172,16 @@ func (p *impl) CancelWorkflows(c context.Context, workflowIDs []string, escalate
 	return p.q.CancelAtOnce(c, workflowIDs, escalate)
 }
 
+// PrioritizeWorkflows moves the given workflows still pending to the top of
+// the queue. An empty list is a no-op.
+func (p *impl) PrioritizeWorkflows(c context.Context, workflowIDs []string) ([]string, error) {
+	if len(workflowIDs) == 0 {
+		return nil, nil
+	}
+
+	return p.q.PrioritizeAtOnce(c, workflowIDs, queue.NextBoost())
+}
+
 func (p *impl) SetCanceledExpiredHandler(handler func(task *model.Task)) {
 	p.q.SetCanceledExpiredHandler(handler)
 }

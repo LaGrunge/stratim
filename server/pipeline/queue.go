@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/builder"
+	yaml_types "go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/types"
 	"go.woodpecker-ci.org/woodpecker/v3/rpc"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 )
@@ -72,6 +73,9 @@ func pipelineTasks(repo *model.Repo, org *model.Org, activePipeline *model.Pipel
 				task.ConcurrencyGroup = fmt.Sprintf("%d//%s", repo.ID, item.ConcurrencyGroup)
 			}
 		}
+
+		// the linter fails a workflow out of range: a bound for any other way in
+		task.Priority = min(max(item.Priority, yaml_types.MinPriority), yaml_types.MaxPriority)
 
 		timeout := workflowTimeout(item.Timeout, repo.Timeout)
 		if item.Config != nil {

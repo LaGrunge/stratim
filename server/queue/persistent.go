@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/rs/zerolog/log"
@@ -37,6 +38,9 @@ const serverConfigQueuePaused = "queue-paused"
 // starts.
 func WithTaskStore(ctx context.Context, q Queue, s store.Store) Queue {
 	tasks, _ := s.TaskList()
+	// in the order they were queued in, the queue's: the store keeps none
+	slices.SortStableFunc(tasks, compareQueued)
+	restoreStamps(s, tasks)
 	for _, task := range tasks {
 		restoreDepStatus(s, task)
 	}
@@ -46,6 +50,43 @@ func WithTaskStore(ctx context.Context, q Queue, s store.Store) Queue {
 	pq := &persistentQueue{q, s}
 	pq.restorePausedState()
 	return pq
+}
+
+// restoreStamps keeps the stamps of the restored tasks in order. The stamps
+// handed out from now on are higher than any stored, as the server that
+// stored them may have had a clock ahead of this one's. A task stored before
+// it was stamped (0) is older than the ones stamped: in their order (see
+// compareQueued), they get the stamps just below the lowest stored, and
+// keep them in the store, so that they do not go to the tail, now or after
+// another restart.
+func restoreStamps(s store.Store, tasks []*model.Task) {
+	var highest, lowest int64
+	var legacy []*model.Task
+	for _, task := range tasks {
+		highest = max(highest, task.Queued, task.Boost)
+		switch {
+		case task.Queued == 0:
+			legacy = append(legacy, task)
+		case lowest == 0 || task.Queued < lowest:
+			lowest = task.Queued
+		}
+	}
+	seedStamps(highest)
+	if len(legacy) == 0 {
+		return
+	}
+	base := lowest - int64(len(legacy))
+	for i, task := range legacy {
+		if lowest == 0 || base <= 0 {
+			// none stamped, or no room below them: in their order from now on
+			task.Queued = nextStamp()
+		} else {
+			task.Queued = base + int64(i)
+		}
+		if err := s.TaskSetQueued(task.ID, task.Queued); err != nil {
+			log.Error().Err(err).Msgf("restore queue item: %s: cannot store when it was queued", task.ID)
+		}
+	}
 }
 
 // restoreDepStatus sets the status of every finished dependency of a reloaded
@@ -117,6 +158,9 @@ func isTerminalWorkflowState(state model.StatusValue) bool {
 // PushAtOnce pushes multiple tasks to the tail of this queue.
 func (q *persistentQueue) PushAtOnce(c context.Context, tasks []*model.Task) error {
 	// TODO: invent store.NewSession who return context including a session and make TaskInsert & TaskDelete use it
+	// stored with when they were queued, so that they are queued again in
+	// that order after a restart
+	stampQueued(tasks)
 	for _, task := range tasks {
 		if err := q.store.TaskInsert(task); err != nil {
 			return err
@@ -263,6 +307,21 @@ func (q *persistentQueue) Error(c context.Context, id string, err error) error {
 func (q *persistentQueue) CancelAtOnce(c context.Context, ids []string, escalate bool) ([]string, error) {
 	canceling, err := q.Queue.CancelAtOnce(c, ids, escalate)
 	return canceling, errors.Join(err, q.deleteTasks(ids))
+}
+
+// PrioritizeAtOnce stores the boost of the tasks first, then moves them to
+// the top of the queue, see Queue: a move that is not stored is not made, a
+// move made is kept after a restart. The store holds the tasks not handed out
+// yet: a task handed out or canceled meanwhile is not in it, and stays as it
+// is.
+func (q *persistentQueue) PrioritizeAtOnce(c context.Context, ids []string, boost int64) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	if err := q.store.TaskSetBoost(ids, boost); err != nil {
+		return nil, fmt.Errorf("failed to store the boost of tasks %v: %w", ids, err)
+	}
+	return q.Queue.PrioritizeAtOnce(c, ids, boost)
 }
 
 // ErrorAtOnce signals multiple tasks are done and complete with an error.

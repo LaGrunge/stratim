@@ -880,6 +880,14 @@ depends_on:
 
 By default, workflows run in parallel. See the [Concurrency section](./25-workflows.md#concurrency) for instructions on how to limit parallel execution of workflows.
 
+## `priority`
+
+The workflow's place among the waiting workflows of its repository: from `-10` to `10`, `0` if left out. Of the workflows of one repository, one of a higher priority is handed to an agent first; between repositories the queue keeps the order the workflows were queued in. See [Priority](./25-workflows.md#priority), and how a server admin moves a whole pipeline to the top of the queue, server-wide.
+
+```yaml
+priority: 5
+```
+
 ## Advanced network options for steps
 
 :::warning

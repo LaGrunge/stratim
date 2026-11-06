@@ -3497,6 +3497,47 @@ const docTemplate = `{
                 }
             }
         },
+        "/repos/{repo_id}/pipelines/{pipeline_number}/prioritize": {
+            "post": {
+                "description": "Its pending workflows are handed to agents before any other pending, server-wide, whatever their repository and priority. Server admins only.",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "Pipelines"
+                ],
+                "summary": "Move a pipeline to the top of the queue",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cpersonal access token\u003e",
+                        "description": "Insert your personal access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the repository id",
+                        "name": "repo_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the number of the pipeline",
+                        "name": "pipeline_number",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
         "/repos/{repo_id}/pipelines/{pipeline_number}/restart-failed": {
             "post": {
                 "description": "Creates a new pipeline that only runs the failed workflows and the workflows depending on them. The event and the deployment can't be changed (event, deploy_to and deploy_task are rejected); any other query parameter is passed to the pipeline as a variable, like for a restart.",
@@ -6108,6 +6149,10 @@ const docTemplate = `{
                 "pipeline_id": {
                     "type": "integer"
                 },
+                "priority": {
+                    "description": "Priority is the workflow's priority: of the pending tasks of one\nrepository, one of a higher priority is handed out first.",
+                    "type": "integer"
+                },
                 "repo_id": {
                     "type": "integer"
                 },
@@ -6648,6 +6693,10 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "pipeline_number": {
+                    "type": "integer"
+                },
+                "priority": {
+                    "description": "Priority is the workflow's priority: of the pending tasks of one\nrepository, one of a higher priority is handed out first.",
                     "type": "integer"
                 },
                 "repo_id": {

@@ -146,6 +146,10 @@ export default class WoodpeckerClient extends ApiClient {
     return this._post(`/api/repos/${repoId}/pipelines/${pipelineNumber}/cancel`);
   }
 
+  async prioritizePipeline(repoId: number, pipelineNumber: number): Promise<unknown> {
+    return this._post(`/api/repos/${repoId}/pipelines/${pipelineNumber}/prioritize`);
+  }
+
   async approvePipeline(repoId: number, pipelineNumber: string): Promise<unknown> {
     return this._post(`/api/repos/${repoId}/pipelines/${pipelineNumber}/approve`);
   }

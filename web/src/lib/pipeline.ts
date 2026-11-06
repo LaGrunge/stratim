@@ -20,6 +20,16 @@ export function pipelineHasErrorsToShow(pipeline?: Pipeline): boolean {
   return pipelineHasNonWarningErrors(pipeline) || workflowsWithErrors(pipeline).length > 0;
 }
 
+// pipelineMovableToTop reports whether a pipeline can be moved to the top of
+// the queue: it is pending or running, and some of its workflows still wait
+// in the queue.
+export function pipelineMovableToTop(pipeline?: Pipeline): boolean {
+  if (pipeline === undefined || (pipeline.status !== 'pending' && pipeline.status !== 'running')) {
+    return false;
+  }
+  return pipeline.workflows?.some((workflow) => workflow.state === 'pending') ?? false;
+}
+
 // pipelineCancelable reports whether a pipeline can be canceled: it is pending or
 // running, or killed while its workflows still run their finalizers, which
 // canceling it again stops.

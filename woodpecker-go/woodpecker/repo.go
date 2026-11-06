@@ -39,6 +39,7 @@ const (
 	pathApprove        = "%s/api/repos/%d/pipelines/%d/approve"
 	pathDecline        = "%s/api/repos/%d/pipelines/%d/decline"
 	pathStop           = "%s/api/repos/%d/pipelines/%d/cancel"
+	pathPrioritize     = "%s/api/repos/%d/pipelines/%d/prioritize"
 	pathRestartFailed  = "%s/api/repos/%d/pipelines/%d/restart-failed"
 	pathRepoSecrets    = "%s/api/repos/%d/secrets"
 	pathRepoSecret     = "%s/api/repos/%d/secrets/%s"
@@ -414,6 +415,13 @@ func (c *client) PipelineStop(repoID, pipeline int64) error {
 	uri := fmt.Sprintf(pathStop, c.addr, repoID, pipeline)
 	err := c.post(uri, nil, nil)
 	return err
+}
+
+// PipelinePrioritize moves the pending workflows of the pipeline to the top
+// of the queue, server-wide. Server admins only.
+func (c *client) PipelinePrioritize(repoID, pipeline int64) error {
+	uri := fmt.Sprintf(pathPrioritize, c.addr, repoID, pipeline)
+	return c.post(uri, nil, nil)
 }
 
 // PipelineApprove approves a blocked pipeline.

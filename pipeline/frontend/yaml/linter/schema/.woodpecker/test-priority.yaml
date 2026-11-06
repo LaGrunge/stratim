@@ -1,0 +1,7 @@
+priority: 5
+
+steps:
+  deploy:
+    image: alpine
+    commands:
+      - echo deploying

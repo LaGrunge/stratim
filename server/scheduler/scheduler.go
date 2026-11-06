@@ -75,6 +75,10 @@ type Scheduler interface {
 	// too.
 	CancelWorkflows(c context.Context, workflowIDs []string, escalate bool) ([]string, error)
 
+	// PrioritizeWorkflows moves the given workflows still pending in the
+	// queue to its top, above all others pending, and returns the ones moved.
+	PrioritizeWorkflows(c context.Context, workflowIDs []string) ([]string, error)
+
 	// SetCanceledExpiredHandler sets what settles a canceled running
 	// workflow whose lease expired before its agent reported it done.
 	SetCanceledExpiredHandler(handler func(task *model.Task))

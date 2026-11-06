@@ -127,6 +127,25 @@ func TestQueuePipelineFinalizeTimeout(t *testing.T) {
 	assert.Equal(t, 5*time.Minute, workflow.Config.FinalizeTimeout)
 }
 
+// The task carries the workflow's priority, bounded to the range the linter
+// allows.
+func TestQueuePipelinePriority(t *testing.T) {
+	for _, tt := range []struct{ priority, want int }{
+		{0, 0},
+		{5, 5},
+		{-10, -10},
+		{10, 10},
+		{11, 10},
+		{-100, -10},
+	} {
+		item := &builder.Item{Workflow: &builder.Workflow{ID: 1, Name: "build"}, Priority: tt.priority}
+		tasks, err := pipelineTasks(&model.Repo{ID: 7}, nil, &model.Pipeline{ID: 42}, []*builder.Item{item}, nil)
+		require.NoError(t, err)
+		require.Len(t, tasks, 1)
+		assert.Equal(t, tt.want, tasks[0].Priority, "priority %d", tt.priority)
+	}
+}
+
 func TestQueuePipelineCreated(t *testing.T) {
 	repo := &model.Repo{ID: 7}
 	item := &builder.Item{Workflow: &builder.Workflow{ID: 1, Name: "build"}}

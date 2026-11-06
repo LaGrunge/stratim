@@ -111,6 +111,9 @@ func (l *Linter) lintFile(config *WorkflowConfig) error {
 	if raw.err != nil {
 		linterErr = multierr.Append(linterErr, raw.err)
 	}
+	if err := lintPriority(config); err != nil {
+		linterErr = multierr.Append(linterErr, err)
+	}
 	if err := l.lintCommandVariables(config, raw); err != nil {
 		linterErr = multierr.Append(linterErr, err)
 	}
@@ -392,6 +395,16 @@ func lintSchema(config *WorkflowConfig) error {
 		}
 	}
 	return linterErr
+}
+
+// lintPriority fails a workflow whose priority is out of range: the schema
+// only warns of it, and the queue would not order it as written.
+func lintPriority(config *WorkflowConfig) error {
+	if p := config.Workflow.Priority; p < types.MinPriority || p > types.MaxPriority {
+		msg := fmt.Sprintf("`priority` must be from %d to %d, not %d", types.MinPriority, types.MaxPriority, p)
+		return newLinterError(msg, config.File, "priority", false)
+	}
+	return nil
 }
 
 func lintDeprecations(config *WorkflowConfig) error {

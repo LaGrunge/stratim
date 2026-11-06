@@ -28,6 +28,28 @@ func (s storage) TaskInsert(task *model.Task) error {
 	return wrapInsert(s.engine.Insert(task))
 }
 
+// TaskSetBoost sets the boost of the stored tasks of ids that have a lower
+// one: a task already handed out or canceled (deleted) stays deleted, and a
+// later move of the same task, written first, is not undone.
+func (s storage) TaskSetBoost(ids []string, boost int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return retryWrite(func() error {
+		_, err := s.engine.In("id", ids).And("boost < ?", boost).Cols("boost").Update(&model.Task{Boost: boost})
+		return err
+	})
+}
+
+// TaskSetQueued sets when the stored task of id was queued, if it was not
+// set yet: a task deleted meanwhile stays deleted.
+func (s storage) TaskSetQueued(id string, queued int64) error {
+	return retryWrite(func() error {
+		_, err := s.engine.Where("id = ? AND queued = 0", id).Cols("queued").Update(&model.Task{Queued: queued})
+		return err
+	})
+}
+
 func (s storage) TaskDelete(id string) error {
 	return retryWrite(func() error {
 		return wrapDelete(s.engine.Where("id = ?", id).Delete(new(model.Task)))
