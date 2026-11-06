@@ -47,7 +47,19 @@ func Parse(data []byte) ([]Axis, error) {
 	if err := yaml.Unmarshal(data, value); err != nil {
 		return nil, compilerError(err)
 	}
+	return parse(value)
+}
 
+// ParsePlain is Parse for a document parsed already.
+func ParsePlain(doc yaml.PlainDoc) ([]Axis, error) {
+	value := new(go_yaml.Node)
+	if err := doc.Decode(value); err != nil {
+		return nil, compilerError(err)
+	}
+	return parse(value)
+}
+
+func parse(value *go_yaml.Node) ([]Axis, error) {
 	if value.Kind == go_yaml.DocumentNode && len(value.Content) == 1 {
 		value = value.Content[0]
 	}

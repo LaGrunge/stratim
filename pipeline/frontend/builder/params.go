@@ -22,7 +22,6 @@ import (
 
 	pipeline_errors "go.woodpecker-ci.org/woodpecker/v3/pipeline/errors"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/metadata"
-	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/matrix"
 	yaml_types "go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/types"
 )
@@ -43,26 +42,22 @@ type workflowConfig struct {
 // parseWorkflow is how a workflow config is read for a run: the variables
 // of the run and its parameters resolved, the config substituted with them
 // and parsed.
-func (b *PipelineBuilder) parseWorkflow(file *YamlFile, axis matrix.Axis, md metadata.Metadata) (*workflowConfig, error) {
-	data := file.Data
-	// a jsonnet workflow's backslashes are as the config wrote them, and it
-	// is substituted string by string
-	subst := metadata.SubstitutionFor(file.FromJsonnet())
+func (b *PipelineBuilder) parseWorkflow(src *workflowSource, axis matrix.Axis, md metadata.Metadata) (*workflowConfig, error) {
 	environ := b.environmentVariables(md, axis)
-	params, invalid, err := b.params(data, axis, environ, subst)
+	declared, err := src.params()
+	if err != nil {
+		return nil, paramError("%v", err)
+	}
+	params, invalid, err := b.params(declared, axis, environ, src.substitution())
 	if err != nil {
 		return nil, err
 	}
 	// over the server's global environment, so that substitution, when and
 	// the steps see one value
 	maps.Copy(environ, params)
-	substituted, err := subst.Text(string(data), environ)
+	parsed, err := src.workflow(environ)
 	if err != nil {
 		return nil, err
-	}
-	parsed, err := yaml.ParseString(substituted)
-	if err != nil {
-		return nil, &pipeline_errors.PipelineError{Message: err.Error(), Type: pipeline_errors.PipelineErrorTypeCompiler}
 	}
 	// a step that set a parameter's name would see one value in its
 	// environment and the server's in its substituted commands
@@ -78,16 +73,12 @@ func (b *PipelineBuilder) parseWorkflow(file *YamlFile, axis matrix.Axis, md met
 	return &workflowConfig{parsed: parsed, environ: environ, params: params, invalidParams: invalid}, nil
 }
 
-// params returns the values of the parameters the workflow config
-// declares, resolved in the order declared: the value the run was given (a
-// manual run, a cron job, the API, a restart or deployment) unless empty, or else the default, with environ and the parameters before
-// it substituted into it. A value outside a parameter's options comes back
-// as invalid, apart from err.
-func (b *PipelineBuilder) params(data []byte, axis matrix.Axis, environ map[string]string, subst metadata.Substitution) (values map[string]string, invalid, err error) {
-	declared, err := yaml.ParseParams(data)
-	if err != nil {
-		return nil, nil, paramError("%v", err)
-	}
+// params returns the values of the parameters declared, resolved in the
+// order declared: the value the run was given (a manual run, a cron job,
+// the API, a restart or deployment) unless empty, or else the default, with
+// environ and the parameters before it substituted into it. A value outside
+// a parameter's options comes back as invalid, apart from err.
+func (b *PipelineBuilder) params(declared []yaml_types.NamedParam, axis matrix.Axis, environ map[string]string, subst metadata.Substitution) (values map[string]string, invalid, err error) {
 	if len(declared) == 0 {
 		return nil, nil, nil
 	}

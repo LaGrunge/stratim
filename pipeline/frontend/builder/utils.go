@@ -63,7 +63,7 @@ func filterMissingDependencies(items []*Item) []*Item {
 
 // selectYamls returns the file of the named workflow and, transitively, the
 // files of the workflows it hard depends on.
-func (b *PipelineBuilder) selectYamls(name string) ([]*YamlFile, error) {
+func (b *PipelineBuilder) selectYamls(state *buildState, name string) ([]*YamlFile, error) {
 	byName := make(map[string]*YamlFile, len(b.Yamls))
 	for _, y := range b.Yamls {
 		byName[SanitizePath(y.Name)] = y
@@ -77,10 +77,12 @@ func (b *PipelineBuilder) selectYamls(name string) ([]*YamlFile, error) {
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
-		dependencies, err := b.workflowDependencies(byName[current])
+		dependencies, err := b.workflowDependencies(state.source(byName[current]))
 		if err != nil {
 			return nil, err
 		}
+		// read again when built: a closure of many big files is not kept
+		state.done(byName[current], current)
 		for _, dep := range dependencies {
 			if dep.Optional {
 				continue
@@ -106,8 +108,8 @@ func (b *PipelineBuilder) selectYamls(name string) ([]*YamlFile, error) {
 
 // workflowDependencies resolves hard and optional dependencies for every matrix
 // axis using the same variable substitution as a workflow build.
-func (b *PipelineBuilder) workflowDependencies(file *YamlFile) (constraint.DependsOn, error) {
-	axes, err := matrix.Parse(file.Data)
+func (b *PipelineBuilder) workflowDependencies(src *workflowSource) (constraint.DependsOn, error) {
+	axes, err := src.matrix()
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +119,8 @@ func (b *PipelineBuilder) workflowDependencies(file *YamlFile) (constraint.Depen
 
 	var dependencies constraint.DependsOn
 	for _, axis := range axes {
-		workflow := &Workflow{Name: SanitizePath(file.Name), Environ: axis}
-		config, err := b.parseWorkflow(file, axis, b.GetWorkflowMetadata(workflow))
+		workflow := &Workflow{Name: SanitizePath(src.file.Name), Environ: axis}
+		config, err := b.parseWorkflow(src, axis, b.GetWorkflowMetadata(workflow))
 		if err != nil {
 			return nil, err
 		}

@@ -29,12 +29,28 @@ import (
 // ParseParams returns the parameters a workflow config declares, in the
 // order declared, as written: nothing is substituted.
 func ParseParams(raw []byte) ([]types.NamedParam, error) {
-	var config struct {
-		Params yaml.Node `yaml:"params"`
-	}
+	var config paramsConfig
 	if err := Unmarshal(raw, &config); err != nil {
 		return nil, err
 	}
+	return config.params()
+}
+
+// Params is ParseParams for the document.
+func (d PlainDoc) Params() ([]types.NamedParam, error) {
+	var config paramsConfig
+	if err := d.Decode(&config); err != nil {
+		return nil, err
+	}
+	return config.params()
+}
+
+// paramsConfig is what ParseParams reads of a workflow config.
+type paramsConfig struct {
+	Params yaml.Node `yaml:"params"`
+}
+
+func (config *paramsConfig) params() ([]types.NamedParam, error) {
 	declared := types.Resolve(&config.Params)
 	if declared.Kind == 0 || declared.ShortTag() == "!!null" {
 		return nil, nil

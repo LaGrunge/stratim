@@ -72,7 +72,7 @@ func SubstituteValues(yamlText string, environ map[string]string) (string, error
 	if doc.Kind == 0 {
 		return yamlText, nil
 	}
-	if err := substituteNode(&doc, environ); err != nil {
+	if err := SubstituteNode(&doc, environ); err != nil {
 		return "", err
 	}
 	out, err := yaml.Dump(&doc, yaml.WithIndent(yamlIndent), yaml.WithLineWidth(-1))
@@ -92,7 +92,12 @@ func truncated(s string, n int) string {
 // yamlIndent is how far SubstituteValues indents a nested block.
 const yamlIndent = 2
 
-func substituteNode(n *yaml.Node, environ map[string]string) error {
+// SubstituteNode substitutes environ, in place, into every string of n, a
+// parsed YAML document or part of one, as SubstituteValues does: string by
+// string, a substituted value a string whatever it looks like, a broken
+// ${...} reported with its string. An alias is left to name its anchor,
+// which is substituted where it is.
+func SubstituteNode(n *yaml.Node, environ map[string]string) error {
 	if n.Kind == yaml.ScalarNode && strings.Contains(n.Value, "$") {
 		v, err := SubstituteVerbatim(n.Value, environ)
 		if err != nil {
@@ -104,7 +109,7 @@ func substituteNode(n *yaml.Node, environ map[string]string) error {
 		}
 	}
 	for _, c := range n.Content {
-		if err := substituteNode(c, environ); err != nil {
+		if err := SubstituteNode(c, environ); err != nil {
 			return err
 		}
 	}
