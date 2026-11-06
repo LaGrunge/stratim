@@ -27,7 +27,7 @@ import (
 
 // lintParams reports what is wrong with the parameters the config
 // declares, as far as it shows without a run.
-func (l *Linter) lintParams(config *WorkflowConfig) error {
+func lintParams(config *WorkflowConfig) error {
 	if _, err := yaml.ParseParams([]byte(config.RawConfig)); err != nil {
 		return newLinterError(err.Error(), config.File, "params", false)
 	}
@@ -44,13 +44,39 @@ func (l *Linter) lintParams(config *WorkflowConfig) error {
 // matrix, and, when the linter was given them, the variables of the run and
 // the server's global environment. An expression with a default
 // (${NAME:-x}) is left alone: it does not come out empty.
-func (l *Linter) lintCommandVariables(config *WorkflowConfig) error {
+func (l *Linter) lintCommandVariables(config *WorkflowConfig, raw *rawFindings) error {
+	known := func(name string) bool {
+		if raw.declared[name] || metadata.IsConfigName(name) {
+			return true
+		}
+		_, ok := l.variables[name]
+		return ok
+	}
+
+	var linterErr error
+	for _, name := range raw.commandNames {
+		if known(name) {
+			continue
+		}
+		linterErr = multierr.Append(linterErr, newLinterError(
+			fmt.Sprintf("${%s} in a command: the server substitutes it before the shell runs and does not know %s, so it comes out empty; write $${%s} for the shell's variable", name, name, name),
+			config.File, "commands", true,
+		))
+	}
+	return linterErr
+}
+
+// commandVariables returns what lintCommandVariables reads of the raw text
+// of config, whatever the run: the names ${NAME} in commands refers to
+// without a default, each once, in order, and the names the config
+// declares as parameters and matrix axes.
+func commandVariables(config *WorkflowConfig) (names []string, declared map[string]bool) {
 	raw := []byte(config.RawConfig)
 	var doc go_yaml.Node
 	if err := go_yaml.Unmarshal(raw, &doc); err != nil {
-		return nil //nolint:nilerr // lintSchema reports it
+		return nil, nil // lintSchema reports it
 	}
-	declared := make(map[string]bool)
+	declared = make(map[string]bool)
 	if params, err := yaml.ParseParams(raw); err == nil {
 		for _, p := range params {
 			declared[p.Name] = true
@@ -63,29 +89,18 @@ func (l *Linter) lintCommandVariables(config *WorkflowConfig) error {
 			}
 		}
 	}
-	known := func(name string) bool {
-		if declared[name] || metadata.IsConfigName(name) {
-			return true
-		}
-		_, ok := l.variables[name]
-		return ok
-	}
 
-	var linterErr error
-	warned := make(map[string]bool)
+	seen := make(map[string]bool)
 	for _, cmd := range commandScalars(&doc, false, make(map[visit]bool)) {
 		for _, ref := range metadata.References(cmd) {
-			if ref.HasDefault || warned[ref.Name] || known(ref.Name) {
+			if ref.HasDefault || seen[ref.Name] {
 				continue
 			}
-			warned[ref.Name] = true
-			linterErr = multierr.Append(linterErr, newLinterError(
-				fmt.Sprintf("${%s} in a command: the server substitutes it before the shell runs and does not know %s, so it comes out empty; write $${%s} for the shell's variable", ref.Name, ref.Name, ref.Name),
-				config.File, "commands", true,
-			))
+			seen[ref.Name] = true
+			names = append(names, ref.Name)
 		}
 	}
-	return linterErr
+	return names, declared
 }
 
 type visit struct {

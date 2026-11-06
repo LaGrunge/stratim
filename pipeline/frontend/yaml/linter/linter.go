@@ -40,6 +40,8 @@ type Linter struct {
 	trustedClonePlugins *[]string
 	// variables the run has, if known: see lintCommandVariables
 	variables map[string]string
+	// cache keeps what the raw text of configs shows (WithCache)
+	cache *Cache
 }
 
 type TrustedConfiguration struct {
@@ -105,23 +107,36 @@ func (l *Linter) lintFile(config *WorkflowConfig) error {
 		linterErr = multierr.Append(linterErr, err)
 	}
 
-	if err := l.lintSchema(config); err != nil {
-		linterErr = multierr.Append(linterErr, err)
+	raw := l.cache.findings(config)
+	if raw.err != nil {
+		linterErr = multierr.Append(linterErr, raw.err)
 	}
-	if err := l.lintDeprecations(config); err != nil {
-		linterErr = multierr.Append(linterErr, err)
-	}
-	if err := l.lintBadHabits(config); err != nil {
-		linterErr = multierr.Append(linterErr, err)
-	}
-	if err := l.lintParams(config); err != nil {
-		linterErr = multierr.Append(linterErr, err)
-	}
-	if err := l.lintCommandVariables(config); err != nil {
+	if err := l.lintCommandVariables(config, raw); err != nil {
 		linterErr = multierr.Append(linterErr, err)
 	}
 
 	return linterErr
+}
+
+// readRaw lints what config's raw text shows, whatever the run. It is
+// not a method of Linter: what it finds is kept by file and text alone
+// (Cache), so it must not depend on how a linter is configured.
+func readRaw(config *WorkflowConfig) *rawFindings {
+	found := new(rawFindings)
+	if err := lintSchema(config); err != nil {
+		found.err = multierr.Append(found.err, err)
+	}
+	if err := lintDeprecations(config); err != nil {
+		found.err = multierr.Append(found.err, err)
+	}
+	if err := lintBadHabits(config); err != nil {
+		found.err = multierr.Append(found.err, err)
+	}
+	if err := lintParams(config); err != nil {
+		found.err = multierr.Append(found.err, err)
+	}
+	found.commandNames, found.declared = commandVariables(config)
+	return found
 }
 
 func (l *Linter) lintCloneSteps(config *WorkflowConfig) error {
@@ -363,7 +378,7 @@ func (l *Linter) lintTrusted(config *WorkflowConfig, c *types.Container, area st
 	return nil
 }
 
-func (l *Linter) lintSchema(config *WorkflowConfig) error {
+func lintSchema(config *WorkflowConfig) error {
 	var linterErr error
 	schemaErrors, err := schema.LintString(config.RawConfig)
 	if err != nil {
@@ -379,7 +394,7 @@ func (l *Linter) lintSchema(config *WorkflowConfig) error {
 	return linterErr
 }
 
-func (l *Linter) lintDeprecations(config *WorkflowConfig) error {
+func lintDeprecations(config *WorkflowConfig) error {
 	parsed := new(types.Workflow)
 	err := yaml.Unmarshal([]byte(config.RawConfig), parsed)
 	if err != nil {
@@ -442,7 +457,7 @@ func deprecatedEnvVarRefRegexp(name string) *regexp.Regexp {
 	return regexp.MustCompile(`\$\{` + q + `\}|\$\$?` + q + `\b`)
 }
 
-func (l *Linter) lintBadHabits(config *WorkflowConfig) (err error) {
+func lintBadHabits(config *WorkflowConfig) (err error) {
 	parsed := new(types.Workflow)
 	err = yaml.Unmarshal([]byte(config.RawConfig), parsed)
 	if err != nil {
