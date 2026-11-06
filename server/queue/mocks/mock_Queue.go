@@ -642,6 +642,80 @@ func (_c *MockQueue_Poll_Call) RunAndReturn(run func(c context.Context, agentID 
 	return _c
 }
 
+// PrioritizeAtOnce provides a mock function for the type MockQueue
+func (_mock *MockQueue) PrioritizeAtOnce(c context.Context, ids []string, boost int64) ([]string, error) {
+	ret := _mock.Called(c, ids, boost)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PrioritizeAtOnce")
+	}
+
+	var r0 []string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string, int64) ([]string, error)); ok {
+		return returnFunc(c, ids, boost)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string, int64) []string); ok {
+		r0 = returnFunc(c, ids, boost)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []string, int64) error); ok {
+		r1 = returnFunc(c, ids, boost)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockQueue_PrioritizeAtOnce_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PrioritizeAtOnce'
+type MockQueue_PrioritizeAtOnce_Call struct {
+	*mock.Call
+}
+
+// PrioritizeAtOnce is a helper method to define mock.On call
+//   - c context.Context
+//   - ids []string
+//   - boost int64
+func (_e *MockQueue_Expecter) PrioritizeAtOnce(c any, ids any, boost any) *MockQueue_PrioritizeAtOnce_Call {
+	return &MockQueue_PrioritizeAtOnce_Call{Call: _e.mock.On("PrioritizeAtOnce", c, ids, boost)}
+}
+
+func (_c *MockQueue_PrioritizeAtOnce_Call) Run(run func(c context.Context, ids []string, boost int64)) *MockQueue_PrioritizeAtOnce_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []string
+		if args[1] != nil {
+			arg1 = args[1].([]string)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockQueue_PrioritizeAtOnce_Call) Return(strings []string, err error) *MockQueue_PrioritizeAtOnce_Call {
+	_c.Call.Return(strings, err)
+	return _c
+}
+
+func (_c *MockQueue_PrioritizeAtOnce_Call) RunAndReturn(run func(c context.Context, ids []string, boost int64) ([]string, error)) *MockQueue_PrioritizeAtOnce_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PushAtOnce provides a mock function for the type MockQueue
 func (_mock *MockQueue) PushAtOnce(c context.Context, tasks []*model.Task) error {
 	ret := _mock.Called(c, tasks)

@@ -225,6 +225,7 @@ func (b *PipelineBuilder) genItemForWorkflow(state *buildState, workflow *Workfl
 		DependsOn:        parsed.DependsOn,
 		ConcurrencyLimit: parsed.Concurrency.Limit,
 		ConcurrencyGroup: parsed.Concurrency.Group,
+		Priority:         parsed.Priority,
 		Timeout:          time.Duration(parsed.Timeout),
 		// TODO: remove in next major.
 		RunsOn: parsed.RunsOn, //nolint:staticcheck

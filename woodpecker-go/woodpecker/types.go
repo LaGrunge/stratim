@@ -322,6 +322,7 @@ type (
 		RunOn        []string          `json:"run_on"`
 		DepStatus    map[string]string `json:"dep_status"`
 		AgentID      int64             `json:"agent_id"`
+		Priority     int               `json:"priority"`
 	}
 
 	// Org is the JSON data for an organization.

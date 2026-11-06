@@ -11,6 +11,7 @@ export interface Task {
   pipeline_id: number;
   pipeline_number: number;
   repo_id: number;
+  priority: number;
 }
 
 export interface QueueStats {

@@ -23,6 +23,7 @@ import (
 
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/pubsub"
+	"go.woodpecker-ci.org/woodpecker/v3/server/queue"
 )
 
 type recordingPubSub struct {
@@ -54,4 +55,20 @@ func TestPublishPipelineEventKey(t *testing.T) {
 	assert.Equal(t, "pipeline.11", ps.messages[0].Key)
 	assert.Equal(t, "pipeline.12", ps.messages[1].Key)
 	assert.Equal(t, pubsub.Topics{pubsub.GetRepoTopic(repo): {}}, ps.topics, "a private repo is not published publicly")
+}
+
+// TestPrioritizeWorkflows moves the pending ones of the workflows given, and
+// does nothing for none.
+func TestPrioritizeWorkflows(t *testing.T) {
+	q := queue.NewMemoryQueue(t.Context())
+	s := NewScheduler(t.Context(), nil, q, nil)
+	require.NoError(t, q.PushAtOnce(t.Context(), []*model.Task{{ID: "1"}, {ID: "2"}}))
+
+	moved, err := s.PrioritizeWorkflows(t.Context(), nil)
+	require.NoError(t, err)
+	assert.Empty(t, moved)
+
+	moved, err = s.PrioritizeWorkflows(t.Context(), []string{"2", "3"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"2"}, moved)
 }

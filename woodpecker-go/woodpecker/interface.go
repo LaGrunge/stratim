@@ -103,6 +103,11 @@ type Client interface {
 	// PipelineStop stops the given pipeline.
 	PipelineStop(repoID, pipeline int64) error
 
+	// PipelinePrioritize moves the pending workflows of the given pipeline to
+	// the top of the queue, above all others pending, server-wide. Server
+	// admins only.
+	PipelinePrioritize(repoID, pipeline int64) error
+
 	// PipelineApprove approves a blocked pipeline.
 	PipelineApprove(repoID, pipeline int64) (*Pipeline, error)
 

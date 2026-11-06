@@ -112,6 +112,12 @@
       "description": "Limit how many instances of this workflow may run at the same time. Read more: https://woodpecker-ci.org/docs/usage/workflows#concurrency",
       "$ref": "#/definitions/concurrency"
     },
+    "priority": {
+      "description": "Order of this workflow among the waiting workflows of its repository: one with a higher priority is handed to an agent first, ties in the order queued; between repositories the queue keeps the order queued. From -10 to 10, 0 if left out. Read more: https://woodpecker-ci.org/docs/usage/workflows#priority",
+      "type": "integer",
+      "minimum": -10,
+      "maximum": 10
+    },
     "runs_on": {
       "type": "array",
       "description": "Deprecated: use `when.status` instead. Read more: https://woodpecker-ci.org/docs/usage/workflows#flow-control",

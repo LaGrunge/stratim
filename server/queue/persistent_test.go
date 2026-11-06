@@ -150,6 +150,7 @@ func TestPersistentQueueRestoredTaskOfCanceledPipeline(t *testing.T) {
 			dependent := &model.Task{ID: "2", Dependencies: []string{"1"}, DepStatus: make(map[string]model.StatusValue), RunOn: []string{"success", "failure"}}
 			store.EXPECT().TaskList().Return([]*model.Task{task, dependent}, nil).Once()
 			store.EXPECT().ServerConfigGet(mock.Anything).Return("", types.ErrRecordNotExist).Maybe()
+			store.EXPECT().TaskSetQueued(mock.Anything, mock.Anything).Return(nil).Maybe() // restored unstamped
 			store.EXPECT().TaskDelete("1").Return(nil).Once()
 			// the dependent's restore reads it
 			store.EXPECT().WorkflowLoad(int64(1)).Return(&model.Workflow{ID: 1, PipelineID: 9, State: model.StatusPending}, nil).Once()

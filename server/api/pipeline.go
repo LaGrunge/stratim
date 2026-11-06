@@ -572,6 +572,25 @@ func CancelPipeline(c *gin.Context) {
 	}
 }
 
+// PrioritizePipeline
+//
+//	@Summary		Move a pipeline to the top of the queue
+//	@Description	Its pending workflows are handed to agents before any other pending, server-wide, whatever their repository and priority. Server admins only.
+//	@Router			/repos/{repo_id}/pipelines/{pipeline_number}/prioritize [post]
+//	@Produce		plain
+//	@Success		204
+//	@Tags			Pipelines
+//	@Param			Authorization	header	string	true	"Insert your personal access token"	default(Bearer <personal access token>)
+//	@Param			repo_id			path	int		true	"the repository id"
+//	@Param			pipeline_number	path	int		true	"the number of the pipeline"
+func PrioritizePipeline(c *gin.Context) {
+	if err := pipeline.Prioritize(c, store.FromContext(c), session.Pipeline(c)); err != nil {
+		handlePipelineErr(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 // PostApproval
 //
 //	@Summary	Approve and start a pipeline

@@ -168,6 +168,15 @@ func TestSchema(t *testing.T) {
 			fail:     true,
 		},
 		{
+			name:     "Priority",
+			testFile: ".woodpecker/test-priority.yaml",
+		},
+		{
+			name:     "Priority out of range",
+			testFile: ".woodpecker/test-priority-invalid.yaml",
+			fail:     true,
+		},
+		{
 			name:     "Service without name in array syntax",
 			testFile: ".woodpecker/test-broken-service-without-name.yaml",
 			fail:     true,

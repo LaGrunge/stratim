@@ -157,6 +157,12 @@ type Store interface {
 	TaskList() ([]*model.Task, error)
 	TaskInsert(*model.Task) error
 	TaskDelete(string) error
+	// TaskSetBoost sets the boost of the stored tasks of ids, those with a
+	// lower one; ones not stored are left out.
+	TaskSetBoost(ids []string, boost int64) error
+	// TaskSetQueued sets when the stored task of id was queued, if it was
+	// not set yet (0).
+	TaskSetQueued(id string, queued int64) error
 
 	// ServerConfig
 	ServerConfigGet(string) (string, error)

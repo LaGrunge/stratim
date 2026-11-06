@@ -92,6 +92,12 @@ steps:
 	}, {
 		Title: "explicitly privileged container",
 		Data:  "{steps: { build: { image: plugins/docker, privileged: true, settings: { test: 'true' } } }, when: { branch: main, event: push } } }",
+	}, {
+		Title: "highest priority",
+		Data:  "{priority: 10, steps: { build: { image: golang } }, when: { event: push } }",
+	}, {
+		Title: "lowest priority",
+		Data:  "{priority: -10, steps: { build: { image: golang } }, when: { event: push } }",
 	}}
 
 	for _, testd := range testdatas {
@@ -232,6 +238,14 @@ func TestLintErrors(t *testing.T) {
 		{
 			from: "steps: { logs: { image: golang, on_finish: true }, build: { image: golang, depends_on: [ logs ] } }",
 			want: "Cannot depend on `logs`: an `on_finish` step runs after all other steps",
+		},
+		{
+			from: "{priority: 11, steps: { build: { image: golang } } }",
+			want: "`priority` must be from -10 to 10, not 11",
+		},
+		{
+			from: "{priority: -11, steps: { build: { image: golang } } }",
+			want: "`priority` must be from -10 to 10, not -11",
 		},
 	}
 

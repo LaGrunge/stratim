@@ -889,9 +889,9 @@ func TestFifoConcurrencySlots(t *testing.T) {
 			task:    "early",
 		},
 		{
-			name:    "name breaks a creation tie",
+			name:    "the pipeline breaks a creation tie, then the name",
 			pending: []*model.Task{member("b", 1, 5, 1), member("a", 2, 5, 1)},
-			task:    "a",
+			task:    "b",
 		},
 		{
 			name: "equal order does not reserve the slot",

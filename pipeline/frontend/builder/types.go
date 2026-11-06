@@ -30,6 +30,9 @@ type Item struct {
 	RunsOn           []string
 	ConcurrencyLimit int
 	ConcurrencyGroup string
+	// Priority orders the workflow among its repository's queued ones,
+	// higher first.
+	Priority int
 	// Timeout is the workflow's own timeout, 0 if it sets none.
 	Timeout time.Duration
 	Config  *backend_types.Config

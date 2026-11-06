@@ -81,6 +81,10 @@ type fifo struct {
 	// lease is extended.
 	canceledGrace time.Duration
 	paused        bool
+	// dirty is set when the pending tasks may be out of the queue's order:
+	// tasks were pushed, released by their dependencies, resubmitted or
+	// moved. sortPending orders them only then.
+	dirty bool
 	// onCanceledExpired settles a canceled task whose lease expired before
 	// its Done: its agent is gone. Nil if not set.
 	onCanceledExpired func(task *model.Task)
@@ -125,10 +129,12 @@ func NewMemoryQueue(ctx context.Context) Queue {
 
 // PushAtOnce pushes multiple tasks to the tail of this queue.
 func (q *fifo) PushAtOnce(_ context.Context, tasks []*model.Task) error {
+	stampQueued(tasks)
 	q.Lock()
 	for _, task := range tasks {
 		q.pending.PushBack(task)
 	}
+	q.dirty = true
 	q.Unlock()
 	return nil
 }
@@ -183,6 +189,41 @@ func (q *fifo) ErrorAtOnce(_ context.Context, ids []string, err error) error {
 	return err
 }
 
+// PrioritizeAtOnce moves the given tasks still pending, or waiting on their
+// dependencies, to the top of the queue: they get the boost, a stamp from
+// NextBoost, unless they have a higher one already. It returns the ones it
+// holds pending or waiting; none if it holds none of them.
+func (q *fifo) PrioritizeAtOnce(_ context.Context, ids []string, boost int64) ([]string, error) {
+	q.Lock()
+	defer q.Unlock()
+
+	wanted := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		wanted[id] = struct{}{}
+	}
+	var moved []string
+	for _, tasks := range []*list.List{q.pending, q.waitingOnDeps} {
+		for element := tasks.Front(); element != nil; element = element.Next() {
+			task, _ := element.Value.(*model.Task)
+			if _, ok := wanted[task.ID]; !ok {
+				continue
+			}
+			task.Boost = max(task.Boost, boost)
+			moved = append(moved, task.ID)
+		}
+	}
+	// a running one gets it too, not counted: if its lease expires it comes
+	// back with the boost the store has for it, and its pipeline's tasks keep
+	// one boost (see taskOrderLess)
+	for _, id := range ids {
+		if running, ok := q.running[id]; ok {
+			running.item.Boost = max(running.item.Boost, boost)
+		}
+	}
+	q.dirty = true
+	return moved, nil
+}
+
 // CancelAtOnce cancels the tasks as ErrorAtOnce with ErrCancel does, and
 // returns the ones canceling: running, their agents told and stopping them,
 // the ones canceled before told to stop their finalizers too.
@@ -199,6 +240,7 @@ func (q *fifo) finished(ids []string, exitStatus model.StatusValue, err error, e
 	err = NewErrExternal(err)
 
 	canceled := errors.Is(err, ErrCancel)
+	q.dirty = true
 	var errs []error
 	updated := make(map[string]model.StatusValue, len(ids))
 	// we first process the tasks itself
@@ -441,6 +483,7 @@ func (q *fifo) process() {
 			}
 		}
 		q.filterWaiting()
+		q.sortPending()
 		for pending, worker := q.assignToWorker(); pending != nil && worker != nil; pending, worker = q.assignToWorker() {
 			task, _ := pending.Value.(*model.Task)
 			task.AgentID = worker.agentID
@@ -459,9 +502,10 @@ func (q *fifo) process() {
 
 func (q *fifo) filterWaiting() {
 	// resubmits all waiting tasks to pending, deps may have cleared
+	var requeued []*list.Element
 	for element := q.waitingOnDeps.Front(); element != nil; element = element.Next() {
 		task, _ := element.Value.(*model.Task)
-		q.pending.PushBack(task)
+		requeued = append(requeued, q.pending.PushBack(task))
 	}
 
 	// rebuild waitingDeps
@@ -490,8 +534,43 @@ func (q *fifo) filterWaiting() {
 	}
 
 	// filter waiting tasks
+	blocked := make(map[*list.Element]struct{}, len(filtered))
 	for _, f := range filtered {
+		blocked[f] = struct{}{}
 		q.pending.Remove(f)
+	}
+
+	// a task its dependencies released is queued now, at the tail
+	for _, element := range requeued {
+		if _, ok := blocked[element]; !ok {
+			task, _ := element.Value.(*model.Task)
+			task.Queued = nextStamp()
+			q.dirty = true
+		}
+	}
+}
+
+// sortPending puts the pending tasks in the queue's order, see orderPending,
+// if they may be out of it (dirty). A task leaving the pending ones leaves
+// the others in order: their stamps are those of their places.
+// Expects the queue to be locked by the caller.
+func (q *fifo) sortPending() {
+	if !q.dirty {
+		return
+	}
+	q.dirty = false
+	tasks := make([]*model.Task, 0, q.pending.Len())
+	for element := q.pending.Front(); element != nil; element = element.Next() {
+		task, _ := element.Value.(*model.Task)
+		tasks = append(tasks, task)
+	}
+	if !orderPending(tasks) {
+		return
+	}
+	element := q.pending.Front()
+	for _, task := range tasks {
+		element.Value = task
+		element = element.Next()
 	}
 }
 
@@ -532,9 +611,10 @@ func (q *fifo) assignToWorker() (*list.Element, *worker) {
 // violating its workflow concurrency limit. Tasks without a limit always pass,
 // keeping the default scheduling behavior unchanged.
 //
-// Slots within a concurrency group are granted in creation order (earliest
-// pipeline first, by the task's Created timestamp, with the workflow name as a
-// deterministic tiebreaker) rather than in the order tasks become ready. This
+// Slots within a concurrency group are granted in creation order (a pipeline
+// an admin moved to the top first, then the earliest pipeline, by the task's
+// Created timestamp, see taskOrderLess) rather than in the order tasks become
+// ready, and not by priority. This
 // guarantees that a later pipeline whose dependencies happen to finish faster
 // cannot overtake an earlier one that is still waiting.
 //
@@ -593,13 +673,27 @@ func (q *fifo) canRunConcurrent(task *model.Task) bool {
 	return running+ahead < task.ConcurrencyLimit
 }
 
-// taskOrderLess reports whether task a was instantiated before task b. Ordering
-// is by the Created timestamp (the pipeline creation time), with the workflow
-// name as a deterministic tiebreaker for tasks created within the same second.
-// The task ID is intentionally not used for ordering.
+// taskOrderLess reports whether task a comes before task b for a slot of a
+// concurrency group: of a pipeline moved to the top later, or else
+// instantiated before. That is by the Created timestamp (the pipeline
+// creation time), with the pipeline, then the workflow name as deterministic
+// tiebreakers for tasks created within the same second. The task ID is
+// intentionally not used for ordering.
+//
+// The order is one of pipelines (a move sets the boost of all the tasks a
+// pipeline has queued): a task never counts ahead of an older pipeline on a
+// key its dependencies in its own pipeline do not share, so two pipelines
+// cannot each hold the other's slot. A priority would break that and is left
+// out (see TestFifoConcurrencyPriorityNoDeadlock).
 func taskOrderLess(a, b *model.Task) bool {
+	if a.Boost != b.Boost {
+		return a.Boost > b.Boost
+	}
 	if a.Created != b.Created {
 		return a.Created < b.Created
+	}
+	if a.PipelineID != b.PipelineID {
+		return a.PipelineID < b.PipelineID
 	}
 	return a.Name < b.Name
 }
@@ -640,6 +734,7 @@ func (q *fifo) resubmitExpiredPipelines() (canceledExpired []*model.Task) {
 			log.Info().Str("task_id", taskID).Msg("queue: resubmitting expired task")
 			taskState.error = ErrTaskExpired
 			q.pending.PushFront(taskState.item)
+			q.dirty = true
 			delete(q.running, taskID)
 			close(taskState.done)
 		}

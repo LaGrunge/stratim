@@ -31,6 +31,10 @@ type (
 		DependsOn   constraint.DependsOn `yaml:"depends_on,omitempty"`
 		Concurrency Concurrency          `yaml:"concurrency,omitempty"`
 		SkipClone   bool                 `yaml:"skip_clone,omitempty"`
+		// Priority orders the workflow among the queued workflows of its
+		// repository: a higher one is handed to an agent before a lower one,
+		// from MinPriority to MaxPriority; 0 if left out.
+		Priority int `yaml:"priority,omitempty"`
 		// Timeout ends the workflow when it runs longer, in place of the
 		// repository's timeout, which is also its ceiling.
 		Timeout base.Timeout `yaml:"timeout,omitempty"`
@@ -45,4 +49,11 @@ type (
 		Base string
 		Path string
 	}
+)
+
+const (
+	// MinPriority is the lowest priority a workflow may set.
+	MinPriority = -10
+	// MaxPriority is the highest priority a workflow may set.
+	MaxPriority = 10
 )

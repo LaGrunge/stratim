@@ -512,6 +512,28 @@ func TestClientRepoMove(t *testing.T) {
 	}
 }
 
+func TestClientPipelinePrioritize(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Equal(t, "/api/repos/123/pipelines/7/prioritize", r.URL.RequestURI())
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		defer ts.Close()
+
+		assert.NoError(t, NewClient(ts.URL, http.DefaultClient).PipelinePrioritize(123, 7))
+	})
+
+	t.Run("nothing pending", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+		}))
+		defer ts.Close()
+
+		assert.Error(t, NewClient(ts.URL, http.DefaultClient).PipelinePrioritize(123, 7))
+	})
+}
+
 func TestClientStepLogDownload(t *testing.T) {
 	tests := []struct {
 		opt   StepLogDownloadOptions

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Pipeline } from '~/lib/api/types';
-import { pipelineCancelable } from '~/lib/pipeline';
+import { pipelineCancelable, pipelineMovableToTop } from '~/lib/pipeline';
 
 function pipeline(status: string, workflowStates: string[] = []): Pipeline {
   return {
@@ -9,6 +9,24 @@ function pipeline(status: string, workflowStates: string[] = []): Pipeline {
     workflows: workflowStates.map((state) => ({ state })),
   } as unknown as Pipeline;
 }
+
+describe('pipelineMovableToTop', () => {
+  it('moves a pipeline with pending workflows', () => {
+    expect(pipelineMovableToTop(pipeline('pending', ['pending']))).toBe(true);
+    expect(pipelineMovableToTop(pipeline('running', ['running', 'pending']))).toBe(true);
+  });
+
+  it('does not move a pipeline with nothing pending', () => {
+    expect(pipelineMovableToTop(pipeline('running', ['running', 'success']))).toBe(false);
+    expect(pipelineMovableToTop(pipeline('pending'))).toBe(false);
+  });
+
+  it('does not move an ended or blocked pipeline', () => {
+    expect(pipelineMovableToTop(pipeline('killed', ['pending']))).toBe(false);
+    expect(pipelineMovableToTop(pipeline('blocked', ['pending']))).toBe(false);
+    expect(pipelineMovableToTop(undefined)).toBe(false);
+  });
+});
 
 describe('pipelineCancelable', () => {
   it('cancels a pending or running pipeline', () => {

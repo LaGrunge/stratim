@@ -144,6 +144,13 @@ type Queue interface {
 	// cancel, which stops its finalizers too.
 	CancelAtOnce(c context.Context, ids []string, escalate bool) ([]string, error)
 
+	// PrioritizeAtOnce moves the given tasks still pending, or waiting on
+	// their dependencies, to the top of the queue: above all others pending,
+	// whatever their repository and priority. boost is a stamp from
+	// NextBoost (see model.Task.Boost), a task with a higher one keeps it. It
+	// returns the ones it holds pending or waiting; none if none of them is.
+	PrioritizeAtOnce(c context.Context, ids []string, boost int64) ([]string, error)
+
 	// WaitKilled waits, for a task its agent was told canceled, until its
 	// finalizers are to be stopped too: by a second cancel, or because the
 	// queue gave up on it. It then returns ErrCancel; nil for a task not
