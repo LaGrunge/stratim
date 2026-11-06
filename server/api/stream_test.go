@@ -15,17 +15,24 @@
 package api
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/logging"
@@ -197,5 +204,152 @@ func TestLogStreamSSEDisconnectedClient(t *testing.T) {
 		assert.Contains(t, w.Body.String(), ": ping\n\n")
 
 		server.Config.Services.Logs = nil
+	}
+}
+
+// TestEventStreamSSEStreamsEachEvent serves the event stream over a real
+// connection: the response must carry the headers that keep proxies from
+// buffering it, and every published pipeline update must reach the client,
+// in order, while the stream is still open (so each one was flushed).
+func TestEventStreamSSEStreamsEachEvent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	sched := scheduler.NewScheduler(t.Context(), nil, nil, memory.New())
+	server.Config.Services.Scheduler = sched
+	t.Cleanup(func() { server.Config.Services.Scheduler = nil })
+
+	router := gin.New()
+	router.GET("/stream/events", EventStreamSSE)
+	srv := httptest.NewServer(router)
+	t.Cleanup(srv.Close)
+
+	ctx, cancel := context.WithCancelCause(t.Context())
+	defer cancel(nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/stream/events", nil)
+	require.NoError(t, err)
+	resp, err := srv.Client().Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, "text/event-stream", resp.Header.Get("Content-Type"))
+	assert.Equal(t, "no", resp.Header.Get("X-Accel-Buffering"))
+	assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
+
+	lines := make(chan string)
+	scanner := bufio.NewScanner(resp.Body)
+	go func() {
+		defer close(lines)
+		for scanner.Scan() {
+			if line := scanner.Text(); line != "" {
+				lines <- line
+			}
+		}
+	}()
+	next := func() string {
+		select {
+		case line := <-lines:
+			return line
+		case <-time.After(5 * time.Second):
+			t.Fatal("no line on the event stream")
+			return ""
+		}
+	}
+
+	// The handler subscribes right after the first ping was flushed.
+	require.Equal(t, ": ping", next())
+	time.Sleep(50 * time.Millisecond)
+
+	repo := &model.Repo{ID: 1}
+	statuses := []model.StatusValue{model.StatusPending, model.StatusRunning, model.StatusSuccess}
+	// distinct pipelines: queued updates of one pipeline may be coalesced
+	for i, status := range statuses {
+		pl := &model.Pipeline{ID: int64(i + 1), Number: int64(i + 1), Status: status}
+		require.NoError(t, sched.PublishPipelineEvent(t.Context(), repo, pl))
+	}
+	for i, status := range statuses {
+		line := next()
+		require.True(t, strings.HasPrefix(line, "data: "), line)
+		var event model.Event
+		require.NoError(t, json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &event))
+		assert.Equal(t, int64(i+1), event.Pipeline.Number)
+		assert.Equal(t, status, event.Pipeline.Status)
+	}
+}
+
+// funcPubSub subscribes by calling subscribe.
+type funcPubSub struct {
+	subscribe func(ctx context.Context, receiver pubsub.Receiver) error
+}
+
+func (f *funcPubSub) Publish(context.Context, pubsub.Topics, pubsub.Message) error { return nil }
+
+func (f *funcPubSub) Subscribe(ctx context.Context, _ pubsub.Topics, receiver pubsub.Receiver) error {
+	return f.subscribe(ctx, receiver)
+}
+
+// TestEventStreamSSEDroppedSubscriber ends the stream of a client the pubsub
+// dropped for not keeping up, and counts it.
+func TestEventStreamSSEDroppedSubscriber(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	server.Config.Services.Scheduler = scheduler.NewScheduler(t.Context(), nil, nil, &funcPubSub{
+		subscribe: func(context.Context, pubsub.Receiver) error { return pubsub.ErrSubscriberTooSlow },
+	})
+	t.Cleanup(func() { server.Config.Services.Scheduler = nil })
+	before := testutil.ToFloat64(droppedEventStreams)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/stream/events", nil)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		EventStreamSSE(c)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the stream of a dropped subscriber did not end")
+	}
+	assert.InDelta(t, before+1, testutil.ToFloat64(droppedEventStreams), 0)
+}
+
+// TestEventStreamSSEWriteDeadline connects a client that never reads: once the
+// connection's buffers are full, the write deadline ends the handler.
+func TestEventStreamSSEWriteDeadline(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	defer func(d time.Duration) { eventWriteTimeout = d }(eventWriteTimeout)
+	eventWriteTimeout = 100 * time.Millisecond
+
+	payload := []byte(`"` + strings.Repeat("x", 64*1024) + `"`)
+	server.Config.Services.Scheduler = scheduler.NewScheduler(t.Context(), nil, nil, &funcPubSub{
+		subscribe: func(ctx context.Context, receiver pubsub.Receiver) error {
+			for ctx.Err() == nil {
+				receiver(pubsub.Message{Data: payload})
+			}
+			return nil
+		},
+	})
+	t.Cleanup(func() { server.Config.Services.Scheduler = nil })
+
+	handlerDone := make(chan struct{})
+	router := gin.New()
+	router.GET("/stream/events", func(c *gin.Context) {
+		defer close(handlerDone)
+		EventStreamSSE(c)
+	})
+	srv := httptest.NewServer(router)
+	t.Cleanup(srv.Close)
+
+	conn, err := net.Dial("tcp", srv.Listener.Addr().String())
+	require.NoError(t, err)
+	defer conn.Close()
+	_, err = io.WriteString(conn, "GET /stream/events HTTP/1.1\r\nHost: test\r\n\r\n")
+	require.NoError(t, err)
+	// never read from conn
+
+	select {
+	case <-handlerDone:
+	case <-time.After(20 * time.Second):
+		t.Fatal("the handler kept writing to a client that does not read")
 	}
 }

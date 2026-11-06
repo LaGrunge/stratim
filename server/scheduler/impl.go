@@ -124,6 +124,7 @@ func (p *impl) PublishPipelineEvent(c context.Context, repo *model.Repo, pipelin
 	message := pubsub.Message{
 		ID:   ulid.Make().String(),
 		Data: data,
+		Key:  pubsub.PipelineKey(pipeline.ID),
 	}
 
 	subTopics := make(pubsub.Topics)

@@ -20,12 +20,16 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"net/http"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server"
@@ -45,6 +49,27 @@ const (
 	idlePingTime = time.Second * 30
 )
 
+// eventWriteTimeout is how long writing one event to a client may take before
+// the stream is given up. A variable for tests.
+var eventWriteTimeout = time.Second * 30
+
+// droppedEventStreams counts the event streams ended because their client
+// did not keep up with the events.
+var droppedEventStreams = promauto.NewCounter(prometheus.CounterOpts{
+	Namespace: "woodpecker",
+	Name:      "event_streams_dropped_total",
+	Help:      "Event streams ended because the client did not keep up with the events.",
+})
+
+// extendWriteDeadline gives the next write to the client eventWriteTimeout, so
+// a client that stopped reading ends its stream. Writers that can't set a
+// deadline (e.g. in tests) are left as they are.
+func extendWriteDeadline(rc *http.ResponseController) {
+	if err := rc.SetWriteDeadline(time.Now().Add(eventWriteTimeout)); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		log.Debug().Err(err).Msg("user feed: cannot set write deadline")
+	}
+}
+
 // EventStreamSSE
 //
 //	@Summary		Stream events like pipeline updates
@@ -61,15 +86,17 @@ func EventStreamSSE(c *gin.Context) {
 
 	rw := c.Writer
 
-	flusher, ok := rw.(http.Flusher)
-	if !ok {
+	if _, ok := rw.(http.Flusher); !ok {
 		c.String(http.StatusInternalServerError, "Streaming not supported")
 		return
 	}
+	rc := http.NewResponseController(rw)
 
 	// ping the client
-	logWriteStringErr(io.WriteString(rw, ": ping\n\n"))
-	flusher.Flush()
+	if err := writeEvent(rc, rw, ": ping\n\n"); err != nil {
+		log.Debug().Err(err).Msg("user feed: cannot write to the client")
+		return
+	}
 
 	log.Debug().Msg("user feed: connection opened")
 
@@ -111,27 +138,47 @@ func EventStreamSSE(c *gin.Context) {
 				case eventChan <- m.Data:
 				}
 			})
+		if errors.Is(err, pubsub.ErrSubscriberTooSlow) {
+			droppedEventStreams.Inc()
+			ev := log.Warn().Strs("topics", slices.Sorted(maps.Keys(subTopics)))
+			if user != nil {
+				ev = ev.Str("user", user.Login)
+			}
+			ev.Msg("user feed: dropped a client that does not keep up with the events")
+		}
 		cancel(err)
 	})
 
 	for {
+		var err error
 		select {
 		case <-requestCtx.Done():
 			return
 		case <-ctx.Done():
 			return
 		case <-time.After(idlePingTime):
-			logWriteStringErr(io.WriteString(rw, ": ping\n\n"))
-			flusher.Flush()
-		case buf, ok := <-eventChan:
-			if ok {
-				logWriteStringErr(io.WriteString(rw, "data: "))
-				logWriteStringErr(rw.Write(buf))
-				logWriteStringErr(io.WriteString(rw, "\n\n"))
-				flusher.Flush()
-			}
+			err = writeEvent(rc, rw, ": ping\n\n")
+		case buf := <-eventChan:
+			err = writeEvent(rc, rw, "data: ", string(buf), "\n\n")
+		}
+		if err != nil {
+			// the client stopped reading, or is gone
+			log.Debug().Err(err).Msg("user feed: cannot write to the client")
+			return
 		}
 	}
+}
+
+// writeEvent writes the parts of one event to the client within
+// eventWriteTimeout and flushes it.
+func writeEvent(rc *http.ResponseController, w io.Writer, parts ...string) error {
+	extendWriteDeadline(rc)
+	for _, part := range parts {
+		if _, err := io.WriteString(w, part); err != nil {
+			return err
+		}
+	}
+	return rc.Flush()
 }
 
 // LogStreamSSE
