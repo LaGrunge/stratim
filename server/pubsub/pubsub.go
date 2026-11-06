@@ -23,6 +23,15 @@ import (
 )
 
 // PubSub provider interface, used to signal pipeline state changes to WebUI.
+//
+// Delivery contract:
+//   - Each subscriber gets its messages one at a time, in publish order.
+//     Publish never waits for a subscriber.
+//   - A message with a Key supersedes a message with the same Key that is
+//     still queued for a subscriber: only the newest is delivered, at the
+//     place of the newest, so delivery stays in publish order.
+//   - A subscriber that falls too far behind is dropped: its Subscribe
+//     returns ErrSubscriberTooSlow and it gets no further messages.
 type PubSub interface {
 	// Publish pushes a state change to all subscribers,
 	// that have at least subscribed to one of the topics we publish it under.
@@ -30,6 +39,8 @@ type PubSub interface {
 	// Subscribe gets all state changes that match the same topic.
 	// If multiple topics are subscribed, and a message also match multiple,
 	// the implementation takes care of deduplication.
+	// It blocks until the context is done (returning nil) or the subscriber
+	// is dropped (returning ErrSubscriberTooSlow).
 	Subscribe(context.Context, Topics, Receiver) error
 }
 
@@ -40,6 +51,11 @@ type Message struct {
 
 	// Data is the actual data in the entry.
 	Data []byte `json:"data"`
+
+	// Key, if set, names what the message is about (e.g. PipelineKey): a
+	// newer message with the same key supersedes one not delivered yet, as it
+	// carries the whole current state.
+	Key string `json:"-"`
 }
 
 // Receiver receives published messages.
@@ -53,6 +69,16 @@ func GetRepoTopic(r *model.Repo) string {
 	return fmt.Sprintf("repo.id.%d", r.ID)
 }
 
+// PipelineKey is the Message.Key of the state changes of a pipeline.
+func PipelineKey(pipelineID int64) string {
+	return fmt.Sprintf("pipeline.%d", pipelineID)
+}
+
 const PublicTopic = "public"
 
-var ErrNoTopic = errors.New("no topic specified")
+var (
+	ErrNoTopic = errors.New("no topic specified")
+	// ErrSubscriberTooSlow is returned by Subscribe when the subscriber did
+	// not keep up with the published messages and was dropped.
+	ErrSubscriberTooSlow = errors.New("subscriber does not keep up with the published messages")
+)

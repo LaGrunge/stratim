@@ -29,6 +29,8 @@ function comparePipelinesWithStatus(a: Pipeline, b: Pipeline): number {
   return bPriority - aPriority || comparePipelines(a, b);
 }
 
+const reloadedStatuses = ['blocked', 'pending', 'running', 'started'];
+
 export const usePipelineStore = defineStore('pipelines', () => {
   const apiClient = useApiClient();
   const repoStore = useRepoStore();
@@ -83,9 +85,58 @@ export const usePipelineStore = defineStore('pipelines', () => {
   }
 
   const perPage = 50;
+
+  // The repo whose pipeline list was loaded last and whether the feed was
+  // loaded, to load them again after the event stream was down.
+  let lastRepoListId: number | undefined;
+  let feedLoaded = false;
+
+  /**
+   * Fetch again what may have changed while the event stream was down, as
+   * events are not replayed: every pipeline the store holds as blocked,
+   * pending or running (at most `concurrency` requests at once), the first
+   * page of the repo pipeline list loaded last and the pipeline feed, so
+   * that pipelines created meanwhile appear too.
+   */
+  async function reloadAfterReconnect(concurrency = 4) {
+    const active = [...pipelines.entries()].flatMap(([repoId, repoPipelines]) =>
+      [...repoPipelines.values()]
+        .filter((pipeline) => reloadedStatuses.includes(pipeline.status))
+        .map((pipeline) => ({ repoId, number: pipeline.number })),
+    );
+    const tasks: (() => Promise<void>)[] = active.map(({ repoId, number }) => async () => {
+      setPipeline(repoId, await apiClient.getPipeline(repoId, number));
+    });
+    const repoId = lastRepoListId;
+    if (repoId !== undefined) {
+      tasks.push(async () => {
+        const list = await apiClient.getPipelineList(repoId, { page: 1, perPage });
+        list.forEach((pipeline) => setPipeline(repoId, pipeline));
+      });
+    }
+    if (feedLoaded) {
+      tasks.push(async () => {
+        const feed = await apiClient.getPipelineFeed();
+        feed.forEach((pipeline) => setPipeline(pipeline.repo_id, pipeline));
+      });
+    }
+
+    const worker = async () => {
+      for (let task = tasks.shift(); task; task = tasks.shift()) {
+        try {
+          await task();
+        } catch {
+          // gone or unreadable now; the next event updates it
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker));
+  }
+
   const hasMore = ref(false);
 
   async function loadRepoPipelines(repoId: number, page?: number) {
+    lastRepoListId = repoId;
     loading.value = true;
     const _pipelines = await apiClient.getPipelineList(repoId, { page, perPage });
     _pipelines.forEach((pipeline) => {
@@ -123,6 +174,7 @@ export const usePipelineStore = defineStore('pipelines', () => {
   async function loadPipelineFeed() {
     await repoStore.loadRepos();
 
+    feedLoaded = true;
     loading.value = true;
     const _pipelines = await apiClient.getPipelineFeed();
     _pipelines.forEach((pipeline) => {
@@ -140,6 +192,7 @@ export const usePipelineStore = defineStore('pipelines', () => {
     getPipeline,
     loadRepoPipelines,
     loadPipeline,
+    reloadAfterReconnect,
     hasMore,
     activePipelines,
     pipelineFeed,
