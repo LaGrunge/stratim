@@ -462,10 +462,10 @@ func (g *GitLab) Status(ctx context.Context, user *model.User, repo *model.Repo,
 
 	_repo, err := g.getProject(ctx, client, repo.ForgeRemoteID, repo.Owner, repo.Name)
 	if err != nil {
-		return err
+		return statusError(nil, err)
 	}
 
-	_, _, err = client.Commits.SetCommitStatus(_repo.ID, pipeline.Commit, &gitlab.SetCommitStatusOptions{
+	_, resp, err := client.Commits.SetCommitStatus(_repo.ID, pipeline.Commit, &gitlab.SetCommitStatusOptions{
 		State:       getStatus(workflow.State),
 		Description: new(common.GetPipelineStatusDescription(workflow.State)),
 		TargetURL:   new(common.GetPipelineStatusURL(repo, pipeline, workflow)),
@@ -478,7 +478,25 @@ func (g *GitLab) Status(ctx context.Context, user *model.User, repo *model.Repo,
 		return nil
 	}
 
-	return err
+	return statusError(resp, err)
+}
+
+// statusError tells the server whether a failed status request may pass if
+// sent again.
+func statusError(resp *gitlab.Response, err error) error {
+	var errResp *gitlab.ErrorResponse
+	switch {
+	case resp != nil && resp.Response != nil:
+		return common.StatusError(resp.StatusCode, resp.Header, err)
+	case errors.As(err, &errResp):
+		var header http.Header
+		if errResp.Response != nil {
+			header = errResp.Response.Header
+		}
+		return common.StatusError(errResp.StatusCode, header, err)
+	default:
+		return common.StatusError(0, nil, err)
+	}
 }
 
 func isRejectedStatusTransition(err error) bool {

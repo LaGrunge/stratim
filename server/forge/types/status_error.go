@@ -22,6 +22,9 @@ type StatusError struct {
 	Err error
 	// Final: the forge refused the status, sending it again cannot help.
 	Final bool
+	// Auth: refused for the user's credentials (401, 403), which a login
+	// renews; it is not sent again now, but may be later.
+	Auth bool
 	// RetryAfter is how long the forge asked to wait first; 0 if it did not.
 	RetryAfter time.Duration
 }

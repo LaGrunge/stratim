@@ -1784,6 +1784,131 @@ func (_c *MockStore_ForgeList_Call) RunAndReturn(run func(p *model.ListOptionsWi
 	return _c
 }
 
+// ForgeStatusCandidates provides a mock function for the type MockStore
+func (_mock *MockStore) ForgeStatusCandidates(since int64, before int64, limit int) ([]*model.ForgeStatusCandidate, error) {
+	ret := _mock.Called(since, before, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ForgeStatusCandidates")
+	}
+
+	var r0 []*model.ForgeStatusCandidate
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64, int64, int) ([]*model.ForgeStatusCandidate, error)); ok {
+		return returnFunc(since, before, limit)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64, int64, int) []*model.ForgeStatusCandidate); ok {
+		r0 = returnFunc(since, before, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*model.ForgeStatusCandidate)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64, int64, int) error); ok {
+		r1 = returnFunc(since, before, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_ForgeStatusCandidates_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ForgeStatusCandidates'
+type MockStore_ForgeStatusCandidates_Call struct {
+	*mock.Call
+}
+
+// ForgeStatusCandidates is a helper method to define mock.On call
+//   - since int64
+//   - before int64
+//   - limit int
+func (_e *MockStore_Expecter) ForgeStatusCandidates(since any, before any, limit any) *MockStore_ForgeStatusCandidates_Call {
+	return &MockStore_ForgeStatusCandidates_Call{Call: _e.mock.On("ForgeStatusCandidates", since, before, limit)}
+}
+
+func (_c *MockStore_ForgeStatusCandidates_Call) Run(run func(since int64, before int64, limit int)) *MockStore_ForgeStatusCandidates_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_ForgeStatusCandidates_Call) Return(forgeStatusCandidates []*model.ForgeStatusCandidate, err error) *MockStore_ForgeStatusCandidates_Call {
+	_c.Call.Return(forgeStatusCandidates, err)
+	return _c
+}
+
+func (_c *MockStore_ForgeStatusCandidates_Call) RunAndReturn(run func(since int64, before int64, limit int) ([]*model.ForgeStatusCandidate, error)) *MockStore_ForgeStatusCandidates_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ForgeStatusSet provides a mock function for the type MockStore
+func (_mock *MockStore) ForgeStatusSet(forgeStatus *model.ForgeStatus) error {
+	ret := _mock.Called(forgeStatus)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ForgeStatusSet")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*model.ForgeStatus) error); ok {
+		r0 = returnFunc(forgeStatus)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockStore_ForgeStatusSet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ForgeStatusSet'
+type MockStore_ForgeStatusSet_Call struct {
+	*mock.Call
+}
+
+// ForgeStatusSet is a helper method to define mock.On call
+//   - forgeStatus *model.ForgeStatus
+func (_e *MockStore_Expecter) ForgeStatusSet(forgeStatus any) *MockStore_ForgeStatusSet_Call {
+	return &MockStore_ForgeStatusSet_Call{Call: _e.mock.On("ForgeStatusSet", forgeStatus)}
+}
+
+func (_c *MockStore_ForgeStatusSet_Call) Run(run func(forgeStatus *model.ForgeStatus)) *MockStore_ForgeStatusSet_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.ForgeStatus
+		if args[0] != nil {
+			arg0 = args[0].(*model.ForgeStatus)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_ForgeStatusSet_Call) Return(err error) *MockStore_ForgeStatusSet_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockStore_ForgeStatusSet_Call) RunAndReturn(run func(forgeStatus *model.ForgeStatus) error) *MockStore_ForgeStatusSet_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ForgeUpdate provides a mock function for the type MockStore
 func (_mock *MockStore) ForgeUpdate(forge *model.Forge) error {
 	ret := _mock.Called(forge)

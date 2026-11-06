@@ -204,6 +204,8 @@ func (g *RPC) Dir(_ context.Context, u *model.User, r *model.Repo, b *model.Pipe
 	return resp, json.Unmarshal(jsonResp, &resp)
 }
 
+// Status sends the status through the addon. Its errors come back as text,
+// so they cannot tell a refusal from an outage: all are sent again.
 func (g *RPC) Status(_ context.Context, u *model.User, r *model.Repo, b *model.Pipeline, p *model.Workflow) error {
 	args, err := json.Marshal(&argumentsStatus{
 		U: modelUserFromModel(u),

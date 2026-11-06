@@ -51,15 +51,20 @@ func retryWriteCtx(ctx context.Context, fn func() error) error {
 }
 
 // isErrLockConflict reports whether err is MariaDB/MySQL choosing the write
-// as a deadlock's victim (1213): it was rolled back, and is tried again from
-// the start. A lock wait timeout (1205) is not: the lock is held long, and
+// as a deadlock's victim (1213), or MariaDB finding a row it locks changed
+// since its transaction's snapshot (1020, with snapshot isolation, on
+// by default from 11.6): it was rolled back, and is tried again from the
+// start. A lock wait timeout (1205) is not: the lock is held long, and
 // waiting again only adds to the queue.
 func isErrLockConflict(err error) bool {
 	var myErr *mysql.MySQLError
-	return errors.As(err, &myErr) && myErr.Number == mysqlErrDeadlock
+	return errors.As(err, &myErr) && (myErr.Number == mysqlErrDeadlock || myErr.Number == mysqlErrRecordChanged)
 }
 
-const mysqlErrDeadlock = 1213
+const (
+	mysqlErrDeadlock      = 1213
+	mysqlErrRecordChanged = 1020
+)
 
 // isErrDatabaseLocked reports whether err is a transient SQLite lock error
 // (SQLITE_BUSY "database is locked" or SQLITE_LOCKED "database table is locked").

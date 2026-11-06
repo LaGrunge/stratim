@@ -129,6 +129,9 @@ func run(ctx context.Context, c *cli.Command) error {
 
 	metric.StartMetricsCollector(ctx, c, _store)
 
+	// the statuses not through when the server stopped, in the background
+	server.Config.Services.Statuses.Resend(ctx)
+
 	serviceWaitingGroup.Go(func() error {
 		log.Info().Msg("starting cron service ...")
 		if err := cron_scheduler.Run(ctx, _store); err != nil {

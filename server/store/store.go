@@ -205,6 +205,10 @@ type Store interface {
 	WorkflowByStep(*model.Step) (*model.Workflow, error)
 	WorkflowUpdate(*model.Workflow) error
 
+	// ForgeStatus
+	ForgeStatusSet(*model.ForgeStatus) error
+	ForgeStatusCandidates(since, before int64, limit int) ([]*model.ForgeStatusCandidate, error)
+
 	// Org
 	OrgCreate(*model.Org) error
 	OrgGet(int64) (*model.Org, error)

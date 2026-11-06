@@ -113,6 +113,15 @@ type Forge interface {
 	// Status sends workflow status updates to the forge.
 	// Provides visual feedback in forge UI (commit checks, PR status).
 	// Failures should be logged but not block pipeline execution.
+	//
+	// Errors tell the server whether to send the status again:
+	//  - a *types.StatusError with Final: the forge refused it, it is not
+	//    sent again (common.StatusError maps a 4xx to it); with Auth too,
+	//    refused for the user's credentials, it is sent again on a start
+	//  - a *types.StatusError without Final: it is sent again, after
+	//    RetryAfter if set (a 5xx, a 429)
+	//  - types.ErrNotImplemented: taken as sent
+	//  - any other error: sent again, as a request that got no answer
 	Status(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, p *model.Workflow) error
 
 	// Netrc generates .netrc credentials for cloning private repositories.

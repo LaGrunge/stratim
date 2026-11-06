@@ -231,6 +231,7 @@ func (o *ListOpts) Encode() string {
 
 type Error struct {
 	Status int
+	Header http.Header `json:"-"`
 	Body   struct {
 		Message string `json:"message"`
 	} `json:"error"`
