@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog/log"
@@ -51,6 +52,10 @@ func (p *impl) Error(c context.Context, id string, err error) error {
 
 func (p *impl) Extend(c context.Context, agentID int64, workflowID string) error {
 	return p.q.Extend(c, agentID, workflowID)
+}
+
+func (p *impl) ExtendFinalizing(c context.Context, agentID int64, workflowID string, finalizeDeadline time.Time) error {
+	return p.q.ExtendFinalizing(c, agentID, workflowID, finalizeDeadline)
 }
 
 func (p *impl) Info(c context.Context) queue.InfoT {
@@ -96,6 +101,10 @@ func (p *impl) Resume() {
 
 func (p *impl) Wait(c context.Context, id string) error {
 	return p.q.Wait(c, id)
+}
+
+func (p *impl) WaitKilled(c context.Context, id string) error {
+	return p.q.WaitKilled(c, id)
 }
 
 //
@@ -155,10 +164,14 @@ func (p *impl) StartPipeline(c context.Context, repo *model.Repo, pipeline *mode
 // CancelWorkflows evicts the given workflows from the queue, signaling a
 // cancellation (queue.ErrCancel) to any agents currently waiting on them.
 // An empty list is a no-op.
-func (p *impl) CancelWorkflows(c context.Context, workflowIDs []string) error {
+func (p *impl) CancelWorkflows(c context.Context, workflowIDs []string, escalate bool) ([]string, error) {
 	if len(workflowIDs) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	return p.q.ErrorAtOnce(c, workflowIDs, queue.ErrCancel)
+	return p.q.CancelAtOnce(c, workflowIDs, escalate)
+}
+
+func (p *impl) SetCanceledExpiredHandler(handler func(task *model.Task)) {
+	p.q.SetCanceledExpiredHandler(handler)
 }

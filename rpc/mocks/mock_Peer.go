@@ -6,6 +6,7 @@ package mocks
 
 import (
 	"context"
+	"time"
 
 	mock "github.com/stretchr/testify/mock"
 	"go.woodpecker-ci.org/woodpecker/v3/rpc"
@@ -203,6 +204,69 @@ func (_c *MockPeer_Extend_Call) Return(err error) *MockPeer_Extend_Call {
 }
 
 func (_c *MockPeer_Extend_Call) RunAndReturn(run func(c context.Context, workflowID string) error) *MockPeer_Extend_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ExtendFinalizing provides a mock function for the type MockPeer
+func (_mock *MockPeer) ExtendFinalizing(c context.Context, workflowID string, finalizeDeadline time.Time) error {
+	ret := _mock.Called(c, workflowID, finalizeDeadline)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExtendFinalizing")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Time) error); ok {
+		r0 = returnFunc(c, workflowID, finalizeDeadline)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockPeer_ExtendFinalizing_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExtendFinalizing'
+type MockPeer_ExtendFinalizing_Call struct {
+	*mock.Call
+}
+
+// ExtendFinalizing is a helper method to define mock.On call
+//   - c context.Context
+//   - workflowID string
+//   - finalizeDeadline time.Time
+func (_e *MockPeer_Expecter) ExtendFinalizing(c any, workflowID any, finalizeDeadline any) *MockPeer_ExtendFinalizing_Call {
+	return &MockPeer_ExtendFinalizing_Call{Call: _e.mock.On("ExtendFinalizing", c, workflowID, finalizeDeadline)}
+}
+
+func (_c *MockPeer_ExtendFinalizing_Call) Run(run func(c context.Context, workflowID string, finalizeDeadline time.Time)) *MockPeer_ExtendFinalizing_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockPeer_ExtendFinalizing_Call) Return(err error) *MockPeer_ExtendFinalizing_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockPeer_ExtendFinalizing_Call) RunAndReturn(run func(c context.Context, workflowID string, finalizeDeadline time.Time) error) *MockPeer_ExtendFinalizing_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -737,6 +801,72 @@ func (_c *MockPeer_Wait_Call) Return(canceled bool, err error) *MockPeer_Wait_Ca
 }
 
 func (_c *MockPeer_Wait_Call) RunAndReturn(run func(c context.Context, workflowID string) (bool, error)) *MockPeer_Wait_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WaitKilled provides a mock function for the type MockPeer
+func (_mock *MockPeer) WaitKilled(c context.Context, workflowID string) (bool, error) {
+	ret := _mock.Called(c, workflowID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WaitKilled")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return returnFunc(c, workflowID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = returnFunc(c, workflowID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(c, workflowID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockPeer_WaitKilled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitKilled'
+type MockPeer_WaitKilled_Call struct {
+	*mock.Call
+}
+
+// WaitKilled is a helper method to define mock.On call
+//   - c context.Context
+//   - workflowID string
+func (_e *MockPeer_Expecter) WaitKilled(c any, workflowID any) *MockPeer_WaitKilled_Call {
+	return &MockPeer_WaitKilled_Call{Call: _e.mock.On("WaitKilled", c, workflowID)}
+}
+
+func (_c *MockPeer_WaitKilled_Call) Run(run func(c context.Context, workflowID string)) *MockPeer_WaitKilled_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockPeer_WaitKilled_Call) Return(killed bool, err error) *MockPeer_WaitKilled_Call {
+	_c.Call.Return(killed, err)
+	return _c
+}
+
+func (_c *MockPeer_WaitKilled_Call) RunAndReturn(run func(c context.Context, workflowID string) (bool, error)) *MockPeer_WaitKilled_Call {
 	_c.Call.Return(run)
 	return _c
 }

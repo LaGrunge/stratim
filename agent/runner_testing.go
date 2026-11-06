@@ -26,3 +26,11 @@ func (r Runner) WithTimeoutUnit(unit time.Duration) Runner {
 	r.timeoutUnit = unit
 	return r
 }
+
+// WithFinalizeLeaseGrace returns the runner with the lease of a workflow
+// extended for grace past the end of its finalizers' time, instead of a
+// minute. It only exists in test builds.
+func (r Runner) WithFinalizeLeaseGrace(grace time.Duration) Runner {
+	r.finalizeLeaseGrace = grace
+	return r
+}

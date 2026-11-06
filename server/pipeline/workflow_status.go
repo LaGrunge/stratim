@@ -15,6 +15,9 @@
 package pipeline
 
 import (
+	"errors"
+	"time"
+
 	"go.woodpecker-ci.org/woodpecker/v3/rpc"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
@@ -33,17 +36,30 @@ func WorkflowStatus(steps []*model.Step) model.StatusValue {
 	return status
 }
 
-func UpdateWorkflowStatusToRunning(store store.Store, workflow model.Workflow, state rpc.WorkflowState) (*model.Workflow, error) {
+// UpdateWorkflowStatusToRunning writes a workflow's start (state, started)
+// if it still is pending, and reports whether it did.
+func UpdateWorkflowStatusToRunning(store store.Store, workflow model.Workflow, state rpc.WorkflowState) (*model.Workflow, bool, error) {
 	workflow.Started = state.Started
 	workflow.State = model.StatusRunning
-	return &workflow, store.WorkflowUpdate(&workflow)
+	won, err := store.WorkflowStart(&workflow)
+	return &workflow, won, err
 }
 
-func UpdateWorkflowToStatusSkipped(store store.Store, workflow model.Workflow) (*model.Workflow, error) {
+// UpdateWorkflowToStatusSkipped writes a workflow that never ran skipped
+// (state, finished) if it still is pending, and reports whether it did.
+func UpdateWorkflowToStatusSkipped(store store.Store, workflow model.Workflow) (*model.Workflow, bool, error) {
 	workflow.State = model.StatusSkipped
-	return &workflow, store.WorkflowUpdate(&workflow)
+	workflow.Finished = time.Now().Unix()
+	won, err := store.WorkflowSkip(&workflow)
+	return &workflow, won, err
 }
 
+// ErrWorkflowEnded is UpdateWorkflowStatusToDone finding the workflow ended
+// already, as when it was settled meanwhile.
+var ErrWorkflowEnded = errors.New("the workflow ended already")
+
+// UpdateWorkflowStatusToDone writes the end of workflow as its agent reports
+// it, if it still is pending or running; ErrWorkflowEnded otherwise.
 func UpdateWorkflowStatusToDone(store store.Store, workflow model.Workflow, state rpc.WorkflowState) (*model.Workflow, error) {
 	workflow.Finished = state.Finished
 	workflow.Error = state.Error
@@ -61,5 +77,9 @@ func UpdateWorkflowStatusToDone(store store.Store, workflow model.Workflow, stat
 	if state.TimedOut {
 		workflow.State = model.StatusTimeout
 	}
-	return &workflow, store.WorkflowUpdate(&workflow)
+	won, err := store.WorkflowFinish(&workflow)
+	if err == nil && !won {
+		err = ErrWorkflowEnded
+	}
+	return &workflow, err
 }

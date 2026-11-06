@@ -135,4 +135,33 @@ func TestTask_ShouldRunAfterTimeout(t *testing.T) {
 
 	onBoth := &Task{DepStatus: dep, RunOn: []string{string(StatusSuccess), string(StatusFailure)}}
 	assert.True(t, onBoth.ShouldRun(), "runs_on success and failure")
+
+	onTimeout := &Task{DepStatus: dep, RunOn: []string{string(StatusTimeout)}}
+	assert.True(t, onTimeout.ShouldRun(), "runs_on timeout")
+
+	failed := &Task{DepStatus: map[string]StatusValue{"build": StatusFailure}, RunOn: []string{string(StatusTimeout)}}
+	assert.False(t, failed.ShouldRun(), "runs_on timeout: a plain failure is no timeout")
+
+	killed := &Task{DepStatus: map[string]StatusValue{"build": StatusKilled}, RunOn: []string{string(StatusKilled)}}
+	assert.True(t, killed.ShouldRun(), "runs_on killed")
+	assert.False(t, (&Task{DepStatus: dep, RunOn: []string{string(StatusKilled)}}).ShouldRun(), "runs_on killed: a timeout is no kill")
+}
+
+func TestTask_ShouldRunAfterSkipped(t *testing.T) {
+	deps := map[string]StatusValue{"build": StatusSuccess, "lint": StatusSkipped}
+
+	onSuccess := &Task{DepStatus: deps}
+	assert.False(t, onSuccess.ShouldRun(), "runs_on success: a skipped dependency did not succeed")
+
+	onSkipped := &Task{DepStatus: deps, RunOn: []string{string(StatusSkipped)}}
+	assert.True(t, onSkipped.ShouldRun(), "runs_on skipped")
+
+	onSuccessSkipped := &Task{DepStatus: deps, RunOn: []string{string(StatusSuccess), string(StatusSkipped)}}
+	assert.True(t, onSuccessSkipped.ShouldRun(), "runs_on success and skipped")
+
+	allSucceeded := &Task{DepStatus: map[string]StatusValue{"build": StatusSuccess}, RunOn: []string{string(StatusSkipped)}}
+	assert.False(t, allSucceeded.ShouldRun(), "runs_on skipped: nothing was skipped")
+
+	noDeps := &Task{RunOn: []string{string(StatusSkipped)}}
+	assert.False(t, noDeps.ShouldRun(), "runs_on skipped: no dependency, nothing skipped")
 }

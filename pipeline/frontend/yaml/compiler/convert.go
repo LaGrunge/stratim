@@ -18,12 +18,14 @@ import (
 	"fmt"
 	"maps"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/oklog/ulid/v2"
 
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline"
 	backend_types "go.woodpecker-ci.org/woodpecker/v3/pipeline/backend/types"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/metadata"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/yaml/compiler/settings"
@@ -96,7 +98,8 @@ func (c *Compiler) createProcess(container *yaml_types.Container, workflow *yaml
 
 	environment["CI_WORKSPACE"] = path.Join(workspaceBase, c.workspacePath)
 
-	if stepType == backend_types.StepTypeService || container.Detached {
+	// a finalizer is never detached
+	if stepType == backend_types.StepTypeService || container.Detached && !isFinalizer(container, stepType) {
 		detached = true
 	}
 
@@ -154,10 +157,16 @@ func (c *Compiler) createProcess(container *yaml_types.Container, workflow *yaml
 	maps.Copy(whenEnv, c.env)
 	maps.Copy(whenEnv, c.nonPluginEnv)
 
-	// at least one constraint contain status success, or all constraints have no status set
-	onSuccess := container.When.IncludesStatusSuccess(c.metadata, false, whenEnv)
-	// at least one constraint must include the status failure.
-	onFailure := container.When.IncludesStatusFailure(c.metadata, false, whenEnv)
+	runOn := stepRunOn(container, stepType, c.metadata, whenEnv)
+	// for agents from before RunOn, and all a step needs when it lists only
+	// those: failure covers timeout and killed there
+	onSuccess := slices.Contains(runOn, pipeline.StatusSuccess)
+	onFailure := slices.Contains(runOn, pipeline.StatusFailure)
+	if !slices.ContainsFunc(runOn, func(status string) bool {
+		return status != pipeline.StatusSuccess && status != pipeline.StatusFailure
+	}) {
+		runOn = nil
+	}
 
 	failure := container.Failure
 	if container.Failure == "" {
@@ -194,12 +203,38 @@ func (c *Compiler) createProcess(container *yaml_types.Container, workflow *yaml
 		AuthConfig:     authConfig,
 		OnSuccess:      onSuccess,
 		OnFailure:      onFailure,
+		RunOn:          runOn,
 		Failure:        failure,
 		NetworkMode:    networkMode,
 		Ports:          ports,
 		BackendOptions: container.BackendOptions,
 		WorkflowLabels: workflow.Labels,
 	}, nil
+}
+
+// isFinalizer reports whether container is a finalizer: on_finish is for
+// steps, a service or a clone step ignores it.
+func isFinalizer(container *yaml_types.Container, stepType backend_types.StepType) bool {
+	return container.OnFinish && (stepType == backend_types.StepTypeCommands || stepType == backend_types.StepTypePlugin)
+}
+
+// stepRunOn lists the outcomes so far a step runs after, from its
+// when.status: success when no status filters it, any outcome for a
+// finalizer then (failure covers timeout and killed).
+func stepRunOn(container *yaml_types.Container, stepType backend_types.StepType, m metadata.Metadata, whenEnv map[string]string) []string {
+	statuses, unfiltered := container.When.MatchingStatuses(m, false, whenEnv)
+	if unfiltered {
+		defaults := []string{pipeline.StatusSuccess}
+		if isFinalizer(container, stepType) {
+			defaults = append(defaults, pipeline.StatusFailure)
+		}
+		for _, status := range defaults {
+			if !slices.Contains(statuses, status) {
+				statuses = append(statuses, status)
+			}
+		}
+	}
+	return statuses
 }
 
 func (c *Compiler) stepWorkingDir(container *yaml_types.Container) string {

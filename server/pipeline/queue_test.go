@@ -15,6 +15,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline"
 	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/builder"
+	"go.woodpecker-ci.org/woodpecker/v3/rpc"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 )
 
@@ -98,6 +100,31 @@ func TestQueuePipelineConcurrency(t *testing.T) {
 			assert.Equal(t, tt.expectedGroup, task.ConcurrencyGroup)
 		})
 	}
+}
+
+// TestFinalizeTimeout: the finalizers' time is at most the workflow's own
+// timeout, the repository's policy.
+func TestFinalizeTimeout(t *testing.T) {
+	assert.Equal(t, 10*time.Minute, finalizeTimeout(10*time.Minute, 60))
+	assert.Equal(t, 5*time.Minute, finalizeTimeout(10*time.Minute, 5), "a 5 minute workflow gets 5 for its finalizers")
+	assert.Equal(t, 10*time.Minute, finalizeTimeout(10*time.Minute, 0), "no timeout set: the compiler's")
+	assert.Zero(t, finalizeTimeout(0, 60), "no finalizers")
+}
+
+// The task carries the finalizers' time, bounded by the workflow's, and so
+// does the config the agent gets.
+func TestQueuePipelineFinalizeTimeout(t *testing.T) {
+	repo := &model.Repo{ID: 7, Timeout: 5}
+	item := &builder.Item{Workflow: &builder.Workflow{ID: 1, Name: "build"}}
+	// the server does not name the backend types: the compiled config, as JSON
+	require.NoError(t, json.Unmarshal([]byte(`{"finalize_timeout": 600000000000}`), &item.Config), "10 minutes")
+	tasks, err := pipelineTasks(repo, nil, &model.Pipeline{ID: 42}, []*builder.Item{item}, nil)
+	require.NoError(t, err)
+	require.Len(t, tasks, 1)
+	assert.Equal(t, int64(5*60), tasks[0].FinalizeTimeout)
+	var workflow rpc.Workflow
+	require.NoError(t, json.Unmarshal(tasks[0].Data, &workflow))
+	assert.Equal(t, 5*time.Minute, workflow.Config.FinalizeTimeout)
 }
 
 func TestQueuePipelineCreated(t *testing.T) {

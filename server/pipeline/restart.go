@@ -205,7 +205,7 @@ func failRestartedPipeline(ctx context.Context, store store.Store, pl *model.Pip
 			ids = append(ids, fmt.Sprint(wf.ID))
 		}
 		// evicts the tasks the queue holds; the ones only stored are deleted below
-		if err := server.Config.Services.Scheduler.CancelWorkflows(ctx, ids); err != nil {
+		if _, err := server.Config.Services.Scheduler.CancelWorkflows(ctx, ids, false); err != nil {
 			log.Debug().Err(err).Msgf("evicting the tasks of pipeline %s#%d", repo.FullName, pl.Number)
 		}
 		for _, id := range ids {
@@ -294,6 +294,11 @@ func createNewOutOfOld(old *model.Pipeline) *model.Pipeline {
 	newPipeline.Errors = nil
 	newPipeline.Reviewer = ""
 	newPipeline.Reviewed = 0
+	// a fresh run: the cancel of the old one is not its (the cancel of
+	// previous pipelines skips a pipeline canceled already), nor are its
+	// workflows
+	newPipeline.CancelInfo = nil
+	newPipeline.Workflows = nil
 	return &newPipeline
 }
 

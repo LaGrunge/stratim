@@ -32,6 +32,7 @@ import (
 	forge_mocks "go.woodpecker-ci.org/woodpecker/v3/server/forge/mocks"
 	forge_types "go.woodpecker-ci.org/woodpecker/v3/server/forge/types"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/pipeline"
 	"go.woodpecker-ci.org/woodpecker/v3/server/pubsub/memory"
 	queue_mocks "go.woodpecker-ci.org/woodpecker/v3/server/queue/mocks"
 	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware/session"
@@ -316,7 +317,7 @@ func TestCancelPipeline(t *testing.T) {
 		mockForge := forge_mocks.NewMockForge(t)
 		mockStore := store_mocks.NewMockStore(t)
 		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{}, nil)
-		mockStore.On("UpdatePipeline", mock.Anything).Return(nil)
+		mockStore.On("PipelineCancel", mock.Anything).Return(true, nil)
 
 		mockManager := manager_mocks.NewMockManager(t)
 		mockManager.On("ForgeFromRepo", fakeRepo).Return(mockForge, nil)
@@ -329,6 +330,8 @@ func TestCancelPipeline(t *testing.T) {
 		c.Set("repo", fakeRepo)
 		c.Set("user", fakeUser)
 		c.Set("pipeline", runningPipeline)
+		// the server's end of workflows, as the middleware sets it
+		c.Set(pipeline.WorkflowEndKey, pipeline.WorkflowEnd{Store: mockStore, Publisher: server.Config.Services.Scheduler})
 
 		CancelPipeline(c)
 

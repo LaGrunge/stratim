@@ -17,6 +17,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -120,26 +121,37 @@ func finishedStepStatus(state rpc.StepState) model.StatusValue {
 }
 
 // UpdateStepStatus updates step status based on agent reports via RPC.
-func UpdateStepStatus(ctx context.Context, store store.Store, step *model.Step, state rpc.StepState) error {
+func UpdateStepStatus(ctx context.Context, store store.Store, end WorkflowEnd, step *model.Step, state rpc.StepState) error {
 	log.Debug().Str("StepUUID", step.UUID).Msgf("Update step %#v state %#v", *step, state)
 
+	from := step.State
 	updatedStep, shouldCancelPipelineFromStep, err := CalcStepStatus(*step, state)
 	if err != nil {
 		return err
 	}
-	*step = *updatedStep // update step for external callers
 
-	// the step is stored first: canceling the pipeline must not lose it
-	if err := store.StepUpdate(step); err != nil {
+	// the step is stored first: canceling the pipeline must not lose it.
+	// Only if still as read: what ended it meanwhile (its workflow killed,
+	// canceled) stays.
+	won, err := store.StepReport(updatedStep, from)
+	if err != nil {
 		return err
 	}
+	if !won {
+		return ErrStepEnded
+	}
+	*step = *updatedStep // update step for external callers
 	if shouldCancelPipelineFromStep {
-		return cancelPipelineFromStep(ctx, store, step)
+		return cancelPipelineFromStep(ctx, store, end, step)
 	}
 	return nil
 }
 
-func cancelPipelineFromStep(ctx context.Context, store store.Store, step *model.Step) error {
+// ErrStepEnded is UpdateStepStatus finding the step changed since it was
+// read: ended by its workflow's end, which stands.
+var ErrStepEnded = errors.New("the step changed meanwhile")
+
+func cancelPipelineFromStep(ctx context.Context, store store.Store, end WorkflowEnd, step *model.Step) error {
 	pipeline, err := store.GetPipeline(step.PipelineID)
 	if err != nil {
 		return err
@@ -163,16 +175,23 @@ func cancelPipelineFromStep(ctx context.Context, store store.Store, step *model.
 	if err != nil {
 		return err
 	}
-	return Cancel(ctx, _forge, store, repo, repoUser, pipeline, &model.CancelInfo{
+	return Cancel(ctx, _forge, store, end, repo, repoUser, pipeline, &model.CancelInfo{
 		CanceledByStep: step.Name,
 	})
 }
 
-func UpdateStepToStatusSkipped(store store.Store, step model.Step, finished int64, status model.StatusValue) (*model.Step, error) {
+// UpdateStepToStatusSkipped ends a step that did not run with status; one
+// that started ends as its workflow's end stops it (see StepEndState). Only
+// state and finished are written, and only if the step still is as read:
+// its agent may have started or ended it meanwhile. It reports whether it
+// was written.
+func UpdateStepToStatusSkipped(store store.Store, step model.Step, finished int64, status model.StatusValue) (*model.Step, bool, error) {
+	from := step.State
 	step.State = status
 	if step.Started != 0 {
-		step.State = model.StatusSuccess // for daemons that are killed
+		step.State = StepEndState(&step, StepEndWorkflowDone)
 		step.Finished = finished
 	}
-	return &step, store.StepUpdate(&step)
+	won, err := store.StepFinish(&step, from)
+	return &step, won, err
 }

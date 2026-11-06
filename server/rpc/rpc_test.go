@@ -155,8 +155,7 @@ func TestCompleteChildrenIfParentCompleted(t *testing.T) {
 		}
 
 		mockStore := store_mocks.NewMockStore(t)
-		mockStore.On("StepUpdate", mock.Anything).Return(nil)
-		mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+		mockStore.On("WorkflowFinish", mock.Anything).Return(true, nil)
 
 		s := RPC{store: mockStore}
 		s.completeChildrenIfParentCompleted(&workflow, rpc.WorkflowState{Finished: 1234567900})
@@ -182,7 +181,6 @@ func TestCompleteChildrenIfParentCompleted(t *testing.T) {
 		}
 
 		mockStore := store_mocks.NewMockStore(t)
-		mockStore.On("StepUpdate", mock.Anything).Return(nil)
 
 		s := RPC{store: mockStore}
 		s.completeChildrenIfParentCompleted(&workflow, rpc.WorkflowState{Finished: 1234567900, Canceled: true, TimedOut: true})
@@ -191,15 +189,30 @@ func TestCompleteChildrenIfParentCompleted(t *testing.T) {
 		assert.Equal(t, model.StatusSuccess, runningService.State)
 	})
 
-	t.Run("When the workflow was canceled a step that never started is killed", func(t *testing.T) {
+	t.Run("When the workflow was canceled a step that never started is canceled, a running one killed", func(t *testing.T) {
+		// Cancel leaves a running workflow's pending steps (its finalizers
+		// run after the cancel) to the agent's Done
+		pendingStep := &model.Step{ID: 1, State: model.StatusPending}
+		runningStep := &model.Step{ID: 2, State: model.StatusRunning, Started: 1234567800}
+		workflow := model.Workflow{ID: 7, State: model.StatusRunning, Children: []*model.Step{pendingStep, runningStep}}
+
+		mockStore := store_mocks.NewMockStore(t)
+
+		s := RPC{store: mockStore}
+		s.completeChildrenIfParentCompleted(&workflow, rpc.WorkflowState{Finished: 1234567900, Canceled: true})
+
+		assert.Equal(t, model.StatusCanceled, pendingStep.State)
+		assert.Equal(t, model.StatusSuccess, runningStep.State, "as for daemons that are killed")
+	})
+
+	t.Run("When the workflow ended without a cancel a step that never started is killed", func(t *testing.T) {
 		pendingStep := &model.Step{ID: 1, State: model.StatusPending}
 		workflow := model.Workflow{ID: 7, State: model.StatusRunning, Children: []*model.Step{pendingStep}}
 
 		mockStore := store_mocks.NewMockStore(t)
-		mockStore.On("StepUpdate", mock.Anything).Return(nil)
 
 		s := RPC{store: mockStore}
-		s.completeChildrenIfParentCompleted(&workflow, rpc.WorkflowState{Finished: 1234567900, Canceled: true})
+		s.completeChildrenIfParentCompleted(&workflow, rpc.WorkflowState{Finished: 1234567900, Error: "backend gone"})
 
 		assert.Equal(t, model.StatusKilled, pendingStep.State)
 	})

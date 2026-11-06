@@ -83,7 +83,7 @@ func TestCancelRunningPipeline(t *testing.T) {
 	require.NoError(t, err, "get running pipeline")
 
 	// Cancel through the normal server API path — same as the HTTP handler does.
-	err = pipeline.Cancel(t.Context(), forge, env.Store, env.Fixtures.Repo, env.Fixtures.Owner, running, nil)
+	err = pipeline.Cancel(t.Context(), forge, env.Store, env.WorkflowEnd, env.Fixtures.Repo, env.Fixtures.Owner, running, nil)
 	require.NoError(t, err, "cancel pipeline")
 
 	// Wait for the pipeline to reach a terminal state.

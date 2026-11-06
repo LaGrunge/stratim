@@ -115,7 +115,15 @@ Workflows that need to run even on failures should set the `status` filter.
 +  - status: [ success, failure ]
 ```
 
-This works just like the [`status` filter for steps](./20-workflow-syntax.md#status).
+This works just like the [`status` filter for steps](./20-workflow-syntax.md#status), matched against the workflows it depends on: `success` runs it when all of them succeeded, `failure` when none did, `timeout` also when one timed out, `killed` also when one was killed and `skipped` also when one was skipped. A workflow that runs after its dependency succeeded or was skipped:
+
+```yaml
+depends_on:
+  - deploy
+
+when:
+  - status: [success, skipped]
+```
 
 ### Optional dependencies
 

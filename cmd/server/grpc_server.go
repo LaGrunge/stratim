@@ -22,16 +22,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v3"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server"
+	"go.woodpecker-ci.org/woodpecker/v3/server/pipeline"
 	server_rpc "go.woodpecker-ci.org/woodpecker/v3/server/rpc"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 )
 
-func runGrpcServer(ctx context.Context, c *cli.Command, _store store.Store) error {
+func runGrpcServer(ctx context.Context, c *cli.Command, _store store.Store, end pipeline.WorkflowEnd) error {
 	network := "tcp"
 	addr := c.String("grpc-addr")
 	jwtSecret, generated := setupGrpcSecret(c.String("grpc-secret"))
@@ -63,6 +63,6 @@ func runGrpcServer(ctx context.Context, c *cli.Command, _store store.Store) erro
 		JWTSecret:        jwtSecret,
 		AgentToken:       server.Config.Server.AgentToken,
 		KeepaliveMinTime: c.Duration("keepalive-min-time"),
-		Registerer:       prometheus.DefaultRegisterer,
+		WorkflowEnd:      end,
 	})
 }

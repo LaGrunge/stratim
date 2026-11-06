@@ -497,8 +497,12 @@ func (x *InitRequest) GetState() *WorkflowState {
 }
 
 type WaitRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// after_cancel waits, once the agent was told the workflow is canceled,
+	// for its finalizers to be stopped too: a second cancel, or the server
+	// giving up on it.
+	AfterCancel   bool `protobuf:"varint,2,opt,name=after_cancel,json=afterCancel,proto3" json:"after_cancel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -538,6 +542,13 @@ func (x *WaitRequest) GetId() string {
 		return x.Id
 	}
 	return ""
+}
+
+func (x *WaitRequest) GetAfterCancel() bool {
+	if x != nil {
+		return x.AfterCancel
+	}
+	return false
 }
 
 type DoneRequest struct {
@@ -593,10 +604,15 @@ func (x *DoneRequest) GetState() *WorkflowState {
 }
 
 type ExtendRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// finalize_left_ms is how long, in milliseconds, the workflow's
+	// finalizers' time still lasts once they started (negative once it
+	// ended); unset when not known. A duration, not a time: the agent's clock
+	// and the server's may differ.
+	FinalizeLeftMs *int64 `protobuf:"varint,2,opt,name=finalize_left_ms,json=finalizeLeftMs,proto3,oneof" json:"finalize_left_ms,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ExtendRequest) Reset() {
@@ -634,6 +650,13 @@ func (x *ExtendRequest) GetId() string {
 		return x.Id
 	}
 	return ""
+}
+
+func (x *ExtendRequest) GetFinalizeLeftMs() int64 {
+	if x != nil && x.FinalizeLeftMs != nil {
+		return *x.FinalizeLeftMs
+	}
+	return 0
 }
 
 type UpdateRequest struct {
@@ -1268,14 +1291,17 @@ const file_woodpecker_proto_rawDesc = "" +
 	"\x06filter\x18\x01 \x01(\v2\r.proto.FilterR\x06filter\"I\n" +
 	"\vInitRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
-	"\x05state\x18\x02 \x01(\v2\x14.proto.WorkflowStateR\x05state\"\x1d\n" +
+	"\x05state\x18\x02 \x01(\v2\x14.proto.WorkflowStateR\x05state\"@\n" +
 	"\vWaitRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"I\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\fafter_cancel\x18\x02 \x01(\bR\vafterCancel\"I\n" +
 	"\vDoneRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
-	"\x05state\x18\x02 \x01(\v2\x14.proto.WorkflowStateR\x05state\"\x1f\n" +
+	"\x05state\x18\x02 \x01(\v2\x14.proto.WorkflowStateR\x05state\"c\n" +
 	"\rExtendRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"G\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12-\n" +
+	"\x10finalize_left_ms\x18\x02 \x01(\x03H\x00R\x0efinalizeLeftMs\x88\x01\x01B\x13\n" +
+	"\x11_finalize_left_ms\"G\n" +
 	"\rUpdateRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12&\n" +
 	"\x05state\x18\x02 \x01(\v2\x10.proto.StepStateR\x05state\"=\n" +
@@ -1416,6 +1442,7 @@ func file_woodpecker_proto_init() {
 	if File_woodpecker_proto != nil {
 		return
 	}
+	file_woodpecker_proto_msgTypes[9].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

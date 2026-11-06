@@ -221,6 +221,18 @@ func TestLintErrors(t *testing.T) {
 			from: "{steps: { build: { image: golang } }, services: [ { name: database, image: mysql }, { name: database, image: postgres } ] }",
 			want: "Service names must be unique, `database` is used more than once",
 		},
+		{
+			from: "{steps: { build: { image: golang } }, services: [ { name: database, image: mysql, on_finish: true } ] }",
+			want: "`on_finish` is only allowed on steps",
+		},
+		{
+			from: "steps: { build: { image: golang }, logs: { image: golang, on_finish: true, detach: true } }",
+			want: "An `on_finish` step cannot be detached",
+		},
+		{
+			from: "steps: { logs: { image: golang, on_finish: true }, build: { image: golang, depends_on: [ logs ] } }",
+			want: "Cannot depend on `logs`: an `on_finish` step runs after all other steps",
+		},
 	}
 
 	for _, tt := range testdata {

@@ -18,24 +18,25 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"go.woodpecker-ci.org/woodpecker/v3/rpc/proto"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/pipeline"
+	queue_mocks "go.woodpecker-ci.org/woodpecker/v3/server/queue/mocks"
 	store_mocks "go.woodpecker-ci.org/woodpecker/v3/server/store/mocks"
 	"go.woodpecker-ci.org/woodpecker/v3/version"
 )
 
 // newTestServer builds a WoodpeckerServer whose peer talks to the given mocked
-// store. A fresh prometheus registry avoids duplicate-collector panics when
-// several servers are constructed in one test binary.
+// store.
 func newTestServer(t *testing.T, store *store_mocks.MockStore) *WoodpeckerServer {
 	t.Helper()
-	server, ok := NewWoodpeckerServer(nil, nil, store, prometheus.NewRegistry()).(*WoodpeckerServer)
+	server, ok := NewWoodpeckerServer(nil, nil, store, pipeline.WorkflowEnd{}).(*WoodpeckerServer)
 	require.True(t, ok)
 	return server
 }
@@ -47,7 +48,7 @@ func ctxWithAgentID(id int64) context.Context {
 func TestNewWoodpeckerServer(t *testing.T) {
 	t.Parallel()
 
-	srv := NewWoodpeckerServer(nil, nil, store_mocks.NewMockStore(t), prometheus.NewRegistry())
+	srv := NewWoodpeckerServer(nil, nil, store_mocks.NewMockStore(t), pipeline.WorkflowEnd{})
 	assert.NotNil(t, srv)
 	assert.IsType(t, &WoodpeckerServer{}, srv)
 }
@@ -139,4 +140,47 @@ func TestServerUnregisterAgent(t *testing.T) {
 		_, err := srv.UnregisterAgent(ctxWithAgentID(9), new(proto.Empty))
 		assert.ErrorIs(t, err, delErr)
 	})
+}
+
+// An agent's finalizers' end comes as how long it still lasts, counted from
+// the server's clock when it comes: the agent's clock does not matter.
+func TestExtendFinalizeLeft(t *testing.T) {
+	mockStore := store_mocks.NewMockStore(t)
+	mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
+	mockStore.On("AgentUpdate", mock.Anything).Return(nil).Maybe()
+	mockStore.On("WorkflowLoad", int64(30)).Return(defaultWorkflow(model.StatusRunning), nil)
+	mockStore.On("GetPipeline", int64(20)).Return(defaultPipeline(model.StatusRunning), nil)
+	mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
+	mockQueue := queue_mocks.NewMockQueue(t)
+	var got time.Time
+	mockQueue.On("ExtendFinalizing", mock.Anything, int64(1), "30", mock.Anything).Run(func(args mock.Arguments) {
+		got, _ = args.Get(3).(time.Time)
+	}).Return(nil).Once()
+	srv := &WoodpeckerServer{peer: newTestRPC(t, mockStore, mockQueue)}
+
+	left := int64(90_000)
+	before := time.Now()
+	_, err := srv.Extend(ctxWithAgentID(1), &proto.ExtendRequest{Id: "30", FinalizeLeftMs: &left})
+	require.NoError(t, err)
+	after := time.Now()
+	assert.False(t, got.Before(before.Add(90*time.Second)), "counted from the server's clock")
+	assert.False(t, got.After(after.Add(90*time.Second)))
+
+	assert.Equal(t, before.Add(-time.Second), finalizeDeadline(-1000, before), "ended a second ago")
+}
+
+// An older agent tells no end: a plain Extend.
+func TestExtendWithoutFinalizeLeft(t *testing.T) {
+	mockStore := store_mocks.NewMockStore(t)
+	mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
+	mockStore.On("AgentUpdate", mock.Anything).Return(nil).Maybe()
+	mockStore.On("WorkflowLoad", int64(30)).Return(defaultWorkflow(model.StatusRunning), nil)
+	mockStore.On("GetPipeline", int64(20)).Return(defaultPipeline(model.StatusRunning), nil)
+	mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
+	mockQueue := queue_mocks.NewMockQueue(t)
+	mockQueue.On("Extend", mock.Anything, int64(1), "30").Return(nil).Once()
+	srv := &WoodpeckerServer{peer: newTestRPC(t, mockStore, mockQueue)}
+
+	_, err := srv.Extend(ctxWithAgentID(1), &proto.ExtendRequest{Id: "30"})
+	require.NoError(t, err)
 }

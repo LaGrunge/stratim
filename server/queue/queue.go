@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
@@ -36,6 +37,10 @@ var (
 
 	// ErrTaskExpired indicates a running task exceeded its lease/deadline and was resubmitted.
 	ErrTaskExpired = errors.New("queue: task expired")
+
+	// ErrCanceledLeaseOver indicates a canceled task's lease is not
+	// extended any more: its finalizers' time is up.
+	ErrCanceledLeaseOver = errors.New("queue: canceled task's finalizers' time is up")
 
 	// ErrWorkerKicked worker of an agent got kicked.
 	ErrWorkerKicked = errors.New("worker was kicked")
@@ -116,6 +121,11 @@ type Queue interface {
 	// Extend extends the deadline for a task.
 	Extend(c context.Context, agentID int64, workflowID string) error
 
+	// ExtendFinalizing extends the deadline for a task, its agent telling
+	// when its finalizers' time ends: a canceled task is held until then,
+	// and a grace, within a bound.
+	ExtendFinalizing(c context.Context, agentID int64, workflowID string, finalizeDeadline time.Time) error
+
 	// Done signals the task is complete.
 	Done(c context.Context, id string, exitStatus model.StatusValue) error
 
@@ -123,8 +133,29 @@ type Queue interface {
 	Error(c context.Context, id string, err error) error
 
 	// ErrorAtOnce signals multiple tasks are done and complete with an error.
-	// If still pending they will just get removed from the queue.
+	// If still pending they will just get removed from the queue. A running
+	// task canceled (ErrCancel) is told so and stays running, holding its
+	// lease and its agent, until its Done or Error, or its lease expires.
 	ErrorAtOnce(c context.Context, ids []string, err error) error
+
+	// CancelAtOnce cancels tasks as ErrorAtOnce with ErrCancel does, and
+	// returns the ones canceling: running, their agents told. One canceling
+	// already stays as it is, unless escalate is set: an explicit second
+	// cancel, which stops its finalizers too.
+	CancelAtOnce(c context.Context, ids []string, escalate bool) ([]string, error)
+
+	// WaitKilled waits, for a task its agent was told canceled, until its
+	// finalizers are to be stopped too: by a second cancel, or because the
+	// queue gave up on it. It then returns ErrCancel; nil for a task not
+	// canceled. For a task the queue does not have, as after a server
+	// restart, it waits until c ends: the server checks the workflow's stored
+	// state meanwhile (see rpc.RPC.WaitKilled).
+	WaitKilled(c context.Context, id string) error
+
+	// SetCanceledExpiredHandler sets what settles a canceled running task
+	// whose lease expired before its Done or Error: its agent is gone. The
+	// task is not run again.
+	SetCanceledExpiredHandler(handler func(task *model.Task))
 
 	// Wait waits until the task is complete.
 	// Also signals via error ErrCancel if workflow got canceled.

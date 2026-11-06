@@ -73,10 +73,15 @@ func pipelineTasks(repo *model.Repo, org *model.Org, activePipeline *model.Pipel
 			}
 		}
 
+		timeout := workflowTimeout(item.Timeout, repo.Timeout)
+		if item.Config != nil {
+			item.Config.FinalizeTimeout = finalizeTimeout(item.Config.FinalizeTimeout, timeout)
+			task.FinalizeTimeout = int64(item.Config.FinalizeTimeout / time.Second)
+		}
 		task.Data, err = json.Marshal(rpc.Workflow{
 			ID:      fmt.Sprint(item.Workflow.ID),
 			Config:  item.Config,
-			Timeout: workflowTimeout(item.Timeout, repo.Timeout),
+			Timeout: timeout,
 		})
 		if err != nil {
 			return nil, err
@@ -96,6 +101,19 @@ func getTaskDependencies(dependsOn []string, items []*builder.Item) (taskIDs []s
 		}
 	}
 	return taskIDs
+}
+
+// finalizeTimeout is the time a workflow's finalizers have in all, the
+// compiler's, at most the workflow's own timeout (timeout, in minutes; zero
+// is none set): finalizers run after the workflow's time is up, so counting
+// theirs in it would leave none, but the repository's limit, set within the
+// server's, bounds how long they hold an agent too. A workflow thus holds
+// one for at most twice its timeout.
+func finalizeTimeout(compiled time.Duration, timeout int64) time.Duration {
+	if timeout <= 0 {
+		return compiled
+	}
+	return min(compiled, time.Duration(timeout)*time.Minute)
 }
 
 // workflowTimeout is the timeout of a workflow, in minutes: its own,

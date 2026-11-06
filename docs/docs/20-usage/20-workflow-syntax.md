@@ -214,6 +214,35 @@ A step that runs longer than its `timeout` is stopped and ends as `timeout`, wit
 
 The workflow's own [`timeout`](#timeout-1) still applies around it.
 
+### `on_finish`
+
+A step with `on_finish: true` is a finalizer: it runs at the end of its workflow whatever the outcome, after a success, a failure, a step or workflow [`timeout`](#timeout) or a cancel, once all other steps ended or were stopped. Collecting logs and artifacts and cleaning up are what it is for.
+
+```diff
+ steps:
+   - name: test
+     image: golang
+     commands:
+       - go test ./... 2>&1 | tee test.log
+   - name: collect
+     image: alpine
++    on_finish: true
+     commands:
+       - echo "the workflow ended as $STRATIM_PIPELINE_STATUS"
+       - cp test.log /artifacts/
+```
+
+- **Order.** Finalizers run after all other steps, wherever they are declared, one after another in their declared order. A [`depends_on`](#depends_on) between finalizers orders them as between steps; a finalizer's dependency on another step is met by then and ignored. A step cannot depend on a finalizer.
+- **Time.** After a cancel or a timeout the workflow's own time is up, so the finalizers of a workflow share a time of their own: 10 minutes, or the sum of their own `timeout`s if that is more, at most 1 hour, and never more than the workflow's own [`timeout`](#timeout-1) (as the repository's timeout bounds it): a workflow holds an agent for at most twice its timeout plus a few minutes. Counting their time in the workflow's timeout would leave none after a timeout, the case they are for. A finalizer's timeout is its own `timeout` or what is left of that time, whichever is less; the finalizers the time leaves no room for do not start and end as `timeout`. The workflow's timeout passing while they run does not stop them.
+- **Cancel.** A canceled pipeline ends `killed` at once, but the finalizers of its running workflows still run: their workflows stay `running` until their agents report them done, and then end as they did, the pipeline staying `killed`. They may thus still run alongside a newer pipeline of the same branch that canceled this one. The cancel that stopped the other steps does not stop the finalizers; canceling the pipeline again, by a user in the UI or the API (`POST /api/repos/{repo_id}/pipelines/{number}/cancel`), does: the finalizer running ends `killed`, the ones after it do not start. Nothing else cancels a second time: not a newer pipeline, not a step's `failure: cancel`. A cancel that comes while the finalizers of a workflow that was not canceled run stops them too, also after the workflow's timeout. The server holds a canceled workflow for its agent until the end of the finalizers' time, as the agent reports it once they started (about their time plus three minutes from the cancel from an agent that does not), within a bound however long the agent asks; then the workflow ends `killed`.
+- **Agent shutdown.** An agent shutting down (`SIGTERM`, `SIGINT`) stops its finalizers as it stops every step: the finalizer running ends `killed`, the ones after it do not start, and the workflow ends canceled. If the agent is gone without reporting the workflow done, what happens once its lease expires (about a minute) depends on the workflow: one the server did not cancel is handed to another agent and run again, as any workflow; a canceled one ends `killed`, its steps that never started `canceled`, the ones running `killed`. So does a canceled one still running when no agent can end it any more, after a server restart, once the longest finalizers' time and a few minutes passed since the cancel.
+- **Status.** A failing finalizer fails a workflow that succeeded so far, unless its failure is ignored. It does not change a `timeout` or `killed` workflow: those take priority over a failure.
+- **`when`.** A finalizer's [`when`](#when---conditional-execution) applies as a step's. With no `status`, it runs whatever the outcome; with one, it is matched against the outcome so far: `failure` matches a failure, a timeout and a cancel, `timeout` a timeout only, `killed` a cancel only, `success` a success only.
+- **Services.** [Services](./60-services.md) and detached steps keep running while the finalizers run, after a cancel or a timeout too, so a finalizer can still reach them; they are stopped once the finalizers are done.
+- **Environment.** [`STRATIM_PIPELINE_STATUS`](./50-environment.md) tells a finalizer the outcome so far: `success`, `failure`, `timeout` or `killed`.
+
+`on_finish` is for steps: a service or a detached step cannot be one. An agent from before finalizers runs a finalizer as a step that runs on success and on failure: not after a cancel or a workflow timeout, and without `STRATIM_PIPELINE_STATUS`, which is then empty. A finalizer that may run on such agents during an upgrade can read it as `${STRATIM_PIPELINE_STATUS:-unknown}`.
+
 ### `when` - Conditional Execution
 
 Woodpecker supports defining a list of conditions for a step by using a `when` block. If at least one of the conditions in the `when` block evaluate to true the step is executed, otherwise it is skipped. A condition is evaluated to true if _all_ sub-conditions are true.
@@ -361,8 +390,15 @@ when:
 By default, steps only run when the workflow has succeeded up to that point,<br>
 which is equivalent to `status: [ success ]`.
 
-The `status` filter lets you override this behavior.
-The only accepted values are `success` and `failure`; a step that timed out counts as a failure.
+The `status` filter lets you override this behavior. It accepts:
+
+- `success`: the steps so far succeeded (or were skipped).
+- `failure`: a step failed, timed out or the workflow was canceled; a step that timed out counts as a failure.
+- `timeout`: a step timed out (or, for a [finalizer](#on_finish), the workflow did).
+- `killed`: the workflow was canceled; only a [finalizer](#on_finish) runs after that. For a workflow, a workflow it depends on was killed.
+- `skipped`: a step of an earlier stage, one that ended before this step started, was skipped by its own `status`. It adds to the others: `status: [ success, skipped ]` runs on success and once a step was skipped. For a workflow, it runs the workflow once a workflow it [depends on](#depends_on-1) was skipped. A step or workflow skipped because it waits for a skip that did not come is no skip itself: a second one waiting for a skip after it does not run on it.
+
+A step runs when one of the values listed matches. `timeout`, `killed` and `skipped` need agents of this release: an older one never runs a step listing only those.
 
 A common use case is executing a step on failure, such as sending notifications for a failed workflow/pipeline.
 To run a step regardless of outcome, list both values:

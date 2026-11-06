@@ -338,12 +338,12 @@
               "minLength": 1,
               "items": {
                 "type": "string",
-                "enum": ["success", "failure"]
+                "enum": ["success", "failure", "timeout", "killed", "skipped"]
               }
             },
             {
               "type": "string",
-              "enum": ["success", "failure"]
+              "enum": ["success", "failure", "timeout", "killed", "skipped"]
             }
           ]
         },
@@ -474,6 +474,10 @@
           "description": "Detach a step to run in background until pipeline finishes. Read more: https://woodpecker-ci.org/docs/usage/services#detachment",
           "type": "boolean"
         },
+        "on_finish": {
+          "description": "Run the step after all other steps, whatever their outcome: success, failure, a timeout or a cancel. Read more: https://woodpecker-ci.org/docs/usage/workflow-syntax#on_finish",
+          "type": "boolean"
+        },
         "timeout": {
           "description": "End the step when it runs longer: a duration such as 90s or 1h30m, or minutes. A detached step has none.",
           "$ref": "#/definitions/duration"
@@ -539,6 +543,10 @@
           "description": "Detach a step to run in background until pipeline finishes. Read more: https://woodpecker-ci.org/docs/usage/services#detachment",
           "type": "boolean"
         },
+        "on_finish": {
+          "description": "Run the step after all other steps, whatever their outcome: success, failure, a timeout or a cancel. Read more: https://woodpecker-ci.org/docs/usage/workflow-syntax#on_finish",
+          "type": "boolean"
+        },
         "timeout": {
           "description": "End the step when it runs longer: a duration such as 90s or 1h30m, or minutes. A detached step has none.",
           "$ref": "#/definitions/duration"
@@ -601,12 +609,12 @@
               "minLength": 1,
               "items": {
                 "type": "string",
-                "enum": ["success", "failure"]
+                "enum": ["success", "failure", "timeout", "killed", "skipped"]
               }
             },
             {
               "type": "string",
-              "enum": ["success", "failure"]
+              "enum": ["success", "failure", "timeout", "killed", "skipped"]
             }
           ]
         },

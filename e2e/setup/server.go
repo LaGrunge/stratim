@@ -22,7 +22,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
@@ -34,6 +33,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/forgestatus"
 	"go.woodpecker-ci.org/woodpecker/v3/server/logging"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/pipeline"
 	"go.woodpecker-ci.org/woodpecker/v3/server/pubsub"
 	"go.woodpecker-ci.org/woodpecker/v3/server/pubsub/memory"
 	"go.woodpecker-ci.org/woodpecker/v3/server/queue"
@@ -74,6 +74,8 @@ type ServerEnv struct {
 	// PubSub carries the pipeline events the server publishes; see
 	// RecordEvents.
 	PubSub pubsub.PubSub
+	// WorkflowEnd is the server's end of workflows, what a cancel takes.
+	WorkflowEnd pipeline.WorkflowEnd
 
 	stopStatuses context.CancelCauseFunc
 }
@@ -153,7 +155,17 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	server.Config.Permissions.Orgs = permissions.NewOrgs([]string{})
 	server.Config.Permissions.OwnersAllowlist = permissions.NewOwnersAllowlist([]string{})
 
-	grpcAddr := startGRPCServer(ctx, t, memStore)
+	// as the server does (cmd/server): one end for Done, settle, cancel and
+	// the sweep, which runs more often
+	end := pipeline.WorkflowEnd{
+		Store:     memStore,
+		Publisher: server.Config.Services.Scheduler,
+		Logs:      server.Config.Services.Logs,
+		Statuses:  server.Config.Services.Statuses,
+	}
+	go pipeline.RunCanceledWorkflowsSweep(t.Context(), end, SweepInterval) //nolint:contextcheck
+
+	grpcAddr := startGRPCServer(ctx, t, memStore, end)
 
 	return &ServerEnv{
 		GRPCAddr: grpcAddr,
@@ -165,6 +177,8 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 		Statuses: statuses,
 		Manager:  mgr,
 		PubSub:   ps,
+
+		WorkflowEnd: end,
 
 		stopStatuses: stopStatuses,
 	}
@@ -231,7 +245,7 @@ func newTestManager(s store.Store, mockForge *forge_mocks.MockForge) (services.M
 // GracefulStop inside Serve) and then blocks until Serve has returned.
 // Without this wait, the next subtest can start while the previous server's
 // goroutines are still live, which races on shared state like server.Config.
-func startGRPCServer(ctx context.Context, t *testing.T, s store.Store) string {
+func startGRPCServer(ctx context.Context, t *testing.T, s store.Store, end pipeline.WorkflowEnd) string {
 	t.Helper()
 
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
@@ -250,7 +264,7 @@ func startGRPCServer(ctx context.Context, t *testing.T, s store.Store) string {
 			JWTSecret:        TestJWTSecret,
 			AgentToken:       TestAgentToken,
 			KeepaliveMinTime: shortTimeout,
-			Registerer:       prometheus.NewRegistry(),
+			WorkflowEnd:      end,
 		})
 	}()
 

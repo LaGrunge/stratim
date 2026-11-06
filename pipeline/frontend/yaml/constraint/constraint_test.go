@@ -60,6 +60,34 @@ func TestConstraintStatusSuccessFailure(t *testing.T) {
 	}
 }
 
+func TestConstraintMatchingStatuses(t *testing.T) {
+	testdata := []struct {
+		conf           string
+		wantStatuses   []string
+		wantUnfiltered bool
+	}{
+		{conf: "", wantUnfiltered: true},
+		{conf: "{status: [failure]}", wantStatuses: []string{"failure"}},
+		{conf: "{status: timeout}", wantStatuses: []string{"timeout"}},
+		{conf: "{status: [success, skipped, killed]}", wantStatuses: []string{"success", "skipped", "killed"}},
+		{conf: "{event: push, status: [timeout, skipped]}"},
+		{conf: "{event: pull_request}", wantUnfiltered: true},
+		{conf: "{event: push}"},
+		{conf: "[{status: timeout},{event: push}]", wantStatuses: []string{"timeout"}},
+		{conf: "[{status: timeout},{}]", wantStatuses: []string{"timeout"}, wantUnfiltered: true},
+		{conf: "[{status: [timeout, failure]},{status: timeout}]", wantStatuses: []string{"timeout", "failure"}},
+	}
+	m := metadata.Metadata{Curr: metadata.Pipeline{Event: metadata.EventPull}}
+	for _, tt := range testdata {
+		t.Run(tt.conf, func(t *testing.T) {
+			c := parseConstraints(t, tt.conf)
+			statuses, unfiltered := c.MatchingStatuses(m, true, nil)
+			assert.Equal(t, tt.wantStatuses, statuses)
+			assert.Equal(t, tt.wantUnfiltered, unfiltered)
+		})
+	}
+}
+
 func TestConstraints(t *testing.T) {
 	testdata := []struct {
 		desc string

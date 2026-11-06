@@ -61,17 +61,37 @@ func (r *Runtime) Run(runnerCtx context.Context) error {
 		return err
 	}
 
-	for _, stage := range r.spec.Stages {
+	stages, finalizers := splitFinalizers(r.spec.Stages)
+	r.finalizers = finalizerSteps(finalizers)
+	if len(finalizers) > 0 {
+		// detached steps, services above all, stay up for the finalizers
+		detachedCtx, stopDetached := context.WithCancelCause(context.WithoutCancel(r.ctx))
+		defer stopDetached(nil)
+		r.detachedCtx = detachedCtx
+	}
+
+	canceled := false
+	for _, stage := range stages {
 		stageChan := r.runStage(runnerCtx, stage.Steps)
 		select {
 		case <-r.ctx.Done():
 			<-stageChan //nolint:errcheck
-			return pipeline_errors.ErrCancel
+			canceled = true
 		case err := <-stageChan:
 			if err != nil {
 				r.err.Set(err)
 			}
 		}
+		if canceled {
+			break
+		}
+	}
+
+	if len(finalizers) > 0 && r.runFinalizers(runnerCtx, finalizers, canceled) {
+		canceled = true
+	}
+	if canceled {
+		return pipeline_errors.ErrCancel
 	}
 
 	// Now we can shutdown the workflow
@@ -158,7 +178,12 @@ func (r *Runtime) runStage(runnerCtx context.Context, steps []*backend_types.Ste
 	}
 
 	go func() {
-		done <- g.Wait()
+		err := g.Wait()
+		// a skip counts for the stages after this one
+		if r.skippedInStage.Load() {
+			r.skipped.Store(true)
+		}
+		done <- err
 		close(done)
 	}()
 

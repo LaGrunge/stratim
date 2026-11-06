@@ -35,7 +35,7 @@
         <template v-if="repoPermissions!.push && pipeline.status !== 'blocked'">
           <div class="flex content-start gap-x-2">
             <Button
-              v-if="pipeline.status === 'pending' || pipeline.status === 'running'"
+              v-if="pipelineCancelable(pipeline)"
               class="shrink-0"
               :text="$t('repo.pipeline.actions.cancel')"
               :is-loading="isCancelingPipeline"
@@ -164,7 +164,7 @@ import useNotifications from '~/compositions/useNotifications';
 import usePipeline from '~/compositions/usePipeline';
 import { useRouteBack } from '~/compositions/useRouteBack';
 import type { Pipeline, PipelineConfig } from '~/lib/api/types';
-import { pipelineHasErrorsToShow, workflowsWithErrors } from '~/lib/pipeline';
+import { pipelineCancelable, pipelineHasErrorsToShow, workflowsWithErrors } from '~/lib/pipeline';
 import { usePipelineStore } from '~/store/pipelines';
 
 const props = defineProps<{

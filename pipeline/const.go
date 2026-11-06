@@ -38,3 +38,14 @@ const (
 	LabelFilterHostname string = "hostname"
 	LabelFilterBackend  string = "backend"
 )
+
+// The outcomes `when.status` matches and STRATIM_PIPELINE_STATUS gives: a
+// timeout and a kill are failures too, skipped is about earlier steps or
+// workflows, not the outcome.
+const (
+	StatusSuccess = "success"
+	StatusFailure = "failure"
+	StatusTimeout = "timeout"
+	StatusKilled  = "killed"
+	StatusSkipped = "skipped"
+)

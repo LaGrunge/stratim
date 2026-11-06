@@ -43,6 +43,9 @@ type Task struct {
 	// Created is the unix timestamp the task's pipeline was created at. It
 	// defines the queue ordering across pipelines.
 	Created int64 `json:"created" xorm:"NOT NULL DEFAULT 0 'created'"`
+	// FinalizeTimeout is how long, in seconds, the workflow's finalizers
+	// may run in all: the queue holds it no longer for them once canceled.
+	FinalizeTimeout int64 `json:"finalize_timeout" xorm:"NOT NULL DEFAULT 0 'finalize_timeout'"`
 } //	@name	Task
 
 // TableName return database table name for xorm.
@@ -79,6 +82,14 @@ func (t *Task) ApplyLabelsFromOrg(o *Org) {
 
 // ShouldRun tells if a task should be run or skipped, based on dependencies.
 func (t *Task) ShouldRun() bool {
+	// timeout, killed and skipped add to success and failure: the task runs
+	// too when a dependency timed out, was killed or was skipped
+	for _, status := range t.DepStatus {
+		if (status == StatusTimeout || status == StatusKilled || status == StatusSkipped) && slices.Contains(t.RunOn, string(status)) {
+			return true
+		}
+	}
+
 	if t.runsOnFailure() && t.runsOnSuccess() {
 		return true
 	}

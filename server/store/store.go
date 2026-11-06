@@ -207,6 +207,43 @@ type Store interface {
 	WorkflowLoad(int64) (*model.Workflow, error)
 	WorkflowByStep(*model.Step) (*model.Workflow, error)
 	WorkflowUpdate(*model.Workflow) error
+	// The conditional writes below write only the columns they name, and
+	// only if the row still is in the state they name; each reports whether
+	// it did. Of two writes at once one wins; an object read before never
+	// overwrites what another write wrote meanwhile.
+	//
+	// WorkflowFinish writes a workflow's end (state, finished, error) if it
+	// still is pending or running.
+	WorkflowFinish(*model.Workflow) (bool, error)
+	// WorkflowStart writes a workflow's start (state, started) if it still
+	// is pending.
+	WorkflowStart(*model.Workflow) (bool, error)
+	// WorkflowSkip writes a workflow that never ran ended (state, finished)
+	// if it still is pending.
+	WorkflowSkip(*model.Workflow) (bool, error)
+	// StepFinish writes a step's end (state, finished) if it still is in
+	// one of the states from.
+	StepFinish(step *model.Step, from ...model.StatusValue) (bool, error)
+	// StepReport writes what an agent reports of a step (state, started,
+	// finished, exit_code, error) if it still is in state from.
+	StepReport(step *model.Step, from model.StatusValue) (bool, error)
+	// PipelineStart writes a pipeline's start (status, started) if it still
+	// is pending.
+	PipelineStart(*model.Pipeline) (bool, error)
+	// PipelineFinish writes a pipeline's end (status, finished) if it still
+	// is pending or running.
+	PipelineFinish(*model.Pipeline) (bool, error)
+	// PipelineCancel writes a pipeline's cancel (status, finished,
+	// cancel_info) if it still is pending, running or blocked: of two
+	// cancels, or a cancel and an end, one wins.
+	PipelineCancel(*model.Pipeline) (bool, error)
+	// PipelineCanceledKilled writes a canceled pipeline killed (status) if
+	// it still is canceled.
+	PipelineCanceledKilled(*model.Pipeline) (bool, error)
+	// WorkflowsLeftInCanceledPipelines lists, by ID, at most limit workflows
+	// still pending or running in pipelines killed or canceled before
+	// canceledBefore (unix seconds, their finished), their steps with them.
+	WorkflowsLeftInCanceledPipelines(canceledBefore int64, limit int) ([]*model.Workflow, error)
 
 	// ForgeStatus
 	ForgeStatusSet(*model.ForgeStatus) error

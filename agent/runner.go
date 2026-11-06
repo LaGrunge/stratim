@@ -35,7 +35,15 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/shared/utils"
 )
 
-const shutdownTimeout = time.Second * 5
+const (
+	shutdownTimeout = time.Second * 5
+	// Leases are extended extendsPerLease times in the time one lasts.
+	extendsPerLease = 3
+	// The lease of a workflow whose finalizers ran is extended for
+	// finalizeLeaseGrace past the end of their time (the runtime's grace
+	// included): the workflow's services are torn down after them.
+	finalizeLeaseGrace = time.Minute
+)
 
 type Runner struct {
 	client   rpc.Peer
@@ -47,6 +55,9 @@ type Runner struct {
 	// timeoutUnit is what one unit of a workflow timeout lasts; zero means a
 	// minute, as the server means it.
 	timeoutUnit time.Duration
+	// finalizeLeaseGrace replaces the const of the name when set; only tests
+	// set it (see WithFinalizeLeaseGrace).
+	finalizeLeaseGrace time.Duration
 }
 
 func NewRunner(workEngine rpc.Peer, f rpc.Filter, h string, agentID int64, state *State, backend backend_types.Backend) Runner {
@@ -146,34 +157,100 @@ func (r *Runner) Run(runnerCtx context.Context) error {
 	// Listen for remote cancel events (UI / API).
 	// When canceled, we MUST cancel the workflow context
 	// so that workflow execution stops immediately.
+	// It listens until the run ended, not the workflow's context: a cancel
+	// also stops the finalizers running after that ended, through
+	// cancelSignal.
+	runCtx, stopRun := context.WithCancelCause(ctxMeta)
+	defer stopRun(nil)
+	cancelSignal, signalCancel := context.WithCancelCause(context.Background())
+	defer signalCancel(nil)
+	// A second cancel stops the finalizers too, whenever it comes.
+	killSignal, signalKill := context.WithCancelCause(context.Background())
+	defer signalKill(nil)
 	go func() {
 		logger.Debug().Msg("start listening for server side cancel signal")
 
-		if canceled, err := r.client.Wait(workflowCtx, workflow.ID); err != nil {
+		canceled, err := r.client.Wait(runCtx, workflow.ID)
+		switch {
+		case runCtx.Err() != nil:
+			logger.Debug().Msg("cancel listener exited with the run")
+		case err != nil:
 			logger.Error().Err(err).Msg("server returned unexpected err while waiting for workflow to finish run")
 			cancelWorkflowCtx(err)
-		} else {
-			if canceled {
-				logger.Debug().Err(err).Msg("server side cancel signal received")
-				cancelWorkflowCtx(pipeline_errors.ErrCancel)
+		case canceled:
+			logger.Debug().Msg("server side cancel signal received")
+			// the signal first: the runtime, seeing the workflow's context
+			// canceled, must find it given already, not stop the finalizers
+			// it starts on it
+			signalCancel(pipeline_errors.ErrCancel)
+			cancelWorkflowCtx(pipeline_errors.ErrCancel)
+
+			// then wait for the finalizers to be stopped too: a second
+			// cancel, or the server giving up on the workflow
+			if killed, err := r.client.WaitKilled(runCtx, workflow.ID); err == nil && killed && runCtx.Err() == nil {
+				logger.Debug().Msg("server side signal to stop the finalizers received")
+				signalKill(pipeline_errors.ErrCancel)
 			}
+		default:
 			// Wait returned without error, meaning the workflow finished normally
 			logger.Debug().Msg("cancel listener exited normally")
 		}
 	}()
 
-	// Periodically extend the workflow lease while running
+	run := pipeline_runtime.New(
+		workflow.Config,
+		r.backend,
+		pipeline_runtime.WithContext(workflowCtx),
+		pipeline_runtime.WithCancelSignal(cancelSignal),
+		pipeline_runtime.WithKillSignal(killSignal),
+		pipeline_runtime.WithTaskUUID(fmt.Sprint(workflow.ID)),
+		pipeline_runtime.WithLogger(r.createLogger(logger, workflow)),
+		pipeline_runtime.WithTracer(r.createTracer(ctxMeta, workflowCtx, logger, workflow)),
+		pipeline_runtime.WithDescription(map[string]string{
+			"workflow_id":     workflow.ID,
+			"repo":            repoName,
+			"pipeline_number": pipelineNumber,
+		}),
+	)
+
+	// Periodically extend the workflow lease while running: until the run
+	// ended, not the workflow's context, as finalizers run after that ended,
+	// but no longer than a grace past the end of their time, for the
+	// teardown of the workflow (its services) after them
+	leaseGrace := r.finalizeLeaseGrace
+	if leaseGrace == 0 {
+		leaseGrace = finalizeLeaseGrace
+	}
+	extendEvery := constant.TaskTimeout / extendsPerLease
 	go func() {
 		for {
 			select {
-			case <-workflowCtx.Done():
-				logger.Debug().Msg("workflow context done")
+			case <-runCtx.Done():
+				logger.Debug().Msg("workflow run done")
 				return
 
-			case <-time.After(constant.TaskTimeout / 3):
+			case <-time.After(extendEvery):
+				finalizeDeadline := run.FinalizeDeadline()
+				// only a canceled workflow's lease ends with its finalizers'
+				// time: one not canceled is held until its run ended, long
+				// teardown included, or the server would run it again
+				if !leaseExtendable(cancelSignal.Err() != nil, finalizeDeadline, time.Now(), leaseGrace) {
+					logger.Warn().Msg("canceled workflow's finalizers' time is up: its lease is no longer extended")
+					return
+				}
 				logger.Debug().Msg("renewing workflow lease")
-				if err := r.client.Extend(workflowCtx, workflow.ID); err != nil {
-					logger.Error().Err(err).Msg("failed to extend workflow lease")
+				extend := func() error { return r.client.Extend(runCtx, workflow.ID) }
+				if !finalizeDeadline.IsZero() {
+					// the server caps a canceled workflow's lease by it
+					extend = func() error { return r.client.ExtendFinalizing(runCtx, workflow.ID, finalizeDeadline) }
+				}
+				if err := extend(); err != nil {
+					// a canceled workflow left the queue: nothing to extend
+					if workflowCtx.Err() != nil {
+						logger.Debug().Err(err).Msg("failed to extend the lease of a stopped workflow")
+					} else {
+						logger.Error().Err(err).Msg("failed to extend workflow lease")
+					}
 				}
 			}
 		}
@@ -203,19 +280,8 @@ func (r *Runner) Run(runnerCtx context.Context) error {
 	}
 
 	// Run pipeline
-	err = pipeline_runtime.New(
-		workflow.Config,
-		r.backend,
-		pipeline_runtime.WithContext(workflowCtx),
-		pipeline_runtime.WithTaskUUID(fmt.Sprint(workflow.ID)),
-		pipeline_runtime.WithLogger(r.createLogger(logger, workflow)),
-		pipeline_runtime.WithTracer(r.createTracer(ctxMeta, workflowCtx, logger, workflow)),
-		pipeline_runtime.WithDescription(map[string]string{
-			"workflow_id":     workflow.ID,
-			"repo":            repoName,
-			"pipeline_number": pipelineNumber,
-		}),
-	).Run(runnerCtx)
+	err = run.Run(runnerCtx)
+	stopRun(nil)
 
 	state.Finished = time.Now().Unix()
 
@@ -253,6 +319,15 @@ func (r *Runner) Run(runnerCtx context.Context) error {
 	}
 
 	return nil
+}
+
+// leaseExtendable reports whether a workflow's lease is still extended at
+// now: always for a workflow not canceled, held until its run ended, long
+// teardown included, or the server would run it again elsewhere; for a
+// canceled one until grace past the end of its finalizers' time,
+// finalizeDeadline, always while they did not start (it is zero then).
+func leaseExtendable(canceled bool, finalizeDeadline, now time.Time, grace time.Duration) bool {
+	return !canceled || finalizeDeadline.IsZero() || !now.After(finalizeDeadline.Add(grace))
 }
 
 func extractRepositoryName(config *backend_types.Config) string {

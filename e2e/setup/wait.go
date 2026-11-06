@@ -29,7 +29,9 @@ import (
 )
 
 const (
-	defaultTimeout  = 30 * time.Second
+	defaultTimeout = 30 * time.Second
+	// SweepInterval is how often the test server sweeps canceled workflows.
+	SweepInterval   = 200 * time.Millisecond
 	defaultRetry    = 3
 	shortTimeout    = 10 * time.Second
 	defaultInterval = 100 * time.Millisecond

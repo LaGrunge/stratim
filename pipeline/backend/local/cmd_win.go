@@ -39,3 +39,6 @@ func newCmd(ctx context.Context, binary string, args ...string) *exec.Cmd {
 
 	return cmd
 }
+
+// waitProcessGroupGone is a no-op: Cancel returns once the tree is killed.
+func waitProcessGroupGone(context.Context, *exec.Cmd) {}

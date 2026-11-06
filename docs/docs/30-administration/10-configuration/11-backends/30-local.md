@@ -32,6 +32,12 @@ In order to use this backend, you need to download (or build) the
 
 The local backend is supported on Windows, macOS, FreeBSD and OpenBSD; see [Supported platforms](../../05-installation/05-supported-platforms.md) for the full component and backend matrix.
 
+## Stopping steps
+
+A step runs in a process group of its own. When it ends, by itself, by its timeout or by a cancel, the agent kills the whole group, the processes the step started in the background included, and waits up to 5 seconds for them to be gone before the next step, a [finalizer](../../../20-usage/20-workflow-syntax.md#on_finish) for instance, starts. A process that moves to a session or process group of its own is not killed.
+
+Killed processes whose parent was killed too are reaped by the system's init. Where the agent itself is the first process, in a container, run it under an init that reaps them (`docker run --init`, or a minimal init as the entrypoint); otherwise they stay as zombies. They no longer run, and the agent does not wait for them, but they fill the process table.
+
 ## Step specific configuration
 
 ### Shell

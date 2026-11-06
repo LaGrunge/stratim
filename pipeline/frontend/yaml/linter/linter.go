@@ -206,8 +206,43 @@ func (l *Linter) lintContainers(config *WorkflowConfig, area string) error {
 		if err := l.lintDependsOn(config, container, area); err != nil {
 			linterErr = multierr.Append(linterErr, err)
 		}
+		if err := l.lintOnFinish(config, container, area); err != nil {
+			linterErr = multierr.Append(linterErr, err)
+		}
 	}
 
+	return linterErr
+}
+
+// lintOnFinish checks the finalizers: steps only, never detached, and no
+// other step depends on one, as they run after all others.
+func (l *Linter) lintOnFinish(config *WorkflowConfig, c *types.Container, area string) error {
+	field := fmt.Sprintf("%s.%s", area, c.Name)
+	if c.OnFinish && area != "steps" {
+		return newLinterError("`on_finish` is only allowed on steps", config.File, field+".on_finish", false)
+	}
+	if c.OnFinish && c.Detached {
+		return newLinterError("An `on_finish` step cannot be detached", config.File, field+".detach", false)
+	}
+	if c.OnFinish || area != "steps" {
+		return nil
+	}
+
+	var linterErr error
+	for _, dep := range c.DependsOn {
+		if slices.ContainsFunc(
+			config.Workflow.Steps.ContainerList,
+			func(step *types.Container) bool { return dep.Name == step.Name && step.OnFinish },
+		) {
+			linterErr = multierr.Append(
+				linterErr,
+				newLinterError(
+					fmt.Sprintf("Cannot depend on `%s`: an `on_finish` step runs after all other steps", dep.Name),
+					config.File, field+".depends_on", false,
+				),
+			)
+		}
+	}
 	return linterErr
 }
 

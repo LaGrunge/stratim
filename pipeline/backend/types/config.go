@@ -14,12 +14,18 @@
 
 package types
 
+import "time"
+
 // Config defines the runtime configuration of a workflow.
 type Config struct {
 	Stages  []*Stage  `json:"pipeline"` // workflow stages
 	Network string    `json:"network"`  // network definition
 	Volume  string    `json:"volume"`   // volume definition
 	Secrets []*Secret `json:"secrets"`  // secret definitions
+	// FinalizeTimeout is how long the finalizer stages may run in all, set
+	// by the compiler when there are any; zero bounds them only by their
+	// steps' own timeouts.
+	FinalizeTimeout time.Duration `json:"finalize_timeout,omitempty"`
 }
 
 // CliCommand is the context key to pass cli context to backends if needed.

@@ -39,6 +39,12 @@ Woodpecker works with the user's OAuth permissions on the forge. By default Wood
 WOODPECKER_REPO_OWNERS=my_company,my_company_oss_github_user
 ```
 
+## Canceled workflows
+
+A canceled workflow may still run its [finalizers](../../20-usage/20-workflow-syntax.md#on_finish) on its agent. One that no agent ends any more, as after a server restart, the server ends `killed` itself, at startup and then every minute, once the longest finalizers' time and the queue's graces (about an hour and 25 minutes) passed since the cancel. A pass ends at most 100 such workflows, each sending its forge status and an event to the UI, so a backlog is ended over several minutes.
+
+The first passes after an upgrade to this release also end the workflows left running in pipelines canceled before it, which nothing ended. To find those workflows quickly, the server adds an index on the `state` column of the `workflows` table at startup. MySQL/MariaDB build it online, without blocking writes to the table; PostgreSQL blocks writes to it while building it, which on a large table takes a while.
+
 ## Databases
 
 The default database engine of Woodpecker is an embedded SQLite database which requires zero installation or configuration. But you can replace it with a MySQL/MariaDB or PostgreSQL database. There are also some fundamentals to keep in mind:

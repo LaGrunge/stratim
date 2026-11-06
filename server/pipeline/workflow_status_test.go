@@ -203,16 +203,16 @@ func TestUpdateWorkflowStatusToRunning(t *testing.T) {
 		}
 
 		mockStore := store_mocks.NewMockStore(t)
-		mockStore.On("WorkflowUpdate", mock.MatchedBy(func(w *model.Workflow) bool {
+		mockStore.On("WorkflowStart", mock.MatchedBy(func(w *model.Workflow) bool {
 			return w.ID == 1 && w.State == model.StatusRunning && w.Started == 1234567890
-		})).Return(nil)
+		})).Return(true, nil).Once()
 
-		result, err := UpdateWorkflowStatusToRunning(mockStore, workflow, state)
+		result, won, err := UpdateWorkflowStatusToRunning(mockStore, workflow, state)
 
 		assert.NoError(t, err)
+		assert.True(t, won)
 		assert.Equal(t, model.StatusRunning, result.State)
 		assert.Equal(t, int64(1234567890), result.Started)
-		mockStore.AssertCalled(t, "WorkflowUpdate", mock.Anything)
 	})
 }
 
@@ -224,15 +224,15 @@ func TestUpdateWorkflowToStatusSkipped(t *testing.T) {
 		}
 
 		mockStore := store_mocks.NewMockStore(t)
-		mockStore.On("WorkflowUpdate", mock.MatchedBy(func(w *model.Workflow) bool {
-			return w.ID == 2 && w.State == model.StatusSkipped
-		})).Return(nil)
+		mockStore.On("WorkflowSkip", mock.MatchedBy(func(w *model.Workflow) bool {
+			return w.ID == 2 && w.State == model.StatusSkipped && w.Finished != 0
+		})).Return(true, nil).Once()
 
-		result, err := UpdateWorkflowToStatusSkipped(mockStore, workflow)
+		result, won, err := UpdateWorkflowToStatusSkipped(mockStore, workflow)
 
 		assert.NoError(t, err)
+		assert.True(t, won)
 		assert.Equal(t, model.StatusSkipped, result.State)
-		mockStore.AssertCalled(t, "WorkflowUpdate", mock.Anything)
 	})
 }
 
@@ -250,9 +250,9 @@ func TestUpdateWorkflowStatusToDone(t *testing.T) {
 		}
 
 		mockStore := store_mocks.NewMockStore(t)
-		mockStore.On("WorkflowUpdate", mock.MatchedBy(func(w *model.Workflow) bool {
+		mockStore.On("WorkflowFinish", mock.MatchedBy(func(w *model.Workflow) bool {
 			return w.State == model.StatusSkipped && w.Finished == 1234567900
-		})).Return(nil)
+		})).Return(true, nil)
 
 		result, err := UpdateWorkflowStatusToDone(mockStore, workflow, state)
 
@@ -274,9 +274,9 @@ func TestUpdateWorkflowStatusToDone(t *testing.T) {
 		}
 
 		mockStore := store_mocks.NewMockStore(t)
-		mockStore.On("WorkflowUpdate", mock.MatchedBy(func(w *model.Workflow) bool {
+		mockStore.On("WorkflowFinish", mock.MatchedBy(func(w *model.Workflow) bool {
 			return w.State == model.StatusFailure
-		})).Return(nil)
+		})).Return(true, nil)
 
 		result, err := UpdateWorkflowStatusToDone(mockStore, workflow, state)
 
@@ -299,7 +299,7 @@ func TestUpdateWorkflowStatusToDone(t *testing.T) {
 		}
 
 		mockStore := store_mocks.NewMockStore(t)
-		mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+		mockStore.On("WorkflowFinish", mock.Anything).Return(true, nil)
 
 		result, err := UpdateWorkflowStatusToDone(mockStore, workflow, state)
 
@@ -320,7 +320,7 @@ func TestUpdateWorkflowStatusToDone(t *testing.T) {
 		}
 
 		mockStore := store_mocks.NewMockStore(t)
-		mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+		mockStore.On("WorkflowFinish", mock.Anything).Return(true, nil)
 
 		result, err := UpdateWorkflowStatusToDone(mockStore, workflow, state)
 
@@ -343,7 +343,7 @@ func TestUpdateWorkflowStatusToDone(t *testing.T) {
 		}
 
 		mockStore := store_mocks.NewMockStore(t)
-		mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+		mockStore.On("WorkflowFinish", mock.Anything).Return(true, nil)
 
 		result, err := UpdateWorkflowStatusToDone(mockStore, workflow, state)
 
@@ -368,7 +368,7 @@ func TestUpdateWorkflowStatusToDone(t *testing.T) {
 		}
 
 		mockStore := store_mocks.NewMockStore(t)
-		mockStore.On("WorkflowUpdate", mock.Anything).Return(nil)
+		mockStore.On("WorkflowFinish", mock.Anything).Return(true, nil)
 
 		result, err := UpdateWorkflowStatusToDone(mockStore, workflow, state)
 

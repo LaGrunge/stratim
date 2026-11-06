@@ -53,6 +53,9 @@ const (
 	EnvKeyStepStateError = "STEP_STATE_ERROR"
 	// EnvKeyStepDestroyFail makes DestroyStep fail after the step finished.
 	EnvKeyStepDestroyFail = "STEP_DESTROY_FAIL"
+	// EnvKeyStepEchoEnv lists, comma separated, environment variables the
+	// step prints as NAME=value after its commands.
+	EnvKeyStepEchoEnv = "ECHO_ENV"
 
 	// Internal const.
 	stepStateStarted   = "started"
@@ -309,7 +312,8 @@ func (e *dummy) DestroyWorkflow(_ context.Context, _ *backend_types.Config, task
 }
 
 func dummyExecStepOutput(step *backend_types.Step) string {
-	return fmt.Sprintf(`StepName: %s
+	var out strings.Builder
+	fmt.Fprintf(&out, `StepName: %s
 StepType: %s
 StepUUID: %s
 StepCommands:
@@ -317,4 +321,10 @@ StepCommands:
 %s
 ------------------
 `, step.Name, step.Type, step.UUID, strings.Join(step.Commands, "\n"))
+	for name := range strings.SplitSeq(step.Environment[EnvKeyStepEchoEnv], ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			fmt.Fprintf(&out, "%s=%s\n", name, step.Environment[name])
+		}
+	}
+	return out.String()
 }

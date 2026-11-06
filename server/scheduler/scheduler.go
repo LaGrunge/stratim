@@ -16,6 +16,7 @@ package scheduler
 
 import (
 	"context"
+	"time"
 
 	"go.woodpecker-ci.org/woodpecker/v3/rpc"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
@@ -44,9 +45,15 @@ type Scheduler interface {
 	// this is a hack for another refactor later.
 	Poll(c context.Context, agentID int64, agentFilter rpc.Filter, markSkipped func(taskID string) error) (*rpc.Workflow, error)
 	Extend(c context.Context, agentID int64, workflowID string) error
+	// ExtendFinalizing is Extend from an agent telling when the finalizers'
+	// time of the workflow ends (see queue.Queue.ExtendFinalizing).
+	ExtendFinalizing(c context.Context, agentID int64, workflowID string, finalizeDeadline time.Time) error
 	Done(c context.Context, id string, exitStatus model.StatusValue) error
 	Error(c context.Context, id string, err error) error
 	Wait(c context.Context, id string) error
+	// WaitKilled waits, for a workflow its agent was told canceled, until
+	// its finalizers are to be stopped too (see queue.Queue.WaitKilled).
+	WaitKilled(c context.Context, id string) error
 	Info(c context.Context) queue.InfoT
 	Pause()
 	Resume()
@@ -62,7 +69,15 @@ type Scheduler interface {
 	// CancelWorkflows cancels the given workflows: it evicts them from the
 	// queue and signals the cancellation to any agents waiting on them. This is
 	// the entry point for the scheduler to later own the full cancel cleanup.
-	CancelWorkflows(c context.Context, workflowIDs []string) error
+	// It returns the ones canceling: running, their agents stopping them and
+	// running their finalizers. One canceling already stays as it is, unless
+	// escalate is set: an explicit second cancel, which stops its finalizers
+	// too.
+	CancelWorkflows(c context.Context, workflowIDs []string, escalate bool) ([]string, error)
+
+	// SetCanceledExpiredHandler sets what settles a canceled running
+	// workflow whose lease expired before its agent reported it done.
+	SetCanceledExpiredHandler(handler func(task *model.Task))
 }
 
 func NewScheduler(ctx context.Context, store store.Store, q queue.Queue, ps pubsub.PubSub) Scheduler {

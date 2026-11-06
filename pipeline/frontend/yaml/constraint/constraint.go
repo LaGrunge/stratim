@@ -124,6 +124,29 @@ func (when *When) IncludesStatusFailure(metadata metadata.Metadata, global bool,
 	return false
 }
 
+// MatchingStatuses lists the statuses the matching constraints list, in
+// order and once each, and whether no constraint, or a matching one that
+// lists none, leaves the status unfiltered.
+func (when *When) MatchingStatuses(metadata metadata.Metadata, global bool, env map[string]string) (statuses []string, unfiltered bool) {
+	if when.IsEmpty() {
+		return nil, true
+	}
+	for _, c := range when.Constraints {
+		if matches, err := c.Match(metadata, global, env); err != nil || !matches {
+			continue
+		}
+		if len(c.Status) == 0 {
+			unfiltered = true
+		}
+		for _, status := range c.Status {
+			if !slices.Contains(statuses, status) {
+				statuses = append(statuses, status)
+			}
+		}
+	}
+	return statuses, unfiltered
+}
+
 func (when *When) IncludesStatusSuccess(metadata metadata.Metadata, global bool, env map[string]string) bool {
 	// "success" acts differently than "failure" in that it's
 	// presumed to be included unless it's specifically not part

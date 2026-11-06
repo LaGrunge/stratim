@@ -28,6 +28,8 @@ type State struct {
 	CurrStep *backend_types.Step `json:"step"`
 	// Current step state
 	CurrStepState backend_types.State
+	// CurrStepFinalizer is set when the current step is a finalizer.
+	CurrStepFinalizer bool `json:"finalizer,omitempty"`
 }
 
 type Workflow struct {
