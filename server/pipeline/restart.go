@@ -20,18 +20,34 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
+	pipeline_errors "go.woodpecker-ci.org/woodpecker/v3/pipeline/errors"
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/builder"
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	forge_types "go.woodpecker-ci.org/woodpecker/v3/server/forge/types"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
+	"go.woodpecker-ci.org/woodpecker/v3/server/store/types"
 	"go.woodpecker-ci.org/woodpecker/v3/version"
 )
 
 // Restart a pipeline by creating a new one out of the old and start it.
 func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipeline, user *model.User, repo *model.Repo, envs map[string]string) (*model.Pipeline, error) {
+	return restart(ctx, store, lastPipeline, user, repo, envs, false)
+}
+
+// RestartFailed creates a new pipeline out of the old one that only runs the
+// workflows which failed, plus every workflow depending on them. The workflows
+// that are not rerun are left out of the new pipeline, and dependencies on
+// them count as finished with the state they had in the old pipeline.
+func RestartFailed(ctx context.Context, store store.Store, lastPipeline *model.Pipeline, user *model.User, repo *model.Repo, envs map[string]string) (*model.Pipeline, error) {
+	return restart(ctx, store, lastPipeline, user, repo, envs, true)
+}
+
+func restart(ctx context.Context, store store.Store, lastPipeline *model.Pipeline, user *model.User, repo *model.Repo, envs map[string]string, failedOnly bool) (*model.Pipeline, error) {
 	forge, err := server.Config.Services.Manager.ForgeFromRepo(repo)
 	if err != nil {
 		msg := fmt.Sprintf("failure to load forge for repo '%s'", repo.FullName)
@@ -41,6 +57,23 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 
 	if lastPipeline.Status == model.StatusBlocked {
 		return nil, &ErrBadRequest{Msg: "cannot restart a pipeline with status blocked"}
+	}
+
+	var oldWorkflows []ranWorkflow
+	if failedOnly {
+		oldWorkflows, err = effectiveWorkflows(store, lastPipeline)
+		if err != nil {
+			msg := fmt.Sprintf("failure to get workflows of pipeline %s#%d", repo.FullName, lastPipeline.Number)
+			log.Error().Err(err).Msg(msg)
+			return nil, errors.New(msg)
+		}
+		states := make([]model.StatusValue, 0, len(oldWorkflows))
+		for _, wf := range oldWorkflows {
+			states = append(states, wf.State)
+		}
+		if !model.CanRestartFailed(lastPipeline.Status, states) {
+			return nil, &ErrBadRequest{Msg: "pipeline has no failed workflows to restart, or is not finished"}
+		}
 	}
 
 	// The forge fetcher reuses this as-is; a config extension may replace it.
@@ -67,6 +100,8 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 	newPipeline := createNewOutOfOld(lastPipeline)
 	newPipeline.Parent = lastPipeline.Number
 	newPipeline.RerunCount++
+	newPipeline.PartialRestart = failedOnly
+	newPipeline.ReusedWorkflows = nil
 	newPipeline.Version = version.String()
 	newPipeline.AdditionalVariables = withRestartVariables(lastPipeline.AdditionalVariables, envs)
 
@@ -75,6 +110,19 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 		msg := fmt.Sprintf("failure to save pipeline for %s", repo.FullName)
 		log.Error().Err(err).Msg(msg)
 		return nil, errors.New(msg)
+	}
+
+	// fail ends the new pipeline with the cause as its error; set up fails
+	// with msg unless msg is empty, then the ended pipeline is returned.
+	fail := func(cause error, msg string) (*model.Pipeline, error) {
+		if fErr := failRestartedPipeline(ctx, store, newPipeline, repo, cause); fErr != nil {
+			return nil, fmt.Errorf("cannot end pipeline %s#%d: %w", repo.FullName, newPipeline.Number, fErr)
+		}
+		if msg != "" {
+			log.Error().Err(cause).Msg(msg)
+			return nil, errors.New(msg)
+		}
+		return newPipeline, nil
 	}
 
 	// Guard on the newly fetched config: a pipeline that errored before
@@ -93,45 +141,133 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 	for _, pipelineFile := range pipelineFiles {
 		config, cErr := findOrPersistPipelineConfig(store, newPipeline, pipelineFile)
 		if cErr != nil {
-			msg := fmt.Sprintf("failure to find or persist pipeline config for %s", repo.FullName)
-			log.Error().Err(cErr).Msg(msg)
-			return nil, errors.New(msg)
+			return fail(cErr, fmt.Sprintf("failure to find or persist pipeline config for %s", repo.FullName))
 		}
 		configs = append(configs, config)
 	}
 	if err := linkPipelineConfigs(store, configs, newPipeline.ID); err != nil {
-		msg := fmt.Sprintf("failure to persist pipeline config for %s.", repo.FullName)
-		log.Error().Err(err).Msg(msg)
-		return nil, errors.New(msg)
+		return fail(err, fmt.Sprintf("failure to persist pipeline config for %s.", repo.FullName))
 	}
 
-	newPipeline, pipelineItems, parseErr, err := createPipelineItems(ctx, forge, store, newPipeline, user, repo, pipelineFiles, envs, false)
+	createItems := func() (*model.Pipeline, []*builder.Item, map[string]map[string]model.StatusValue, error, error) {
+		pl, items, parseErr, err := createPipelineItems(ctx, forge, store, newPipeline, user, repo, pipelineFiles, envs, false)
+		return pl, items, nil, parseErr, err
+	}
+	if failedOnly {
+		createItems = func() (*model.Pipeline, []*builder.Item, map[string]map[string]model.StatusValue, error, error) {
+			return createPartialRestartItems(ctx, forge, store, newPipeline, user, repo, pipelineFiles, envs, oldWorkflows)
+		}
+	}
+	newPipeline, pipelineItems, depStatus, parseErr, err := createItems()
 	if handleParseErrors(newPipeline, parseErr) {
-		if newPipeline, uErr := UpdateToStatusError(store, *newPipeline, parseErr); uErr != nil {
-			log.Error().Err(uErr).Msgf("error setting error status of pipeline for %s#%d", repo.FullName, newPipeline.Number)
-		} else {
-			updatePipelineStatus(newPipeline)
+		_, fErr := fail(parseErr, "")
+		if fErr != nil {
+			log.Error().Err(fErr).Msgf("error setting error status of pipeline for %s#%d", repo.FullName, newPipeline.Number)
 		}
 		msg := fmt.Sprintf("failure to parse pipeline config for %s", repo.FullName)
 		log.Error().Err(parseErr).Msg(msg)
 		return nil, errors.New(msg)
 	}
+	if cannot := (*errCannotRestart)(nil); errors.As(err, &cannot) {
+		return fail(cannot.cause, "")
+	}
 	if err != nil {
-		msg := fmt.Sprintf("failure to createPipelineItems for %s", repo.FullName)
-		log.Error().Err(err).Msg(msg)
-		return nil, errors.New(msg)
+		return fail(err, fmt.Sprintf("failure to createPipelineItems for %s", repo.FullName))
 	}
 
 	publishPipeline(ctx, newPipeline, repo)
 
-	newPipeline, err = start(ctx, forge, store, newPipeline, user, repo, pipelineItems)
+	startedPipeline, err := startWithDepStatus(ctx, forge, store, newPipeline, user, repo, pipelineItems, depStatus)
 	if err != nil {
-		msg := fmt.Sprintf("failure to start pipeline for %s", repo.FullName)
-		log.Error().Err(err).Msg(msg)
-		return nil, errors.New(msg)
+		return fail(err, fmt.Sprintf("failure to start pipeline for %s", repo.FullName))
 	}
 
-	return newPipeline, nil
+	return startedPipeline, nil
+}
+
+// failRestartedPipeline ends a restarted pipeline that could not be set up
+// after it was created, so no pipeline is left pending that will never run:
+// the queue tasks of its workflows are removed (starting it may have queued
+// some of them), its unfinished workflows and the pipeline get the error
+// status, the steps of those workflows end (canceled if they did not start,
+// killed if they did), and the change is published. Only the status columns of the
+// pipeline are written, so a pipeline row that can't be written as a whole
+// is still ended. It fails if the pipeline's status can't be written.
+func failRestartedPipeline(ctx context.Context, store store.Store, pl *model.Pipeline, repo *model.Repo, cause error) error {
+	workflows, err := store.WorkflowList(pl)
+	if err != nil {
+		log.Error().Err(err).Msgf("cannot list the workflows of pipeline %s#%d to end them", repo.FullName, pl.Number)
+	}
+
+	if len(workflows) > 0 {
+		ids := make([]string, 0, len(workflows))
+		for _, wf := range workflows {
+			ids = append(ids, fmt.Sprint(wf.ID))
+		}
+		// evicts the tasks the queue holds; the ones only stored are deleted below
+		if err := server.Config.Services.Scheduler.CancelWorkflows(ctx, ids); err != nil {
+			log.Debug().Err(err).Msgf("evicting the tasks of pipeline %s#%d", repo.FullName, pl.Number)
+		}
+		for _, id := range ids {
+			if err := store.TaskDelete(id); err != nil && !errors.Is(err, types.ErrRecordNotExist) {
+				log.Error().Err(err).Msgf("cannot delete the task of workflow %s of pipeline %s#%d", id, repo.FullName, pl.Number)
+			}
+		}
+	}
+
+	now := time.Now().Unix()
+	for _, wf := range workflows {
+		if wf.State != model.StatusPending && wf.State != model.StatusRunning && wf.State != model.StatusCreated {
+			continue
+		}
+		wf.State = model.StatusError
+		wf.Error = cause.Error()
+		wf.Finished = now
+		if err := store.WorkflowUpdate(wf); err != nil {
+			log.Error().Err(err).Msgf("cannot end workflow %d of pipeline %s#%d", wf.ID, repo.FullName, pl.Number)
+		}
+		endUnfinishedSteps(store, wf, now)
+	}
+
+	pl.Status = model.StatusError
+	pl.Errors = pipeline_errors.GetPipelineErrors(cause)
+	if pl.Started == 0 {
+		pl.Started = now
+	}
+	pl.Finished = now
+	if err := store.UpdatePipelineStatus(pl); err != nil {
+		return err
+	}
+
+	if pl.Workflows, err = store.WorkflowGetTree(pl); err != nil {
+		pl.Workflows = nil
+	}
+	publishPipeline(ctx, pl, repo)
+	return nil
+}
+
+// endUnfinishedSteps ends the steps of a workflow that was ended before they
+// finished: a step that did not start is canceled, one that did is killed.
+func endUnfinishedSteps(store store.Store, wf *model.Workflow, now int64) {
+	steps, err := store.StepListFromWorkflowFind(wf)
+	if err != nil {
+		log.Error().Err(err).Msgf("cannot list the steps of workflow %d to end them", wf.ID)
+		return
+	}
+	for _, step := range steps {
+		switch step.State {
+		case model.StatusPending, model.StatusCreated:
+			step.State = model.StatusCanceled
+		case model.StatusRunning:
+			step.State = model.StatusKilled
+			step.Finished = now
+		default:
+			continue
+		}
+		if err := store.StepUpdate(step); err != nil {
+			log.Error().Err(err).Msgf("cannot end step %d of workflow %d", step.ID, wf.ID)
+		}
+	}
 }
 
 func linkPipelineConfigs(store store.Store, configs []*model.Config, pipelineID int64) error {

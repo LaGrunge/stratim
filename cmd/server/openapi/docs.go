@@ -3497,6 +3497,50 @@ const docTemplate = `{
                 }
             }
         },
+        "/repos/{repo_id}/pipelines/{pipeline_number}/restart-failed": {
+            "post": {
+                "description": "Creates a new pipeline that only runs the failed workflows and the workflows depending on them. The event and the deployment can't be changed (event, deploy_to and deploy_task are rejected); any other query parameter is passed to the pipeline as a variable, like for a restart.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Pipelines"
+                ],
+                "summary": "Restart the failed workflows of a pipeline",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cpersonal access token\u003e",
+                        "description": "Insert your personal access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the repository id",
+                        "name": "repo_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the number of the pipeline",
+                        "name": "pipeline_number",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Pipeline"
+                        }
+                    }
+                }
+            }
+        },
         "/repos/{repo_id}/pull_requests": {
             "get": {
                 "produces": [
@@ -5208,6 +5252,10 @@ const docTemplate = `{
                 "branch": {
                     "type": "string"
                 },
+                "can_restart_failed": {
+                    "description": "CanRestartFailed tells whether the failed workflows of the pipeline can\nbe restarted on their own, see CanRestartFailed. Only set when the\npipeline comes with its workflows, omitted otherwise.",
+                    "type": "boolean"
+                },
                 "cancel_info": {
                     "$ref": "#/definitions/CancelInfo"
                 },
@@ -5273,6 +5321,10 @@ const docTemplate = `{
                 "parent": {
                     "type": "integer"
                 },
+                "partial_restart": {
+                    "description": "set if the pipeline only reruns the failed workflows of its parent",
+                    "type": "boolean"
+                },
                 "pr_draft": {
                     "type": "boolean"
                 },
@@ -5301,6 +5353,13 @@ const docTemplate = `{
                 },
                 "rerun_count": {
                     "type": "integer"
+                },
+                "reused_workflows": {
+                    "description": "the workflows a partial restart took over from earlier pipelines",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ReusedWorkflow"
+                    }
                 },
                 "reviewed": {
                     "type": "integer"
@@ -5782,6 +5841,32 @@ const docTemplate = `{
                 "VisibilityPrivate",
                 "VisibilityInternal"
             ]
+        },
+        "ReusedWorkflow": {
+            "type": "object",
+            "properties": {
+                "axis_id": {
+                    "type": "integer"
+                },
+                "environ": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "pipeline_number": {
+                    "type": "integer"
+                },
+                "state": {
+                    "$ref": "#/definitions/StatusValue"
+                },
+                "workflow_id": {
+                    "type": "integer"
+                }
+            }
         },
         "Secret": {
             "type": "object",
@@ -6317,6 +6402,14 @@ const docTemplate = `{
                 },
                 "rerun_count": {
                     "type": "integer"
+                },
+                "reused_workflows": {
+                    "description": "ReusedWorkflows lists the workflows a partial restart did not rerun,\nwith the number of the pipeline they ran in.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
                 },
                 "started": {
                     "type": "integer"

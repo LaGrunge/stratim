@@ -41,6 +41,8 @@ type Pipeline struct {
 	Commit               string                  `json:"commit"                      xorm:"commit"`
 	Branch               string                  `json:"branch"                      xorm:"branch"`
 	RerunCount           int64                   `json:"rerun_count"                 xorm:"rerun_count"`
+	PartialRestart       bool                    `json:"partial_restart"             xorm:"partial_restart"`                  // set if the pipeline only reruns the failed workflows of its parent
+	ReusedWorkflows      []*ReusedWorkflow       `json:"reused_workflows,omitempty"  xorm:"json LONGTEXT 'reused_workflows'"` // the workflows a partial restart took over from earlier pipelines
 	Ref                  string                  `json:"ref"                         xorm:"ref"`
 	Refspec              string                  `json:"refspec"                     xorm:"refspec"`
 	Avatar               string                  `json:"author_avatar"               xorm:"varchar(500) avatar"` // TODO: only & rename to AuthorAvatar // Avatar URL of the author of the commit
@@ -76,7 +78,66 @@ type APIPipeline struct {
 	*Pipeline
 
 	IsPrerelease bool `json:"is_prerelease,omitempty"` // deprecated, use release.is_prerelease instead
+
+	// CanRestartFailed tells whether the failed workflows of the pipeline can
+	// be restarted on their own, see CanRestartFailed. Only set when the
+	// pipeline comes with its workflows, omitted otherwise.
+	CanRestartFailed *bool `json:"can_restart_failed,omitempty"`
 } //	@name	Pipeline
+
+// ReusedWorkflow is a workflow a partial restart did not run again but took
+// over from the pipeline it ran in.
+type ReusedWorkflow struct {
+	Name           string            `json:"name"`
+	Environ        map[string]string `json:"environ,omitempty"`
+	AxisID         int               `json:"axis_id,omitempty"`
+	PipelineNumber int64             `json:"pipeline_number"`
+	WorkflowID     int64             `json:"workflow_id"`
+	State          StatusValue       `json:"state"`
+} //	@name	ReusedWorkflow
+
+// ReusedWorkflowNumbers maps each reused workflow to the number of the
+// pipeline it ran in. A variant of a matrix workflow is named like its forge
+// status, "name/axis", as its variants may have run in different pipelines.
+func (p *Pipeline) ReusedWorkflowNumbers() map[string]int64 {
+	if len(p.ReusedWorkflows) == 0 {
+		return nil
+	}
+	numbers := make(map[string]int64, len(p.ReusedWorkflows))
+	for _, r := range p.ReusedWorkflows {
+		name := r.Name
+		if r.AxisID > 0 {
+			name = fmt.Sprintf("%s/%d", r.Name, r.AxisID)
+		}
+		numbers[name] = r.PipelineNumber
+	}
+	return numbers
+}
+
+// CanRestartFailed tells whether a pipeline with the given status and states
+// of its workflows has workflows to restart on their own: it finished, and it
+// has a workflow that failed, or it was canceled (killed) and has a workflow
+// that did not pass. Restarting the failed workflows reruns the ones that
+// failed or were skipped, as a cancel skips the ones not started yet.
+func CanRestartFailed(status StatusValue, workflowStates []StatusValue) bool {
+	switch status {
+	case StatusBlocked, StatusPending, StatusRunning, StatusCreated, StatusDeclined:
+		return false
+	}
+	canceled := status == StatusKilled || status == StatusCanceled
+	anyFailed, anyNotPassed := false, false
+	for _, state := range workflowStates {
+		switch {
+		case state == StatusPending || state == StatusRunning:
+			return false
+		case state.IsFailure():
+			anyFailed, anyNotPassed = true, true
+		case state == StatusSkipped:
+			anyNotPassed = true
+		}
+	}
+	return anyNotPassed && (anyFailed || canceled)
+}
 
 // TableName return database table name for xorm.
 func (Pipeline) TableName() string {
@@ -86,6 +147,14 @@ func (Pipeline) TableName() string {
 func (p *Pipeline) ToAPIModel() *APIPipeline {
 	ap := &APIPipeline{
 		Pipeline: p,
+	}
+	if p.Workflows != nil {
+		states := make([]StatusValue, 0, len(p.Workflows))
+		for _, wf := range p.Workflows {
+			states = append(states, wf.State)
+		}
+		can := CanRestartFailed(p.Status, states)
+		ap.CanRestartFailed = &can
 	}
 
 	switch p.Event {

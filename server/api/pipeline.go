@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -653,6 +654,98 @@ func GetPipelineQueue(c *gin.Context) {
 //	@Param			event			query	string	false	"override the event type"
 //	@Param			deploy_to		query	string	false	"override the target deploy value"
 func PostPipeline(c *gin.Context) {
+	req := restartRequest{envs: restartEnvs(c)}
+	if task, ok := c.GetQuery("deploy_task"); ok {
+		req.deployTask = &task
+	}
+
+	// make Event overridable to deploy
+	// TODO: refactor to use own proper API for deploy
+	if event, ok := c.GetQuery("event"); ok {
+		if model.WebhookEvent(event) != model.EventDeploy {
+			_ = c.AbortWithError(http.StatusBadRequest, model.ErrInvalidWebhookEvent)
+			return
+		}
+		if !session.Repo(c).AllowDeploy {
+			_ = c.AbortWithError(http.StatusForbidden, fmt.Errorf("repo does not allow deployments"))
+			return
+		}
+		// The deployment is attributed to whoever triggered it, not the original pipeline's author.
+		deployer := session.User(c)
+		if deployer == nil {
+			_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("user not found in session"))
+			return
+		}
+		req.deploy = &deployRequest{deployer: deployer}
+		if to, ok := c.GetQuery("deploy_to"); ok {
+			req.deploy.deployTo = &to
+		}
+	}
+
+	restartPipeline(c, req, pipeline.Restart)
+}
+
+// PostPipelineRestartFailed
+//
+//	@Summary		Restart the failed workflows of a pipeline
+//	@Description	Creates a new pipeline that only runs the failed workflows and the workflows depending on them. The event and the deployment can't be changed (event, deploy_to and deploy_task are rejected); any other query parameter is passed to the pipeline as a variable, like for a restart.
+//	@Router			/repos/{repo_id}/pipelines/{pipeline_number}/restart-failed [post]
+//	@Produce		json
+//	@Success		200	{object}	Pipeline
+//	@Tags			Pipelines
+//	@Param			Authorization	header	string	true	"Insert your personal access token"	default(Bearer <personal access token>)
+//	@Param			repo_id			path	int		true	"the repository id"
+//	@Param			pipeline_number	path	int		true	"the number of the pipeline"
+func PostPipelineRestartFailed(c *gin.Context) {
+	// Rerunning some workflows of a pipeline as a deployment would mix two
+	// different runs, so the event can't be changed here.
+	for _, key := range []string{"event", "deploy_to", "deploy_task"} {
+		if _, ok := c.GetQuery(key); ok {
+			c.String(http.StatusBadRequest, "%s can't be changed when restarting the failed workflows", key)
+			return
+		}
+	}
+	restartPipeline(c, restartRequest{envs: restartEnvs(c)}, pipeline.RestartFailed)
+}
+
+// restartRequest is what a restart endpoint read from its request.
+type restartRequest struct {
+	// deployTask, if set, replaces the deploy task of the pipeline.
+	deployTask *string
+	// deploy, if set, makes the restart a deployment.
+	deploy *deployRequest
+	// envs become variables of the pipeline.
+	envs map[string]string
+}
+
+type deployRequest struct {
+	deployer *model.User
+	// deployTo, if set, replaces the deploy target.
+	deployTo *string
+}
+
+// restartReservedParams are the query parameters of the restart endpoints
+// that are options of the endpoint, never pipeline variables.
+var restartReservedParams = []string{"fork", "event", "deploy_to", "deploy_task", "access_token"}
+
+// restartEnvs reads the query parameters that become pipeline variables.
+func restartEnvs(c *gin.Context) map[string]string {
+	envs := make(map[string]string)
+	for key, val := range c.Request.URL.Query() {
+		if slices.Contains(restartReservedParams, key) {
+			continue
+		}
+		// We only accept string literals, because pipeline parameters will be
+		// injected as environment variables
+		// TODO: sanitize the value
+		envs[key] = val[0]
+	}
+	return envs
+}
+
+type restartFunc func(ctx context.Context, store store.Store, lastPipeline *model.Pipeline, user *model.User, repo *model.Repo, envs map[string]string) (*model.Pipeline, error)
+
+func restartPipeline(c *gin.Context, req restartRequest, restart restartFunc) {
 	_store := store.FromContext(c)
 	repo := session.Repo(c)
 	pl := session.Pipeline(c)
@@ -666,57 +759,23 @@ func PostPipeline(c *gin.Context) {
 	// refresh the token to make sure, pipeline.Restart can still obtain the pipeline config if necessary again
 	refreshUserToken(c, user)
 
-	// make Deploy overridable
-
-	// make Deploy task overridable
-	pl.DeployTask = c.DefaultQuery("deploy_task", pl.DeployTask)
-
-	// make Event overridable to deploy
-	// TODO: refactor to use own proper API for deploy
-	if event, ok := c.GetQuery("event"); ok {
-		pl.Event = model.WebhookEvent(event)
-		if pl.Event != model.EventDeploy {
-			_ = c.AbortWithError(http.StatusBadRequest, model.ErrInvalidWebhookEvent)
-			return
+	if req.deployTask != nil {
+		pl.DeployTask = *req.deployTask
+	}
+	if req.deploy != nil {
+		pl.Event = model.EventDeploy
+		pl.Author = req.deploy.deployer.Login
+		pl.Avatar = req.deploy.deployer.Avatar
+		pl.Email = req.deploy.deployer.Email
+		pl.Sender = req.deploy.deployer.Login
+		if req.deploy.deployTo != nil {
+			pl.DeployTo = *req.deploy.deployTo
 		}
-
-		if !repo.AllowDeploy {
-			_ = c.AbortWithError(http.StatusForbidden, fmt.Errorf("repo does not allow deployments"))
-			return
-		}
-
-		// The deployment is attributed to whoever triggered it, not the original pipeline's author.
-		deployer := session.User(c)
-		if deployer == nil {
-			_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("user not found in session"))
-			return
-		}
-		pl.Author = deployer.Login
-		pl.Avatar = deployer.Avatar
-		pl.Email = deployer.Email
-		pl.Sender = deployer.Login
-
-		pl.DeployTo = c.DefaultQuery("deploy_to", pl.DeployTo)
 		// a workflow picked for the manual run must not narrow the deployment
 		pl.SelectedWorkflow = ""
 	}
 
-	// Read query string parameters into pipelineParams, exclude reserved params
-	envs := make(map[string]string)
-	for key, val := range c.Request.URL.Query() {
-		switch key {
-		// Skip some options of the endpoint
-		case "fork", "event", "deploy_to", "access_token":
-			continue
-		default:
-			// We only accept string literals, because pipeline parameters will be
-			// injected as environment variables
-			// TODO: sanitize the value
-			envs[key] = val[0]
-		}
-	}
-
-	newPipeline, err := pipeline.Restart(c, _store, pl, user, repo, envs)
+	newPipeline, err := restart(c, _store, pl, user, repo, req.envs)
 	if err != nil {
 		handlePipelineErr(c, err)
 	} else {

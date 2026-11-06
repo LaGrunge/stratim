@@ -6532,6 +6532,57 @@ func (_c *MockStore_UpdatePipeline_Call) RunAndReturn(run func(pipeline *model.P
 	return _c
 }
 
+// UpdatePipelineStatus provides a mock function for the type MockStore
+func (_mock *MockStore) UpdatePipelineStatus(pipeline *model.Pipeline) error {
+	ret := _mock.Called(pipeline)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePipelineStatus")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*model.Pipeline) error); ok {
+		r0 = returnFunc(pipeline)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockStore_UpdatePipelineStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdatePipelineStatus'
+type MockStore_UpdatePipelineStatus_Call struct {
+	*mock.Call
+}
+
+// UpdatePipelineStatus is a helper method to define mock.On call
+//   - pipeline *model.Pipeline
+func (_e *MockStore_Expecter) UpdatePipelineStatus(pipeline any) *MockStore_UpdatePipelineStatus_Call {
+	return &MockStore_UpdatePipelineStatus_Call{Call: _e.mock.On("UpdatePipelineStatus", pipeline)}
+}
+
+func (_c *MockStore_UpdatePipelineStatus_Call) Run(run func(pipeline *model.Pipeline)) *MockStore_UpdatePipelineStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *model.Pipeline
+		if args[0] != nil {
+			arg0 = args[0].(*model.Pipeline)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_UpdatePipelineStatus_Call) Return(err error) *MockStore_UpdatePipelineStatus_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockStore_UpdatePipelineStatus_Call) RunAndReturn(run func(pipeline *model.Pipeline) error) *MockStore_UpdatePipelineStatus_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateRepo provides a mock function for the type MockStore
 func (_mock *MockStore) UpdateRepo(repo *model.Repo) error {
 	ret := _mock.Called(repo)
