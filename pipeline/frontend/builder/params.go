@@ -43,16 +43,20 @@ type workflowConfig struct {
 // parseWorkflow is how a workflow config is read for a run: the variables
 // of the run and its parameters resolved, the config substituted with them
 // and parsed.
-func (b *PipelineBuilder) parseWorkflow(data []byte, axis matrix.Axis, md metadata.Metadata) (*workflowConfig, error) {
+func (b *PipelineBuilder) parseWorkflow(file *YamlFile, axis matrix.Axis, md metadata.Metadata) (*workflowConfig, error) {
+	data := file.Data
+	// a jsonnet workflow's backslashes are as the config wrote them, and it
+	// is substituted string by string
+	subst := metadata.SubstitutionFor(file.FromJsonnet())
 	environ := b.environmentVariables(md, axis)
-	params, invalid, err := b.params(data, axis, environ)
+	params, invalid, err := b.params(data, axis, environ, subst)
 	if err != nil {
 		return nil, err
 	}
 	// over the server's global environment, so that substitution, when and
 	// the steps see one value
 	maps.Copy(environ, params)
-	substituted, err := metadata.EnvVarSubst(string(data), environ)
+	substituted, err := subst.Text(string(data), environ)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +83,7 @@ func (b *PipelineBuilder) parseWorkflow(data []byte, axis matrix.Axis, md metada
 // manual run, a cron job, the API, a restart or deployment) unless empty, or else the default, with environ and the parameters before
 // it substituted into it. A value outside a parameter's options comes back
 // as invalid, apart from err.
-func (b *PipelineBuilder) params(data []byte, axis matrix.Axis, environ map[string]string) (values map[string]string, invalid, err error) {
+func (b *PipelineBuilder) params(data []byte, axis matrix.Axis, environ map[string]string, subst metadata.Substitution) (values map[string]string, invalid, err error) {
 	declared, err := yaml.ParseParams(data)
 	if err != nil {
 		return nil, nil, paramError("%v", err)
@@ -98,14 +102,14 @@ func (b *PipelineBuilder) params(data []byte, axis matrix.Axis, environ map[stri
 		}
 		value := given[name]
 		if value == "" {
-			if value, err = metadata.Substitute(param.Default, env); err != nil {
+			if value, err = subst.Value(param.Default, env); err != nil {
 				return nil, nil, paramError("parameter %s: default: %v", name, err)
 			}
 		}
 		if param.Options != nil {
 			options := make([]string, len(param.Options))
 			for k, o := range param.Options {
-				if options[k], err = metadata.Substitute(o, env); err != nil {
+				if options[k], err = subst.Value(o, env); err != nil {
 					return nil, nil, paramError("parameter %s: options: %v", name, err)
 				}
 			}

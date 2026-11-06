@@ -193,13 +193,13 @@ func TestLibraryMatrix(t *testing.T) {
 local s = import 'stratim.libsonnet';
 { steps: [{ name: std.manifestJsonMinified(s.matrix({ A: [1, 2], B: ['x', 'y'] })), image: 'alpine' }] }`)}})
 	require.NoError(t, err)
-	assert.Contains(t, string(out[0].Data), `[{\"A\":1,\"B\":\"x\"},{\"A\":1,\"B\":\"y\"},{\"A\":2,\"B\":\"x\"},{\"A\":2,\"B\":\"y\"}]`)
+	assert.Equal(t, `[{"A":1,"B":"x"},{"A":1,"B":"y"},{"A":2,"B":"x"},{"A":2,"B":"y"}]`, stepField(t, out[0], "name"))
 
 	out, err = Expand([]*File{{Name: ".woodpecker/m.jsonnet", Data: []byte(`
 local s = import 'stratim.libsonnet';
 { steps: [{ name: std.manifestJsonMinified(s.matrix({})), image: 'alpine' }] }`)}})
 	require.NoError(t, err)
-	assert.Contains(t, string(out[0].Data), `"name": "[{}]"`, "no axes: one empty combination")
+	assert.Equal(t, "[{}]", stepField(t, out[0], "name"), "no axes: one empty combination")
 }
 
 func TestLibraryManualQuotesTheTask(t *testing.T) {
@@ -207,7 +207,12 @@ func TestLibraryManualQuotesTheTask(t *testing.T) {
 local s = import 'stratim.libsonnet';
 { steps: [{ name: 'a', image: 'alpine' }], when: [s.when.manual('a" || true || "\\b')] }`}))
 	require.NoError(t, err)
-	assert.Contains(t, string(out[0].Data), `"evaluate": "TASK == \"a\\\" || true || \\\"\\\\b\""`,
+	var w struct {
+		When []struct{ Evaluate string } `yaml:"when"`
+	}
+	require.NoError(t, yaml.Unmarshal(out[0].Data, &w))
+	require.Len(t, w.When, 1)
+	assert.Equal(t, `TASK == "a\" || true || \"\\b"`, w.When[0].Evaluate,
 		"the task is one quoted string, not part of the expression")
 }
 
@@ -298,7 +303,7 @@ func TestExpandStepsByName(t *testing.T) {
 
 	ordered, err := Expand(files(map[string]string{"a.jsonnet": "{ steps: { zz: { image: 'alpine' }, aa: { image: 'alpine' } } }"}))
 	require.NoError(t, err)
-	assert.Less(t, strings.Index(string(ordered[0].Data), `"aa"`), strings.Index(string(ordered[0].Data), `"zz"`),
+	assert.Less(t, strings.Index(string(ordered[0].Data), "aa:"), strings.Index(string(ordered[0].Data), "zz:"),
 		"steps by name come out sorted, as jsonnet writes objects: a list keeps the order")
 
 	empty, err := Expand(files(map[string]string{"a.jsonnet": "{ steps: {} }"}))
@@ -332,4 +337,15 @@ func TestVarsAreNotAFile(t *testing.T) {
 	}), map[string]string{"TIER": "real"})
 	require.NoError(t, err)
 	assert.Contains(t, string(out[0].Data), "echo real")
+}
+
+// stepField is field of the first step of a workflow file.
+func stepField(t *testing.T, f *File, field string) string {
+	t.Helper()
+	var w struct {
+		Steps []map[string]string `yaml:"steps"`
+	}
+	require.NoError(t, yaml.Unmarshal(f.Data, &w), string(f.Data))
+	require.NotEmpty(t, w.Steps)
+	return w.Steps[0][field]
 }

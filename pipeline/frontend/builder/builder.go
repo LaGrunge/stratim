@@ -102,7 +102,7 @@ func (b *PipelineBuilder) Build() (items []*Item, errorsAndWarnings error) {
 			if len(axes) > 1 {
 				workflow.AxisID = i + 1
 			}
-			item, err := b.genItemForWorkflow(workflow, axis, string(y.Data))
+			item, err := b.genItemForWorkflow(workflow, axis, y)
 			if err != nil && pipeline_errors.HasBlockingErrors(err) {
 				return nil, err
 			} else if err != nil {
@@ -132,9 +132,9 @@ func (b *PipelineBuilder) Build() (items []*Item, errorsAndWarnings error) {
 	return items, errorsAndWarnings
 }
 
-func (b *PipelineBuilder) genItemForWorkflow(workflow *Workflow, axis matrix.Axis, data string) (item *Item, errorsAndWarnings error) {
+func (b *PipelineBuilder) genItemForWorkflow(workflow *Workflow, axis matrix.Axis, file *YamlFile) (item *Item, errorsAndWarnings error) {
 	workflowMetadata := b.GetWorkflowMetadata(workflow)
-	config, err := b.parseWorkflow([]byte(data), axis, workflowMetadata)
+	config, err := b.parseWorkflow(file, axis, workflowMetadata)
 	if err != nil {
 		return nil, multierr.Append(errorsAndWarnings, err)
 	}
@@ -154,7 +154,7 @@ func (b *PipelineBuilder) genItemForWorkflow(workflow *Workflow, axis matrix.Axi
 		).Lint([]*linter.WorkflowConfig{{
 			Workflow:  parsed,
 			File:      workflow.Name,
-			RawConfig: data,
+			RawConfig: string(file.Data),
 		}}))
 		if pipeline_errors.HasBlockingErrors(errorsAndWarnings) {
 			return nil, errorsAndWarnings

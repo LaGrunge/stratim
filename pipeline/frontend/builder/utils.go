@@ -118,7 +118,7 @@ func (b *PipelineBuilder) workflowDependencies(file *YamlFile) (constraint.Depen
 	var dependencies constraint.DependsOn
 	for _, axis := range axes {
 		workflow := &Workflow{Name: SanitizePath(file.Name), Environ: axis}
-		config, err := b.parseWorkflow(file.Data, axis, b.GetWorkflowMetadata(workflow))
+		config, err := b.parseWorkflow(file, axis, b.GetWorkflowMetadata(workflow))
 		if err != nil {
 			return nil, err
 		}

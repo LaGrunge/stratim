@@ -24,8 +24,10 @@
 // imports stratim.libsonnet, which this package provides, and other files
 // given with it, by a path relative to it; nothing else is readable.
 //
-// The workflows come out as JSON, which is YAML, so everything after this
-// step (substitution, parsing, linting) treats them like YAML files.
+// The workflows come out as YAML in block style (see toYAML), so everything
+// after this step (substitution, parsing, linting) treats them like YAML
+// files, except that they are substituted string by string, backslashes
+// as written (File.FromJsonnet).
 package jsonnet
 
 import (
@@ -42,6 +44,7 @@ import (
 	"strings"
 
 	"github.com/google/go-jsonnet"
+	"go.yaml.in/yaml/v4"
 )
 
 const (
@@ -77,7 +80,15 @@ var workflowName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 type File struct {
 	Name string
 	Data []byte
+	// fromJsonnet: a workflow a jsonnet config evaluated to; only Expand
+	// sets it.
+	fromJsonnet bool
 }
+
+// FromJsonnet reports whether f is a workflow a jsonnet config evaluated
+// to: its backslashes are as the config wrote them, to be substituted
+// string by string and verbatim (metadata.SubstituteValues).
+func (f *File) FromJsonnet() bool { return f.fromJsonnet }
 
 // IsConfig reports whether name is a config written in jsonnet.
 func IsConfig(name string) bool { return strings.HasSuffix(name, Ext) }
@@ -185,11 +196,11 @@ func split(config string, data []byte) ([]*File, error) {
 		if !workflowName.MatchString(name) {
 			return nil, fmt.Errorf("workflow name %q: use letters, digits, '.', '_' and '-', starting with a letter or digit", name)
 		}
-		var pretty bytes.Buffer
-		if err := json.Indent(&pretty, workflow, "", "  "); err != nil {
+		data, err := toYAML(workflow)
+		if err != nil {
 			return nil, err
 		}
-		return &File{Name: path.Join(path.Dir(config), name+".yaml"), Data: pretty.Bytes()}, nil
+		return &File{Name: path.Join(path.Dir(config), name+".yaml"), Data: data, fromJsonnet: true}, nil
 	}
 
 	if areSteps(fields["steps"]) {
@@ -326,3 +337,33 @@ func varsJSON(vars map[string]string) string {
 
 // clean is a file name as configs and imports refer to it.
 func clean(name string) string { return path.Clean(filepath.ToSlash(name)) }
+
+// yamlIndent is how far a nested block is indented in the YAML written.
+const yamlIndent = 2
+
+// toYAML writes a workflow jsonnet evaluated to as YAML in block style, to
+// be read like a YAML file a person wrote, apart from its substitution
+// (metadata.SubstituteValues). Long lines stay whole.
+func toYAML(workflow []byte) ([]byte, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(workflow, &doc); err != nil {
+		return nil, err
+	}
+	blockStyle(&doc)
+	return yaml.Dump(&doc, yaml.WithIndent(yamlIndent), yaml.WithLineWidth(-1))
+}
+
+// blockStyle lets the encoder choose each node's style, as for a value it
+// never parsed, except that a string a YAML 1.1 reader takes for something
+// else (yes, off, 0777, 1:20) is quoted: the encoder writes YAML 1.2, where
+// those are plain strings, and a tool reading 1.1 would see a bool or a
+// number.
+func blockStyle(n *yaml.Node) {
+	n.Style = 0
+	if n.Kind == yaml.ScalarNode && n.ShortTag() == "!!str" && notPlainIn11(n.Value) {
+		n.Style = yaml.DoubleQuotedStyle
+	}
+	for _, c := range n.Content {
+		blockStyle(c)
+	}
+}
