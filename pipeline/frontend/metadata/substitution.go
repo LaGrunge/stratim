@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/drone/envsubst"
+	"go.yaml.in/yaml/v4"
 )
 
 func EnvVarSubst(yaml string, environ map[string]string) (string, error) {
@@ -34,6 +35,140 @@ func EnvVarSubst(yaml string, environ map[string]string) (string, error) {
 		}
 		return env
 	})
+}
+
+// Substitution is how a workflow config is substituted: its text, and the
+// values (a parameter's default and options) read from it before.
+type Substitution struct {
+	Text  func(text string, environ map[string]string) (string, error)
+	Value func(value string, environ map[string]string) (string, error)
+}
+
+// SubstitutionFor is the substitution of a YAML file written by hand
+// (EnvVarSubst, Substitute), or, verbatim, of a workflow whose backslashes
+// are all as meant, such as one a jsonnet config evaluated to
+// (SubstituteValues, SubstituteVerbatim).
+func SubstitutionFor(verbatim bool) Substitution {
+	if verbatim {
+		return Substitution{Text: SubstituteValues, Value: SubstituteVerbatim}
+	}
+	return Substitution{Text: EnvVarSubst, Value: Substitute}
+}
+
+// SubstituteValues substitutes environ into every string of yamlText, a
+// YAML document whose backslashes are all as meant, such as a workflow a
+// jsonnet config evaluated to: string by string (SubstituteVerbatim), after
+// parsing, so that a value (a commit message with ": ", " #", quotes or
+// line breaks) is part of its string and never YAML, and every backslash
+// comes through as it is. ${...} and $$ work as in EnvVarSubst.
+func SubstituteValues(yamlText string, environ map[string]string) (string, error) {
+	if !strings.Contains(yamlText, "$") {
+		return yamlText, nil // nothing to substitute: no parsing twice
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(yamlText), &doc); err != nil {
+		return "", err
+	}
+	if doc.Kind == 0 {
+		return yamlText, nil
+	}
+	if err := substituteNode(&doc, environ); err != nil {
+		return "", err
+	}
+	out, err := yaml.Dump(&doc, yaml.WithIndent(yamlIndent), yaml.WithLineWidth(-1))
+	return string(out), err
+}
+
+// maxQuoted is how much of a string an error quotes.
+const maxQuoted = 80
+
+func truncated(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
+}
+
+// yamlIndent is how far SubstituteValues indents a nested block.
+const yamlIndent = 2
+
+func substituteNode(n *yaml.Node, environ map[string]string) error {
+	if n.Kind == yaml.ScalarNode && strings.Contains(n.Value, "$") {
+		v, err := SubstituteVerbatim(n.Value, environ)
+		if err != nil {
+			return fmt.Errorf("%q: %w", truncated(n.Value, maxQuoted), err)
+		}
+		if v != n.Value {
+			// a substituted value is a string, whatever it looks like
+			n.Value, n.Tag, n.Style = v, "!!str", 0
+		}
+	}
+	for _, c := range n.Content {
+		if err := substituteNode(c, environ); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SubstituteVerbatim is Substitute for a value whose backslashes are all
+// as meant: envsubst reads \\ as an escaped backslash and \/ as a slash,
+// which a YAML file written by hand has always been subject to; here every
+// backslash comes through as it is.
+func SubstituteVerbatim(s string, environ map[string]string) (string, error) {
+	return Substitute(escapeBackslashes(s), environ)
+}
+
+// escapeBackslashes doubles every backslash outside ${...}, which envsubst
+// then halves; inside an expression envsubst takes backslashes as they are.
+// $$ is copied as it is, so that $${...} stays an escaped dollar.
+func escapeBackslashes(s string) string {
+	if !strings.Contains(s, `\`) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s) + strings.Count(s, `\`))
+	for i := 0; i < len(s); {
+		switch {
+		case strings.HasPrefix(s[i:], escapedDollar):
+			b.WriteString(escapedDollar)
+			i += len(escapedDollar)
+		case strings.HasPrefix(s[i:], exprOpen):
+			end := expressionEnd(s, i+len(exprOpen))
+			b.WriteString(s[i:end])
+			i = end
+		case s[i] == '\\':
+			b.WriteString(`\\`)
+			i++
+		default:
+			b.WriteByte(s[i])
+			i++
+		}
+	}
+	return b.String()
+}
+
+const (
+	escapedDollar = "$$"
+	exprOpen      = "${"
+)
+
+// expressionEnd is the index past the } that closes the ${ opened before
+// start, nested ${...} included, or len(s) if none does.
+func expressionEnd(s string, start int) int {
+	depth := 1
+	for i := start; i < len(s); i++ {
+		switch {
+		case strings.HasPrefix(s[i:], exprOpen):
+			depth++
+			i++
+		case s[i] == '}':
+			if depth--; depth == 0 {
+				return i + 1
+			}
+		}
+	}
+	return len(s)
 }
 
 // Substitute substitutes environ into s, a value: ${NAME} and the string

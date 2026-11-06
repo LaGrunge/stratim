@@ -138,6 +138,14 @@ func TestWorkflowsBuild(t *testing.T) {
 				}
 				assert.ElementsMatch(t, tt.wantWorkflows, names, "the workflows that run")
 			}
+			if tt.selected == "synthetic-check" {
+				// the awk of the big log, as synthetic.jsonnet writes it: its \n
+				// once came to the step as a line break and broke the program
+				cmds := stepCommands(items, "synthetic-logs", "big-log")
+				require.Len(t, cmds, 1)
+				assert.Contains(t, cmds[0], `..........\n", i }'`)
+				assert.NotContains(t, cmds[0], "\n")
+			}
 			if tt.wantTest != nil {
 				assert.Subset(t, stepNames(items, "test"), tt.wantTest, "steps of the test workflow")
 			}
@@ -273,4 +281,21 @@ func TestCrons(t *testing.T) {
 	assert.Equal(t, "0 3 * * *", c.Schedule)
 	assert.Equal(t, "UTC", c.Timezone)
 	assert.Empty(t, c.Variables)
+}
+
+// stepCommands are the commands of a workflow's step.
+func stepCommands(items []*builder.Item, workflow, step string) []string {
+	for _, item := range items {
+		if item.Workflow.Name != workflow || item.Config == nil {
+			continue
+		}
+		for _, stage := range item.Config.Stages {
+			for _, s := range stage.Steps {
+				if s.Name == step {
+					return s.Commands
+				}
+			}
+		}
+	}
+	return nil
 }

@@ -153,7 +153,7 @@ func copyFiles(files []*File) []*File {
 	}
 	out := make([]*File, len(files))
 	for i, f := range files {
-		out[i] = &File{Name: f.Name, Data: slices.Clone(f.Data)}
+		out[i] = &File{Name: f.Name, Data: slices.Clone(f.Data), fromJsonnet: f.fromJsonnet}
 	}
 	return out
 }
@@ -191,7 +191,8 @@ func isTransient(err error) bool {
 }
 
 // contentKey identifies a list of config files, in order, and the library
-// and vars they see.
+// and vars they see. The fromJsonnet mark is not part of it: only Expand's
+// output carries it, never a file given to it.
 func contentKey(files []*File, vars map[string]string) [sha256.Size]byte {
 	h := sha256.New()
 	h.Write([]byte(Library))

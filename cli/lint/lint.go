@@ -113,7 +113,7 @@ func lintFile(_ context.Context, c *cli.Command, file string) error {
 	return errors.Join(errs...)
 }
 
-// lintWorkflow lints one workflow; a jsonnet config yields it as JSON.
+// lintWorkflow lints one workflow; a jsonnet config yields it as YAML.
 func lintWorkflow(c *cli.Command, file string, buf []byte) error {
 	rawConfig := string(buf)
 
