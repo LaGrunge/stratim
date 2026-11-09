@@ -96,11 +96,14 @@ func StartMetricsCollector(ctx context.Context, c *cli.Command, _store store.Sto
 			[]string{"workflow", "repo", "step", "type"},
 		)
 	}
+	// the scheduler is taken once: the collector must not read the global
+	// configuration while it runs, as that changes when the server stops
+	scheduler := server.Config.Services.Scheduler
 	go func() {
 		log.Info().Msg("queue metric collector started")
 
 		for {
-			stats := server.Config.Services.Scheduler.Info(ctx)
+			stats := scheduler.Info(ctx)
 			pendingSteps.Set(float64(stats.Stats.Pending))
 			waitingSteps.Set(float64(stats.Stats.WaitingOnDeps))
 			runningSteps.Set(float64(stats.Stats.Running))
