@@ -249,7 +249,7 @@ func (q *persistentQueue) Poll(c context.Context, agentID int64, f func(*model.T
 				}
 				return nil, nil
 			}
-			// Not handed out unstored: after a restart it would be queued
+			// Not handed out with its agent not stored: after a restart it would be queued
 			// again while its agent runs it. It is put back at once, for a
 			// later poll; if the queue cannot, its lease expires and does.
 			log.Error().Err(setErr).Msgf("pull queue item: %s: cannot store its agent, retried later", task.ID)

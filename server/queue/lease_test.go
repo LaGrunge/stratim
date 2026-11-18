@@ -354,7 +354,7 @@ func TestLeasePollPutsBackUnstoredTask(t *testing.T) {
 
 	got, err := pq.Poll(ctx, 1, filterFnTrue)
 	assert.NoError(t, err)
-	assert.Nil(t, got, "not handed out unstored")
+	assert.Nil(t, got, "not handed out with its agent not stored")
 
 	got = pollOne(ctx, pq, 1, 2*time.Second) // the lease is a minute
 	require.NotNil(t, got, "put back at once")
