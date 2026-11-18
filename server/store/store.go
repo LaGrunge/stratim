@@ -257,8 +257,9 @@ type Store interface {
 	// still pending or running in pipelines killed or canceled before
 	// canceledBefore (unix seconds, their finished), their steps with them.
 	WorkflowsLeftInCanceledPipelines(canceledBefore int64, limit int) ([]*model.Workflow, error)
-	// WorkflowsRunning lists, by ID, at most limit workflows running.
-	WorkflowsRunning(limit int) ([]*model.Workflow, error)
+	// WorkflowsRunning lists, by ID, at most limit workflows running whose
+	// ID is above afterID: a page, the next one after its last.
+	WorkflowsRunning(afterID int64, limit int) ([]*model.Workflow, error)
 
 	// BotToken
 	// BotTokenCreate stores a new bot token unless its owner has maxActive

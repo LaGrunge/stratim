@@ -334,7 +334,8 @@ func TestStepReport(t *testing.T) {
 	assert.Equal(t, int64(9), got.Finished)
 }
 
-// WorkflowsRunning lists the workflows running, by ID, a limit at most.
+// WorkflowsRunning lists the workflows running, by ID, a limit at most, a
+// page after an ID.
 func TestWorkflowsRunning(t *testing.T) {
 	store, closer := newTestStore(t, new(model.Workflow))
 	defer closer()
@@ -353,11 +354,19 @@ func TestWorkflowsRunning(t *testing.T) {
 		}
 		return got
 	}
-	workflows, err := store.WorkflowsRunning(10)
+	workflows, err := store.WorkflowsRunning(0, 10)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"first", "second"}, names(workflows))
 
-	workflows, err = store.WorkflowsRunning(1)
+	workflows, err = store.WorkflowsRunning(0, 1)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"first"}, names(workflows), "the limit at most, by ID")
+
+	workflows, err = store.WorkflowsRunning(workflows[0].ID, 1)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"second"}, names(workflows), "the next page")
+
+	workflows, err = store.WorkflowsRunning(workflows[0].ID, 1)
+	require.NoError(t, err)
+	assert.Empty(t, workflows, "past the last")
 }

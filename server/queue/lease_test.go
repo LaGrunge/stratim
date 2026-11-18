@@ -16,16 +16,19 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
+	store_mocks "go.woodpecker-ci.org/woodpecker/v3/server/store/mocks"
 )
 
 // startServerQueue starts a queue on the store as a server does, its leases
@@ -272,9 +275,9 @@ func TestLeaseWatchAdoptsOrphans(t *testing.T) {
 	require.True(t, ok)
 	setWorkflowRunningOn(t, s, dep.ID, 7)
 
-	pq.adoptOrphans(make(map[string]struct{}))
+	pq.adoptOrphans(t.Context(), make(map[string]struct{}))
 	assert.Equal(t, map[string]int64{dep.ID: 7}, runningTasks(q.Info(t.Context())))
-	pq.adoptOrphans(map[string]struct{}{dep.ID: {}})
+	pq.adoptOrphans(t.Context(), map[string]struct{}{dep.ID: {}})
 	assert.Len(t, q.Info(t.Context()).Running, 1, "held once")
 }
 
@@ -288,4 +291,89 @@ func setWorkflowRunningOn(t *testing.T, s store.Store, id string, agentID int64)
 	workflow.State = model.StatusRunning
 	workflow.AgentID = agentID
 	require.NoError(t, s.WorkflowUpdate(workflow))
+}
+
+// A workflow running with no agent recorded is adopted for none: no agent
+// extends it, it is settled; stored, it is held running again after a
+// restart, not queued without its config.
+func TestLeaseAdoptsOrphanWithoutAgent(t *testing.T) {
+	s := newSQLiteStore(t)
+	dep, _ := createDepAndGate(t, s, nil)
+	setWorkflowRunningOn(t, s, dep.ID, 0)
+
+	ctx1, q1, stop1 := startServerQueue(t, s, 0)
+	assert.Equal(t, map[string]int64{dep.ID: model.IDNotSet}, runningTasks(q1.Info(ctx1)))
+	assert.Equal(t, map[string]int64{dep.ID: model.IDNotSet}, storedAgents(t, s))
+	assert.ErrorIs(t, q1.Extend(ctx1, 0, dep.ID), ErrAgentMissMatch, "no agent extends it")
+	stop1()
+
+	ctx2, q2, _ := startServerQueue(t, s, 0)
+	assert.Equal(t, map[string]int64{dep.ID: model.IDNotSet}, runningTasks(q2.Info(ctx2)), "held again, not queued")
+	assert.Nil(t, pollOne(ctx2, q2, 8, 500*time.Millisecond), "never handed out")
+}
+
+// The workflows running are read page by page: orphans past the first page
+// are adopted too, the ones stored taking no room.
+func TestLeaseAdoptsOrphansPastAPage(t *testing.T) {
+	s := newSQLiteStore(t)
+	before := orphansPage
+	orphansPage = 2
+	t.Cleanup(func() { orphansPage = before })
+	workflows := []*model.Workflow{
+		{PipelineID: 1, PID: 1, Name: "first", State: model.StatusPending},
+		{PipelineID: 1, PID: 2, Name: "second", State: model.StatusPending},
+		{PipelineID: 1, PID: 3, Name: "orphan", State: model.StatusPending},
+	}
+	require.NoError(t, s.WorkflowsCreate(workflows))
+	first := &model.Task{ID: fmt.Sprint(workflows[0].ID)}
+	second := &model.Task{ID: fmt.Sprint(workflows[1].ID)}
+	orphan := &model.Task{ID: fmt.Sprint(workflows[2].ID)}
+	for _, task := range []*model.Task{first, second} {
+		task.AgentID = 7
+		task.Data = []byte("config")
+		require.NoError(t, s.TaskInsert(task))
+		setWorkflowRunningOn(t, s, task.ID, 7)
+	}
+	setWorkflowRunningOn(t, s, orphan.ID, 9)
+
+	ctx, q, _ := startServerQueue(t, s, 0)
+	assert.Equal(t, map[string]int64{first.ID: 7, second.ID: 7, orphan.ID: 9}, runningTasks(q.Info(ctx)))
+}
+
+// A task whose agent cannot be stored is not handed out, and is put back at
+// once, not after its lease: the next poll gets it.
+func TestLeasePollPutsBackUnstoredTask(t *testing.T) {
+	ctx, cancel, q := setupTestQueue(t)
+	defer cancel(nil)
+	mockStore := store_mocks.NewMockStore(t)
+	mockStore.EXPECT().WorkflowLoad(int64(1)).Return(&model.Workflow{ID: 1, State: model.StatusPending}, nil).Twice()
+	mockStore.EXPECT().TaskSetAgent("1", int64(1)).Return(errors.New("database is down")).Once()
+	mockStore.EXPECT().TaskSetAgent("1", int64(1)).Return(nil).Once()
+	pq := &persistentQueue{Queue: q, store: mockStore}
+	require.NoError(t, q.PushAtOnce(ctx, []*model.Task{genDummyTask()}))
+
+	got, err := pq.Poll(ctx, 1, filterFnTrue)
+	assert.NoError(t, err)
+	assert.Nil(t, got, "not handed out unstored")
+
+	got = pollOne(ctx, pq, 1, 2*time.Second) // the lease is a minute
+	require.NotNil(t, got, "put back at once")
+	assert.Equal(t, "1", got.ID)
+}
+
+// An orphan whose agent's Done came before it was held, finding no task,
+// is released at once: removed from the store, not held running.
+func TestLeaseAdoptReleasesOrphanDoneMeanwhile(t *testing.T) {
+	ctx, cancel, q := setupTestQueue(t)
+	defer cancel(nil)
+	mockStore := store_mocks.NewMockStore(t)
+	mockStore.EXPECT().WorkflowsRunning(int64(0), mock.Anything).Return([]*model.Workflow{{ID: 5, PipelineID: 9, AgentID: 7, State: model.StatusRunning}}, nil).Once()
+	mockStore.EXPECT().GetPipeline(int64(9)).Return(&model.Pipeline{ID: 9, RepoID: 1, Status: model.StatusRunning}, nil)
+	mockStore.EXPECT().TaskInsert(mock.Anything).Return(nil).Once()
+	mockStore.EXPECT().WorkflowLoad(int64(5)).Return(&model.Workflow{ID: 5, State: model.StatusSuccess}, nil).Once()
+	mockStore.EXPECT().TaskDelete("5").Return(nil).Once()
+	pq := &persistentQueue{Queue: q, store: mockStore}
+
+	pq.adoptOrphans(t.Context(), make(map[string]struct{}))
+	assert.Empty(t, q.Info(ctx).Running)
 }

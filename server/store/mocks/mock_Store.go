@@ -8709,8 +8709,8 @@ func (_c *MockStore_WorkflowsReplace_Call) RunAndReturn(run func(pipeline *model
 }
 
 // WorkflowsRunning provides a mock function for the type MockStore
-func (_mock *MockStore) WorkflowsRunning(limit int) ([]*model.Workflow, error) {
-	ret := _mock.Called(limit)
+func (_mock *MockStore) WorkflowsRunning(afterID int64, limit int) ([]*model.Workflow, error) {
+	ret := _mock.Called(afterID, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WorkflowsRunning")
@@ -8718,18 +8718,18 @@ func (_mock *MockStore) WorkflowsRunning(limit int) ([]*model.Workflow, error) {
 
 	var r0 []*model.Workflow
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(int) ([]*model.Workflow, error)); ok {
-		return returnFunc(limit)
+	if returnFunc, ok := ret.Get(0).(func(int64, int) ([]*model.Workflow, error)); ok {
+		return returnFunc(afterID, limit)
 	}
-	if returnFunc, ok := ret.Get(0).(func(int) []*model.Workflow); ok {
-		r0 = returnFunc(limit)
+	if returnFunc, ok := ret.Get(0).(func(int64, int) []*model.Workflow); ok {
+		r0 = returnFunc(afterID, limit)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*model.Workflow)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(int) error); ok {
-		r1 = returnFunc(limit)
+	if returnFunc, ok := ret.Get(1).(func(int64, int) error); ok {
+		r1 = returnFunc(afterID, limit)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -8742,19 +8742,25 @@ type MockStore_WorkflowsRunning_Call struct {
 }
 
 // WorkflowsRunning is a helper method to define mock.On call
+//   - afterID int64
 //   - limit int
-func (_e *MockStore_Expecter) WorkflowsRunning(limit any) *MockStore_WorkflowsRunning_Call {
-	return &MockStore_WorkflowsRunning_Call{Call: _e.mock.On("WorkflowsRunning", limit)}
+func (_e *MockStore_Expecter) WorkflowsRunning(afterID any, limit any) *MockStore_WorkflowsRunning_Call {
+	return &MockStore_WorkflowsRunning_Call{Call: _e.mock.On("WorkflowsRunning", afterID, limit)}
 }
 
-func (_c *MockStore_WorkflowsRunning_Call) Run(run func(limit int)) *MockStore_WorkflowsRunning_Call {
+func (_c *MockStore_WorkflowsRunning_Call) Run(run func(afterID int64, limit int)) *MockStore_WorkflowsRunning_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 int
+		var arg0 int64
 		if args[0] != nil {
-			arg0 = args[0].(int)
+			arg0 = args[0].(int64)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -8765,7 +8771,7 @@ func (_c *MockStore_WorkflowsRunning_Call) Return(workflows []*model.Workflow, e
 	return _c
 }
 
-func (_c *MockStore_WorkflowsRunning_Call) RunAndReturn(run func(limit int) ([]*model.Workflow, error)) *MockStore_WorkflowsRunning_Call {
+func (_c *MockStore_WorkflowsRunning_Call) RunAndReturn(run func(afterID int64, limit int) ([]*model.Workflow, error)) *MockStore_WorkflowsRunning_Call {
 	_c.Call.Return(run)
 	return _c
 }

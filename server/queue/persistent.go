@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
-	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -33,14 +32,6 @@ import (
 // serverConfigQueuePaused stores whether the global queue is paused so the
 // state survives server restarts.
 const serverConfigQueuePaused = "queue-paused"
-
-// orphansCheckInterval is how often the queue looks for workflows running
-// that it does not hold, see adoptOrphans.
-const orphansCheckInterval = time.Minute
-
-// maxOrphansAdopted is how many workflows running one look for orphans goes
-// through at most.
-const maxOrphansAdopted = 1000
 
 // WithTaskStore returns a queue that is backed by the TaskStore. A task is
 // stored from its push until its Done or Error (or its cancel, if it is not
@@ -70,7 +61,7 @@ func WithTaskStore(ctx context.Context, q Queue, s store.Store) Queue {
 	// them wait for them
 	pending := pq.restoreRunning(tasks)
 	if err == nil {
-		pq.adoptOrphans(stored)
+		pq.adoptOrphans(ctx, stored)
 	}
 	for _, task := range pending {
 		restoreDepStatus(s, task)
@@ -81,193 +72,6 @@ func WithTaskStore(ctx context.Context, q Queue, s store.Store) Queue {
 	pq.restorePausedState()
 	go pq.watchOrphans(ctx)
 	return pq
-}
-
-// runningRestorer is a queue that holds tasks running again, see
-// fifo.restoreRunning.
-type runningRestorer interface {
-	restoreRunning(tasks []runningTask)
-}
-
-// restoreRunning holds the stored tasks handed out to an agent running
-// again, and returns the others, pending. A task whose workflow ended, or is
-// missing, is removed from the store instead: its Done reached the store, not
-// the queue. One of a pipeline that ended is held canceling, as from its
-// pipeline's end. A queue that cannot hold them running gets them pending.
-func (q *persistentQueue) restoreRunning(tasks []*model.Task) (pending []*model.Task) {
-	restorer, ok := q.Queue.(runningRestorer)
-	if !ok {
-		return tasks
-	}
-	var running []runningTask
-	for _, task := range tasks {
-		if task.AgentID == 0 {
-			pending = append(pending, task)
-			continue
-		}
-		restored, keep := q.runningTask(task)
-		if !keep {
-			continue
-		}
-		running = append(running, restored)
-		log.Info().Str("task_id", task.ID).Int64("agent_id", task.AgentID).Msg("restore queue item: held running again")
-	}
-	restorer.restoreRunning(running)
-	return pending
-}
-
-// runningTask is the stored task handed out to an agent to hold running
-// again; not if its workflow ended or is missing, then removed from the
-// store. Its config missing, it is adopted.
-func (q *persistentQueue) runningTask(task *model.Task) (runningTask, bool) {
-	restored := runningTask{task: task, adopted: len(task.Data) == 0}
-	workflowID, err := strconv.ParseInt(task.ID, 10, 64)
-	if err != nil {
-		log.Error().Err(err).Msgf("restore queue item: %s: invalid workflow id", task.ID)
-		return restored, true
-	}
-	workflow, err := q.store.WorkflowLoad(workflowID)
-	switch {
-	case errors.Is(err, types.ErrRecordNotExist):
-		log.Warn().Msgf("restore queue item: %s: workflow missing, removed", task.ID)
-		q.deleteTask(task.ID)
-		return restored, false
-	case err != nil:
-		// cannot tell: held, its agent's Done or its lease ends it
-		log.Error().Err(err).Msgf("restore queue item: %s: cannot load its workflow", task.ID)
-		return restored, true
-	case workflow.State.IsDone():
-		log.Debug().Msgf("restore queue item: %s: workflow ended, removed", task.ID)
-		q.deleteTask(task.ID)
-		return restored, false
-	}
-	restored.canceledAt = q.pipelineEndedAt(task.PipelineID)
-	return restored, true
-}
-
-// pipelineEndedAt is when the pipeline of id ended, as canceled: now if it
-// did not tell; zero if it did not end, or cannot be loaded.
-func (q *persistentQueue) pipelineEndedAt(id int64) time.Time {
-	if id == 0 {
-		return time.Time{}
-	}
-	pipeline, err := q.store.GetPipeline(id)
-	if err != nil {
-		log.Error().Err(err).Int64("pipeline_id", id).Msg("restore queue item: cannot load its pipeline")
-		return time.Time{}
-	}
-	if !pipeline.Status.IsDone() {
-		return time.Time{}
-	}
-	if pipeline.Finished == 0 {
-		return time.Now()
-	}
-	return time.Unix(pipeline.Finished, 0)
-}
-
-// adoptOrphans holds running, as adopted, the workflows running not stored
-// as tasks (stored: the IDs of those that are, listed before): their tasks
-// were handed out by a server that did not store them, or were lost. Each is
-// stored as a task without its config, with the agent the workflow runs on,
-// and gets a lease: its agent extends it, waits on it and reports it done as
-// any, and if it does not, the task is not run again but settled, see
-// SetCanceledExpiredHandler.
-func (q *persistentQueue) adoptOrphans(stored map[string]struct{}) {
-	restorer, ok := q.Queue.(runningRestorer)
-	if !ok {
-		return
-	}
-	workflows, err := q.store.WorkflowsRunning(maxOrphansAdopted)
-	if err != nil {
-		log.Error().Err(err).Msg("cannot look for orphaned workflows")
-		return
-	}
-	var adopted []runningTask
-	for _, workflow := range workflows {
-		id := strconv.FormatInt(workflow.ID, 10)
-		if _, ok := stored[id]; ok {
-			continue
-		}
-		task := &model.Task{
-			ID:         id,
-			PID:        workflow.PID,
-			Name:       workflow.Name,
-			PipelineID: workflow.PipelineID,
-			AgentID:    workflow.AgentID,
-		}
-		if pipeline, err := q.store.GetPipeline(workflow.PipelineID); err == nil {
-			task.RepoID = pipeline.RepoID
-		}
-		if err := q.store.TaskInsert(task); err != nil {
-			log.Error().Err(err).Str("task_id", id).Msg("cannot store an orphaned workflow's task")
-			continue
-		}
-		// its agent's Done may have come meanwhile, before it was stored
-		if current, err := q.store.WorkflowLoad(workflow.ID); err != nil || current.State != model.StatusRunning {
-			q.deleteTask(id)
-			continue
-		}
-		log.Warn().Str("task_id", id).Int64("agent_id", task.AgentID).Msg("adopted an orphaned workflow")
-		adopted = append(adopted, runningTask{task: task, canceledAt: q.pipelineEndedAt(task.PipelineID), adopted: true})
-	}
-	restorer.restoreRunning(adopted)
-}
-
-// watchOrphans adopts the orphaned workflows every orphansCheckInterval,
-// until ctx ends. The stored tasks are listed before the workflows running:
-// a workflow ends before its task is removed, so one running then has its
-// task listed, unless it is an orphan.
-func (q *persistentQueue) watchOrphans(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(orphansCheckInterval):
-		}
-		tasks, err := q.store.TaskList()
-		if err != nil {
-			log.Error().Err(err).Msg("cannot list the stored tasks to look for orphaned workflows")
-			continue
-		}
-		stored := make(map[string]struct{}, len(tasks))
-		for _, task := range tasks {
-			stored[task.ID] = struct{}{}
-		}
-		q.adoptOrphans(stored)
-	}
-}
-
-// SetCanceledExpiredHandler sets what settles a task not run again whose
-// lease expired, see Queue. Once settled, its task is removed from the
-// store, and, if its workflow ended, from the queue, the ones depending on it
-// getting the state it ended with.
-func (q *persistentQueue) SetCanceledExpiredHandler(handler func(task *model.Task)) {
-	q.Queue.SetCanceledExpiredHandler(func(task *model.Task) {
-		handler(task)
-		q.settled(task)
-	})
-}
-
-// settled removes a settled task from the store, and, if its workflow ended,
-// from the queue, with the state it ended with: an adopted one is held
-// running until then.
-func (q *persistentQueue) settled(task *model.Task) {
-	workflowID, err := strconv.ParseInt(task.ID, 10, 64)
-	if err != nil {
-		return
-	}
-	workflow, err := q.store.WorkflowLoad(workflowID)
-	if err != nil {
-		log.Error().Err(err).Str("task_id", task.ID).Msg("cannot load a settled workflow")
-		return
-	}
-	if !workflow.State.IsDone() {
-		return
-	}
-	q.deleteTask(task.ID)
-	if err := q.Queue.Done(context.Background(), task.ID, workflow.State); err != nil && !errors.Is(err, ErrNotFound) {
-		log.Error().Err(err).Str("task_id", task.ID).Msg("cannot release a settled workflow from the queue")
-	}
 }
 
 // deleteTask removes the stored task of id, logging what fails.
@@ -446,10 +250,12 @@ func (q *persistentQueue) Poll(c context.Context, agentID int64, f func(*model.T
 				return nil, nil
 			}
 			// Not handed out unstored: after a restart it would be queued
-			// again while its agent runs it. It keeps its place in the
-			// queue's running tasks, whose lease expires and puts it back
-			// for a later poll.
+			// again while its agent runs it. It is put back at once, for a
+			// later poll; if the queue cannot, its lease expires and does.
 			log.Error().Err(setErr).Msgf("pull queue item: %s: cannot store its agent, retried later", task.ID)
+			if holder, ok := q.Queue.(*fifo); ok {
+				holder.putBack(task.ID)
+			}
 			return nil, nil
 		}
 	}

@@ -183,6 +183,23 @@ func (q *fifo) restoreRunning(tasks []runningTask) {
 	q.dirty = true
 }
 
+// putBack puts a task running back to pending, at the head, as if its
+// lease expired: one handed out to no agent after all. A canceled one, or
+// one not running, is left as it is.
+func (q *fifo) putBack(id string) {
+	q.Lock()
+	defer q.Unlock()
+	taskEntry, ok := q.running[id]
+	if !ok || taskEntry.canceling {
+		return
+	}
+	delete(q.running, id)
+	taskEntry.error = ErrTaskExpired
+	close(taskEntry.done)
+	q.pending.PushFront(taskEntry.item)
+	q.dirty = true
+}
+
 // Poll retrieves and removes a task head of this queue.
 func (q *fifo) Poll(c context.Context, agentID int64, filter func(*model.Task) (bool, int)) (*model.Task, error) {
 	q.Lock()

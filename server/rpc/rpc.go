@@ -135,7 +135,9 @@ func (s *RPC) Wait(c context.Context, workflowID string) (canceled bool, err err
 }
 
 // killedCheckInterval is how often WaitKilled checks the workflow's
-// stored state, and Wait whether the queue holds a workflow it did not.
+// stored state, and Wait whether the queue holds a workflow it did not: more
+// often than the queue looks for workflows to adopt (a minute), so that the
+// agent of one adopted listens for a cancel soon after.
 const killedCheckInterval = 15 * time.Second
 
 // waitHeld waits on the workflow of id in the queue, see queue.Queue.Wait.

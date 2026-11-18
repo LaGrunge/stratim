@@ -152,7 +152,7 @@ func TestPersistentQueueRestoredTaskOfCanceledPipeline(t *testing.T) {
 			task.PipelineID = 9
 			dependent := &model.Task{ID: "2", Dependencies: []string{"1"}, DepStatus: make(map[string]model.StatusValue), RunOn: []string{"success", "failure"}}
 			store.EXPECT().TaskList().Return([]*model.Task{task, dependent}, nil).Once()
-			store.EXPECT().WorkflowsRunning(mock.Anything).Return(nil, nil).Once()
+			store.EXPECT().WorkflowsRunning(mock.Anything, mock.Anything).Return(nil, nil).Once()
 			store.EXPECT().ServerConfigGet(mock.Anything).Return("", types.ErrRecordNotExist).Maybe()
 			store.EXPECT().TaskSetQueued(mock.Anything, mock.Anything).Return(nil).Maybe() // restored unstamped
 			store.EXPECT().TaskDelete("1").Return(nil).Once()
@@ -313,7 +313,7 @@ func TestWithTaskStoreRestoresPausedState(t *testing.T) {
 
 	store := store_mocks.NewMockStore(t)
 	store.EXPECT().TaskList().Return(nil, nil).Once()
-	store.EXPECT().WorkflowsRunning(mock.Anything).Return(nil, nil).Once()
+	store.EXPECT().WorkflowsRunning(mock.Anything, mock.Anything).Return(nil, nil).Once()
 	store.EXPECT().ServerConfigGet(serverConfigQueuePaused).Return("true", nil).Once()
 
 	pq := WithTaskStore(ctx, q, store)
@@ -327,7 +327,7 @@ func TestWithTaskStoreLeavesQueueRunningWhenNotPaused(t *testing.T) {
 
 	store := store_mocks.NewMockStore(t)
 	store.EXPECT().TaskList().Return(nil, nil).Once()
-	store.EXPECT().WorkflowsRunning(mock.Anything).Return(nil, nil).Once()
+	store.EXPECT().WorkflowsRunning(mock.Anything, mock.Anything).Return(nil, nil).Once()
 	store.EXPECT().ServerConfigGet(serverConfigQueuePaused).Return("false", nil).Once()
 
 	pq := WithTaskStore(ctx, q, store)
@@ -341,7 +341,7 @@ func TestWithTaskStoreLeavesQueueRunningWhenNoPausedConfig(t *testing.T) {
 
 	store := store_mocks.NewMockStore(t)
 	store.EXPECT().TaskList().Return(nil, nil).Once()
-	store.EXPECT().WorkflowsRunning(mock.Anything).Return(nil, nil).Once()
+	store.EXPECT().WorkflowsRunning(mock.Anything, mock.Anything).Return(nil, nil).Once()
 	store.EXPECT().ServerConfigGet(serverConfigQueuePaused).Return("", types.ErrRecordNotExist).Once()
 
 	pq := WithTaskStore(ctx, q, store)
@@ -365,7 +365,7 @@ func TestWithTaskStoreRestoresPausedStateAfterRestart(t *testing.T) {
 	defer cancel2(nil)
 
 	store.EXPECT().TaskList().Return(nil, nil).Once()
-	store.EXPECT().WorkflowsRunning(mock.Anything).Return(nil, nil).Once()
+	store.EXPECT().WorkflowsRunning(mock.Anything, mock.Anything).Return(nil, nil).Once()
 	store.EXPECT().ServerConfigGet(serverConfigQueuePaused).Return("true", nil).Once()
 
 	restored := WithTaskStore(ctx2, q2, store)
