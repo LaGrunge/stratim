@@ -24,6 +24,9 @@ import (
 var (
 	ErrNotImplemented = errors.New("not implemented")
 	ErrRepoNotFound   = errors.New("repo not found")
+	// ErrRateLimited is a forge refusing calls for a while: the ones made
+	// with the same token wait.
+	ErrRateLimited = errors.New("rate limited by the forge")
 )
 
 type ErrIgnoreEvent struct {

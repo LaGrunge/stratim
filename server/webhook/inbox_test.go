@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -36,6 +37,7 @@ import (
 	manager_mocks "go.woodpecker-ci.org/woodpecker/v3/server/services/mocks"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store/datastore"
+	store_types "go.woodpecker-ci.org/woodpecker/v3/server/store/types"
 )
 
 // clock is a clock a test moves.
@@ -84,7 +86,8 @@ func newFixture(t *testing.T) *fixture {
 	server.Config.Services.Manager = m
 	t.Cleanup(func() { server.Config.Services.Manager = orig })
 
-	c := &clock{now: time.Unix(1_800_000_000, 0)}
+	// the real time: the store sets the creation of pipelines from it
+	c := &clock{now: time.Now().Truncate(time.Second)}
 	return &fixture{
 		store: s, repo: repo, user: user, forge: f, clock: c,
 		inbox: New(s, pipeline.WorkflowEnd{Store: s}, Options{Now: c.Now}),
@@ -105,32 +108,33 @@ func (fx *fixture) receive(t *testing.T, guid string) *model.WebhookDelivery {
 
 func (fx *fixture) delivery(t *testing.T, guid string) *model.WebhookDelivery {
 	t.Helper()
-	due, err := fx.store.WebhookDeliveriesDue(1<<40, 100)
-	require.NoError(t, err)
-	for _, d := range due {
-		if d.GUID == guid {
-			full, err := fx.store.WebhookDeliveryGet(d.ID)
-			require.NoError(t, err)
-			return full
-		}
-	}
-	// settled
-	known, err := fx.store.WebhookDeliveriesKnown(fx.repo.ForgeID, []string{guid})
-	require.NoError(t, err)
-	require.Len(t, known, 1, "delivery %s kept", guid)
-	for id := int64(1); ; id++ {
-		d, err := fx.store.WebhookDeliveryGet(id)
-		require.NoError(t, err)
+	for _, d := range fx.deliveries(t) {
 		if d.GUID == guid {
 			return d
 		}
+	}
+	t.Fatalf("delivery %s not kept", guid)
+	return nil
+}
+
+// deliveries are all the deliveries kept, by ID.
+func (fx *fixture) deliveries(t *testing.T) []*model.WebhookDelivery {
+	t.Helper()
+	var all []*model.WebhookDelivery
+	for id := int64(1); ; id++ {
+		d, err := fx.store.WebhookDeliveryGet(id)
+		if errors.Is(err, store_types.ErrRecordNotExist) {
+			return all
+		}
+		require.NoError(t, err)
+		all = append(all, d)
 	}
 }
 
 // run dispatches the deliveries due and waits for them.
 func (fx *fixture) run(t *testing.T) {
 	t.Helper()
-	fx.inbox.dispatch(t.Context())
+	fx.inbox.dispatch(t.Context(), t.Context())
 	fx.inbox.wg.Wait()
 }
 
@@ -165,9 +169,7 @@ func TestReceiveKeepsTheRequest(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, created)
 	}
-	due, err := fx.store.WebhookDeliveriesDue(1<<40, 10)
-	require.NoError(t, err)
-	assert.Len(t, due, 3)
+	assert.Len(t, fx.deliveries(t), 3)
 
 	_, err = fx.inbox.Receive(fx.repo, http.Header{}, make([]byte, MaxBodyBytes+1))
 	assert.ErrorIs(t, err, ErrTooLarge)
@@ -268,7 +270,9 @@ func TestProcessAfterAStop(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, claimed)
 	d.PipelineID = half.ID
-	require.NoError(t, fx.store.WebhookDeliveryUpdate(d))
+	held, err := fx.store.WebhookDeliveryUpdate(d)
+	require.NoError(t, err)
+	require.True(t, held)
 	fx.run(t)
 	assert.Equal(t, model.DeliveryProcessing, fx.delivery(t, "g-1").State, "claimed until it expires")
 
@@ -309,7 +313,7 @@ func TestDispatchOnePerRepo(t *testing.T) {
 	fx.receive(t, "b-1")
 	fx.repo = repo
 
-	fx.inbox.dispatch(t.Context())
+	fx.inbox.dispatch(t.Context(), t.Context())
 	require.Eventually(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
@@ -370,7 +374,7 @@ func TestPurge(t *testing.T) {
 
 	fx.clock.Add(keepSettled + time.Second)
 	fx.inbox.purge()
-	known, err := fx.store.WebhookDeliveriesKnown(fx.repo.ForgeID, []string{"g-1", "g-2"})
+	known, err := fx.store.WebhookDeliveriesKnown(fx.repo.ForgeID, fx.repo.ID, []string{"g-1", "g-2"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"g-2"}, known)
 }
@@ -380,4 +384,145 @@ func TestRetryDelay(t *testing.T) {
 	assert.Equal(t, 2*firstRetryDelay, retryDelay(2))
 	assert.Equal(t, maxRetryDelay, retryDelay(10))
 	assert.Equal(t, maxRetryDelay, retryDelay(1000))
+}
+
+func TestReceiveHeaders(t *testing.T) {
+	fx := newFixture(t)
+	// Bitbucket's hook UUID is the webhook's, the same every time: not a
+	// delivery's ID
+	for _, body := range []string{`{"n":1}`, `{"n":2}`} {
+		header := http.Header{}
+		header.Set("X-Hook-UUID", "the-webhook")
+		header.Set("X-Gitlab-Token", "the-token")
+		created, err := fx.inbox.Receive(fx.repo, header, []byte(body))
+		require.NoError(t, err)
+		assert.True(t, created, "every delivery kept")
+	}
+	for _, d := range fx.deliveries(t) {
+		assert.NotContains(t, d.Header, "X-Gitlab-Token", "the webhook's token is not kept")
+	}
+
+	// IDs longer than the column are kept hashed, still deduplicated
+	long := strings.Repeat("y", maxGUIDLen+1)
+	for i, want := range []bool{true, false} {
+		header := http.Header{}
+		header.Set("X-GitHub-Delivery", long)
+		header.Set("X-GitHub-Event", strings.Repeat("e", maxEventLen+5))
+		created, err := fx.inbox.Receive(fx.repo, header, []byte(`{}`))
+		require.NoError(t, err)
+		assert.Equal(t, want, created, i)
+	}
+	all := fx.deliveries(t)
+	last := all[len(all)-1]
+	assert.True(t, strings.HasPrefix(last.GUID, "sha256:"))
+	assert.LessOrEqual(t, len(last.GUID), maxGUIDLen)
+	assert.Len(t, last.Event, maxEventLen)
+
+	header := http.Header{}
+	header.Set("X-GitHub-Delivery", strings.Repeat("z", maxGUIDLen))
+	created, err := fx.inbox.Receive(fx.repo, header, []byte(`{}`))
+	require.NoError(t, err)
+	assert.True(t, created)
+	assert.Equal(t, strings.Repeat("z", maxGUIDLen), fx.delivery(t, strings.Repeat("z", maxGUIDLen)).GUID, "as long as the column: kept as it is")
+}
+
+// A delivery waiting to be tried again holds back the next of its repo:
+// made in order, an older push's pipeline does not cancel a newer one's.
+func TestProcessInOrderWhileOneWaits(t *testing.T) {
+	fx := newFixture(t)
+	var order []string
+	fx.forge.EXPECT().Hook(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, r *http.Request) (*model.Repo, *model.Pipeline, error) {
+		guid := r.Header.Get("X-GitHub-Delivery")
+		order = append(order, guid)
+		if guid == "a-1" && len(order) == 1 {
+			return nil, nil, errors.New("forge unavailable")
+		}
+		return nil, nil, &types.ErrIgnoreEvent{}
+	})
+	fx.receive(t, "a-1")
+	fx.run(t)
+	require.Equal(t, model.DeliveryPending, fx.delivery(t, "a-1").State)
+
+	fx.receive(t, "a-2")
+	fx.run(t)
+	assert.Equal(t, []string{"a-1"}, order, "a-2 waits for a-1")
+	assert.Equal(t, model.DeliveryPending, fx.delivery(t, "a-2").State)
+
+	fx.clock.Add(firstRetryDelay)
+	fx.run(t)
+	fx.run(t)
+	assert.Equal(t, []string{"a-1", "a-1", "a-2"}, order)
+}
+
+// A delivery asked again late is not made into a pipeline once a later
+// one of its branch was made meanwhile.
+func TestProcessLateDelivery(t *testing.T) {
+	fx := newFixture(t)
+	push := func() *model.Pipeline {
+		return &model.Pipeline{Event: model.EventPush, Branch: "main", Ref: "refs/heads/main", Message: "[CI SKIP] x"}
+	}
+	fx.forge.EXPECT().Hook(mock.Anything, mock.Anything).RunAndReturn(func(context.Context, *http.Request) (*model.Repo, *model.Pipeline, error) {
+		return fx.repo, push(), nil
+	})
+	sent := fx.clock.Now()
+	fx.clock.Add(10 * time.Minute)
+	// a pipeline of main made after it was sent
+	later := &model.Pipeline{RepoID: fx.repo.ID, Event: model.EventPush, Branch: "main", Status: model.StatusSuccess}
+	require.NoError(t, fx.store.CreatePipeline(later))
+
+	fx.inbox.ExpectLate(fx.repo, "late", sent)
+	d := fx.receive(t, "late")
+	assert.Equal(t, sent.Unix(), d.Sent)
+	fx.run(t)
+	d = fx.delivery(t, "late")
+	assert.Equal(t, model.DeliveryIgnored, d.State)
+	assert.Contains(t, d.Error, "came late")
+
+	// one of another branch is made
+	fx.inbox.ExpectLate(fx.repo, "late-dev", sent)
+	fx.forge.EXPECT().Hook(mock.Anything, mock.Anything).Unset()
+	fx.forge.EXPECT().Hook(mock.Anything, mock.Anything).RunAndReturn(func(context.Context, *http.Request) (*model.Repo, *model.Pipeline, error) {
+		p := push()
+		p.Branch, p.Ref = "dev", "refs/heads/dev"
+		return fx.repo, p, nil
+	})
+	fx.receive(t, "late-dev")
+	fx.run(t)
+	d = fx.delivery(t, "late-dev")
+	assert.NotContains(t, d.Error, "came late", "skipped for its commit message, not for coming late")
+}
+
+func TestRunStopsWhatItProcessesAfterAWhile(t *testing.T) {
+	fx := newFixture(t)
+	fx.inbox.drain = 50 * time.Millisecond
+	started := make(chan struct{})
+	fx.forge.EXPECT().Hook(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, _ *http.Request) (*model.Repo, *model.Pipeline, error) {
+		close(started)
+		<-ctx.Done()
+		return nil, nil, ctx.Err()
+	}).Once()
+	fx.receive(t, "g-1")
+	fx.receive(t, "other")
+
+	ctx, cancel := context.WithCancelCause(t.Context())
+	done := make(chan struct{})
+	go func() {
+		fx.inbox.Run(ctx)
+		close(done)
+	}()
+	<-started
+	cancel(nil)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not stop what it processed")
+	}
+	d := fx.delivery(t, "g-1")
+	assert.Equal(t, model.DeliveryPending, d.State, "tried again by the next server")
+	assert.Equal(t, model.DeliveryPending, fx.delivery(t, "other").State, "nothing claimed once stopping")
+	assert.Zero(t, fx.delivery(t, "other").Attempts)
+
+	// stopped: dispatch claims nothing
+	fx.inbox.dispatch(ctx, t.Context())
+	assert.Zero(t, fx.delivery(t, "other").Attempts)
 }

@@ -20,10 +20,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
-	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge/types"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
@@ -67,7 +67,7 @@ func (in *Inbox) process(ctx context.Context, d *model.WebhookDelivery) result {
 	if !repo.IsActive {
 		return ignored("the repo is not active")
 	}
-	_forge, err := server.Config.Services.Manager.ForgeFromRepo(repo)
+	_forge, err := in.forgeOf(repo)
 	if err != nil {
 		return retry(fmt.Errorf("cannot get the forge of the repo: %w", err))
 	}
@@ -121,10 +121,15 @@ func (in *Inbox) process(ctx context.Context, d *model.WebhookDelivery) result {
 	if pipelineFromForge.IsPullRequest() && !repo.AllowPull {
 		return ignored("pull requests are disabled for the repo")
 	}
+	if superseded, err := in.superseded(d, repo, pipelineFromForge); err != nil {
+		return retry(err)
+	} else if superseded {
+		return ignored("came late: a later pipeline of its branch was made meanwhile")
+	}
 
 	stored := pipeline.OnStored(func(p *model.Pipeline) {
 		d.PipelineID = p.ID
-		if err := in.store.WebhookDeliveryUpdate(d); err != nil {
+		if _, err := in.store.WebhookDeliveryUpdate(d); err != nil {
 			log.Error().Err(err).Str("delivery", d.GUID).Msg("webhook inbox: cannot record the pipeline of a delivery")
 		}
 	})
@@ -137,6 +142,11 @@ func (in *Inbox) process(ctx context.Context, d *model.WebhookDelivery) result {
 	case err != nil && d.PipelineID == 0:
 		return retry(err)
 	case err != nil:
+		// stored, not started: it ends in error, to be restarted
+		res := in.settleStored(d)
+		if res.retry {
+			return res
+		}
 		return result{state: model.DeliveryFailed, pipeline: d.PipelineID, err: err}
 	case created != nil:
 		return result{state: model.DeliveryDone, pipeline: created.ID}
@@ -144,6 +154,31 @@ func (in *Inbox) process(ctx context.Context, d *model.WebhookDelivery) result {
 		// the pipeline was stored and ended in error: its config, say
 		return result{state: model.DeliveryDone, pipeline: d.PipelineID}
 	}
+}
+
+// lateAfter is how much later than sent a delivery is received for it to
+// be late: missed by the server, delivered again.
+const lateAfter = time.Minute
+
+// superseded tells whether a late delivery's pipeline, p, is superseded: a
+// pipeline of its event and branch (of its pull request) was made after it
+// was sent. Made now, it would cancel that later one.
+func (in *Inbox) superseded(d *model.WebhookDelivery, repo *model.Repo, p *model.Pipeline) (bool, error) {
+	if d.Sent == 0 || time.Unix(d.Received, 0).Sub(time.Unix(d.Sent, 0)) < lateAfter {
+		return false, nil
+	}
+	filter := &model.PipelineFilter{After: d.Sent - 1, Events: []model.WebhookEvent{p.Event}}
+	switch p.Event {
+	case model.EventPush:
+		filter.Branch = p.Branch
+	case model.EventPull, model.EventPullMetadata:
+		filter.RefContains = p.Ref
+		filter.Events = []model.WebhookEvent{model.EventPull, model.EventPullMetadata}
+	default:
+		return false, nil
+	}
+	later, err := in.store.GetPipelineList(repo, &model.ListOptionsWithAll{ListOptions: &model.ListOptions{Page: 1, PerPage: 1}}, filter)
+	return len(later) > 0, err
 }
 
 // settleStored settles a delivery whose pipeline an attempt stored before

@@ -148,8 +148,15 @@ func run(ctx context.Context, c *cli.Command) error {
 		inbox.Run(ctx)
 		return nil
 	})
-	// the deliveries that did not reach the server asked again
-	go webhook.NewReconciler(_store, webhook.ReconcilerOptions{}).Run(ctx)
+	// the deliveries that did not reach the server asked again; waited for
+	// too, its calls write tokens
+	if every := c.Duration("webhook-reconcile-interval"); every > 0 {
+		reconciler := webhook.NewReconciler(_store, webhook.ReconcilerOptions{Every: every, Inbox: inbox})
+		serviceWaitingGroup.Go(func() error {
+			reconciler.Run(ctx)
+			return nil
+		})
+	}
 
 	serviceWaitingGroup.Go(func() error {
 		log.Info().Msg("starting cron service ...")

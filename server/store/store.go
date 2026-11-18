@@ -291,12 +291,14 @@ type Store interface {
 	BotTokenCallPurge(before int64) (int64, error)
 
 	// WebhookDelivery
-	// WebhookDeliveryCreate stores a delivery unless its forge's delivery
-	// with its GUID is stored already: false then.
+	// WebhookDeliveryCreate stores a delivery unless the repo's delivery
+	// with its GUID is stored already: false then. One stored that failed is
+	// queued again with it instead: true.
 	WebhookDeliveryCreate(*model.WebhookDelivery) (bool, error)
 	// WebhookDeliveriesDue lists, by ID, at most limit deliveries due at now
-	// (unix seconds): pending ones whose turn came, processing ones whose
-	// claim expired. Without their header and body.
+	// (unix seconds): of each repo, the first not settled, if pending and its
+	// turn came or processing and its claim expired. Without their header
+	// and body.
 	WebhookDeliveriesDue(now int64, limit int) ([]*model.WebhookDelivery, error)
 	// WebhookDeliveryClaim claims the delivery, as WebhookDeliveriesDue
 	// listed it, until (unix seconds), counting an attempt: false if it
@@ -304,11 +306,12 @@ type Store interface {
 	WebhookDeliveryClaim(d *model.WebhookDelivery, until, now int64) (bool, error)
 	WebhookDeliveryGet(id int64) (*model.WebhookDelivery, error)
 	// WebhookDeliveryUpdate writes the delivery's state, next try, error,
-	// pipeline and update time.
-	WebhookDeliveryUpdate(*model.WebhookDelivery) error
-	// WebhookDeliveriesKnown tells which of guids the forge's deliveries
+	// pipeline and update time while the claim of its attempt holds: false
+	// if it was lost.
+	WebhookDeliveryUpdate(*model.WebhookDelivery) (bool, error)
+	// WebhookDeliveriesKnown tells which of guids the repo's deliveries
 	// stored have.
-	WebhookDeliveriesKnown(forgeID int64, guids []string) ([]string, error)
+	WebhookDeliveriesKnown(forgeID, repoID int64, guids []string) ([]string, error)
 	// WebhookDeliveriesPurge deletes at most limit deliveries settled before
 	// (unix seconds), telling how many.
 	WebhookDeliveriesPurge(before int64, limit int) (int64, error)

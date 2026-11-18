@@ -69,12 +69,12 @@ func TestHookKeepsDeliveryOnce(t *testing.T) {
 	assert.Equal(t, http.StatusOK, postHook(t, s, inbox, repo, hookSecret, "d-1", []byte(`{"ref":"refs/heads/main"}`)), "delivered again")
 	assert.Equal(t, http.StatusAccepted, postHook(t, s, inbox, repo, hookSecret, "d-2", []byte(`{}`)))
 
-	known, err := s.WebhookDeliveriesKnown(repo.ForgeID, []string{"d-1", "d-2"})
+	known, err := s.WebhookDeliveriesKnown(repo.ForgeID, repo.ID, []string{"d-1", "d-2"})
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"d-1", "d-2"}, known)
 	due, err := s.WebhookDeliveriesDue(1<<40, 10)
 	require.NoError(t, err)
-	require.Len(t, due, 2, "one row per delivery")
+	require.Len(t, due, 1, "the repo's first is due, the next after it")
 	kept, err := s.WebhookDeliveryGet(due[0].ID)
 	require.NoError(t, err)
 	assert.Equal(t, "push", kept.Event)
@@ -170,4 +170,16 @@ func TestHookWithoutInbox(t *testing.T) {
 	}
 	require.NoError(t, s.CreateRepo(repo))
 	assert.Equal(t, http.StatusInternalServerError, postHook(t, s, nil, repo, hookSecret, "d-1", []byte(`{}`)))
+}
+
+func TestHookTakesTheLargestBody(t *testing.T) {
+	s := datastore.NewTestStore(t)
+	repo := &model.Repo{
+		ForgeID: 1, ForgeRemoteID: "1", Owner: "owner", Name: "name", FullName: "owner/name",
+		IsActive: true, UserID: 1, WebhookSecret: hookSecret,
+	}
+	require.NoError(t, s.CreateRepo(repo))
+	inbox := webhook.New(s, pipeline.WorkflowEnd{}, webhook.Options{})
+	assert.Equal(t, http.StatusAccepted, postHook(t, s, inbox, repo, hookSecret, "d-max", make([]byte, webhook.MaxBodyBytes)))
+	assert.Equal(t, http.StatusRequestEntityTooLarge, postHook(t, s, inbox, repo, hookSecret, "d-over", make([]byte, webhook.MaxBodyBytes+1)))
 }

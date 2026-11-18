@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 	"strconv"
 
@@ -70,21 +71,22 @@ func getAgentName(store store.Store, agentNameMap map[int64]string, agentID int6
 func PostHook(c *gin.Context) {
 	_store := store.FromContext(c)
 
-	// read first: the token may be looked for in a form, which reads it
-	body, err := webhook.ReadBody(c.Request)
-	if errors.Is(err, webhook.ErrTooLarge) {
-		c.String(http.StatusRequestEntityTooLarge, err.Error())
-		return
+	// a form is read first: looking for the token in it reads it. Any other
+	// body only once the token is checked.
+	var body []byte
+	form := isForm(c.Request)
+	if form {
+		var err error
+		if body, err = readHookBody(c.Request); err != nil {
+			hookBodyErr(c, err)
+			return
+		}
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
 	}
-	if err != nil {
-		c.String(http.StatusBadRequest, "cannot read the webhook")
-		return
-	}
-	c.Request.Body = io.NopCloser(bytes.NewReader(body))
 
 	var repo *model.Repo
 
-	_, err = token.ParseRequest([]token.Type{token.HookToken}, c.Request, func(t *token.Token) (string, error) {
+	_, err := token.ParseRequest([]token.Type{token.HookToken}, c.Request, func(t *token.Token) (string, error) {
 		var err error
 		repo, err = getRepoFromToken(_store, t)
 		if err != nil {
@@ -113,6 +115,13 @@ func PostHook(c *gin.Context) {
 		return
 	}
 
+	if !form {
+		if body, err = readHookBody(c.Request); err != nil {
+			hookBodyErr(c, err)
+			return
+		}
+	}
+
 	inbox, ok := webhook.FromContext(c)
 	if !ok {
 		log.Error().Msg("no webhook inbox")
@@ -131,6 +140,37 @@ func PostHook(c *gin.Context) {
 	default:
 		c.String(http.StatusAccepted, "kept")
 	}
+}
+
+// isForm tells whether the webhook's body is a form.
+func isForm(r *http.Request) bool {
+	ct, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	return ct == "application/x-www-form-urlencoded"
+}
+
+// readHookBody reads the body of a webhook, at most webhook.MaxBodyBytes. A
+// form read already, by a middleware looking for a token in it, is its
+// fields encoded again.
+func readHookBody(r *http.Request) ([]byte, error) {
+	if isForm(r) && r.PostForm != nil {
+		return []byte(r.PostForm.Encode()), nil
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, webhook.MaxBodyBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > webhook.MaxBodyBytes {
+		return nil, webhook.ErrTooLarge
+	}
+	return body, nil
+}
+
+func hookBodyErr(c *gin.Context, err error) {
+	if errors.Is(err, webhook.ErrTooLarge) {
+		c.String(http.StatusRequestEntityTooLarge, err.Error())
+		return
+	}
+	c.String(http.StatusBadRequest, "cannot read the webhook")
 }
 
 func getRepoFromToken(store store.Store, t *token.Token) (*model.Repo, error) {

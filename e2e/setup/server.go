@@ -226,6 +226,7 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	rpcStore := &FaultyStore{Store: memStore}
 	grpcAddr, stopGRPC := startGRPCServer(ctx, t, rpcStore, end, "127.0.0.1:0")
 
+	inbox := webhook.New(memStore, end, webhook.Options{Poll: inboxPoll})
 	env := &ServerEnv{
 		GRPCAddr:   grpcAddr,
 		Store:      memStore,
@@ -249,9 +250,9 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 		ctx:          ctx,
 		rpcStore:     rpcStore,
 
-		Inbox: webhook.New(memStore, end, webhook.Options{Poll: inboxPoll}),
+		Inbox: inbox,
 		Reconciler: webhook.NewReconciler(memStore, webhook.ReconcilerOptions{
-			FirstAfter: reconcileFirstAfter, Link: server.Config.Server.Host,
+			FirstAfter: reconcileFirstAfter, Link: server.Config.Server.Host, Inbox: inbox,
 		}),
 		Hooks: hooks,
 	}

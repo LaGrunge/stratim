@@ -15,6 +15,7 @@
 package datastore
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -52,20 +53,69 @@ func TestWebhookDeliveryCreateOnce(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, created, "a delivery again is taken once")
 
-	// another forge's delivery of the same GUID is another
+	// another forge's delivery of the same GUID is another, and another
+	// repo's
 	created, err = store.WebhookDeliveryCreate(newDelivery(2, "guid-1", 100))
+	require.NoError(t, err)
+	assert.True(t, created)
+	otherRepo := newDelivery(1, "guid-1", 100)
+	otherRepo.RepoID = 8
+	created, err = store.WebhookDeliveryCreate(otherRepo)
 	require.NoError(t, err)
 	assert.True(t, created)
 
 	n, err := store.engine.Count(new(model.WebhookDelivery))
 	require.NoError(t, err)
-	assert.EqualValues(t, 2, n, "one row per delivery")
+	assert.EqualValues(t, 3, n, "one row per delivery")
 
 	got, err := store.WebhookDeliveryGet(first.ID)
 	require.NoError(t, err)
 	assert.Equal(t, first.Header, got.Header)
 	assert.Equal(t, first.Body, got.Body)
 	assert.EqualValues(t, 100, got.NextTry, "the first one stays")
+
+	// long IDs fit the column whole
+	long := strings.Repeat("x", 100)
+	created, err = store.WebhookDeliveryCreate(newDelivery(1, long, 100))
+	require.NoError(t, err)
+	assert.True(t, created)
+	created, err = store.WebhookDeliveryCreate(newDelivery(1, long, 100))
+	require.NoError(t, err)
+	assert.False(t, created)
+}
+
+// A delivery that failed, delivered again (by hand, say), is queued again.
+func TestWebhookDeliveryCreateRequeuesFailed(t *testing.T) {
+	store, closer := newTestStore(t, new(model.WebhookDelivery))
+	defer closer()
+
+	for _, state := range []model.WebhookDeliveryState{model.DeliveryFailed, model.DeliveryDone, model.DeliveryIgnored, model.DeliveryProcessing} {
+		d := newDelivery(1, string(state), 100)
+		_, err := store.WebhookDeliveryCreate(d)
+		require.NoError(t, err)
+		_, err = store.engine.Exec("UPDATE webhook_deliveries SET state = ?, attempts = 5, error = 'gave up', pipeline_id = 3 WHERE id = ?", state, d.ID)
+		require.NoError(t, err)
+
+		again := newDelivery(1, string(state), 900)
+		again.Body = []byte("again")
+		created, err := store.WebhookDeliveryCreate(again)
+		require.NoError(t, err)
+		got, err := store.WebhookDeliveryGet(d.ID)
+		require.NoError(t, err)
+		if state != model.DeliveryFailed {
+			assert.False(t, created, state)
+			assert.Equal(t, state, got.State)
+			continue
+		}
+		assert.True(t, created, "a failed one is queued again")
+		assert.Equal(t, model.DeliveryPending, got.State)
+		assert.EqualValues(t, 900, got.NextTry)
+		assert.EqualValues(t, 900, got.Received)
+		assert.Zero(t, got.Attempts)
+		assert.Empty(t, got.Error)
+		assert.Zero(t, got.PipelineID)
+		assert.Equal(t, []byte("again"), got.Body)
+	}
 }
 
 func TestWebhookDeliveriesDueAndClaim(t *testing.T) {
@@ -85,6 +135,11 @@ func TestWebhookDeliveriesDueAndClaim(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	// one repo each: of each, the first not settled
+	for i, d := range []*model.WebhookDelivery{due, later, expired, claimed, done} {
+		_, err := store.engine.Exec("UPDATE webhook_deliveries SET repo_id = ? WHERE id = ?", 100+i, d.ID)
+		require.NoError(t, err)
+	}
 	list, err := store.WebhookDeliveriesDue(200, 10)
 	require.NoError(t, err)
 	require.Len(t, list, 2)
@@ -118,7 +173,17 @@ func TestWebhookDeliveriesDueAndClaim(t *testing.T) {
 	got.PipelineID = 42
 	got.Error = "none"
 	got.Updated = 210
-	require.NoError(t, store.WebhookDeliveryUpdate(got))
+	stale := *got
+	stale.Attempts = 0
+	held, err := store.WebhookDeliveryUpdate(&stale)
+	require.NoError(t, err)
+	assert.False(t, held, "the claim of another attempt")
+	held, err = store.WebhookDeliveryUpdate(got)
+	require.NoError(t, err)
+	assert.True(t, held)
+	held, err = store.WebhookDeliveryUpdate(got)
+	require.NoError(t, err)
+	assert.False(t, held, "settled: no claim holds")
 	got, err = store.WebhookDeliveryGet(due.ID)
 	require.NoError(t, err)
 	assert.Equal(t, model.DeliveryDone, got.State)
@@ -137,10 +202,13 @@ func TestWebhookDeliveriesKnownAndPurge(t *testing.T) {
 		_, err := store.WebhookDeliveryCreate(d)
 		require.NoError(t, err)
 	}
-	known, err := store.WebhookDeliveriesKnown(1, []string{"a", "c", "x"})
+	known, err := store.WebhookDeliveriesKnown(1, 7, []string{"a", "c", "x"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"a"}, known)
-	known, err = store.WebhookDeliveriesKnown(1, nil)
+	known, err = store.WebhookDeliveriesKnown(1, 8, []string{"a"})
+	require.NoError(t, err)
+	assert.Empty(t, known, "another repo's")
+	known, err = store.WebhookDeliveriesKnown(1, 7, nil)
 	require.NoError(t, err)
 	assert.Empty(t, known)
 
@@ -153,10 +221,42 @@ func TestWebhookDeliveriesKnownAndPurge(t *testing.T) {
 	n, err := store.WebhookDeliveriesPurge(100, 10)
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, n)
-	known, err = store.WebhookDeliveriesKnown(1, []string{"a", "b"})
+	known, err = store.WebhookDeliveriesKnown(1, 7, []string{"a", "b"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"b"}, known)
 	n, err = store.WebhookDeliveriesPurge(100, 10)
 	require.NoError(t, err)
 	assert.Zero(t, n)
+}
+
+// A repo's deliveries go one at a time, in order: the first not settled
+// holds the next back while it waits for its turn or is processed.
+func TestWebhookDeliveriesDueInOrderPerRepo(t *testing.T) {
+	store, closer := newTestStore(t, new(model.WebhookDelivery))
+	defer closer()
+
+	first := newDelivery(1, "first", 300) // waits for its next try
+	second := newDelivery(1, "second", 100)
+	other := newDelivery(1, "other", 100)
+	other.RepoID = 8
+	for _, d := range []*model.WebhookDelivery{first, second, other} {
+		_, err := store.WebhookDeliveryCreate(d)
+		require.NoError(t, err)
+	}
+	list, err := store.WebhookDeliveriesDue(200, 10)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.Equal(t, "other", list[0].GUID, "second waits for first")
+
+	list, err = store.WebhookDeliveriesDue(300, 10)
+	require.NoError(t, err)
+	require.Len(t, list, 2)
+	assert.Equal(t, "first", list[0].GUID)
+
+	_, err = store.engine.Exec("UPDATE webhook_deliveries SET state = ? WHERE id = ?", model.DeliveryDone, first.ID)
+	require.NoError(t, err)
+	list, err = store.WebhookDeliveriesDue(300, 10)
+	require.NoError(t, err)
+	require.Len(t, list, 2)
+	assert.Equal(t, "second", list[0].GUID, "its turn once first settled")
 }

@@ -8190,8 +8190,8 @@ func (_c *MockStore_WebhookDeliveriesDue_Call) RunAndReturn(run func(now int64, 
 }
 
 // WebhookDeliveriesKnown provides a mock function for the type MockStore
-func (_mock *MockStore) WebhookDeliveriesKnown(forgeID int64, guids []string) ([]string, error) {
-	ret := _mock.Called(forgeID, guids)
+func (_mock *MockStore) WebhookDeliveriesKnown(forgeID int64, repoID int64, guids []string) ([]string, error) {
+	ret := _mock.Called(forgeID, repoID, guids)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WebhookDeliveriesKnown")
@@ -8199,18 +8199,18 @@ func (_mock *MockStore) WebhookDeliveriesKnown(forgeID int64, guids []string) ([
 
 	var r0 []string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(int64, []string) ([]string, error)); ok {
-		return returnFunc(forgeID, guids)
+	if returnFunc, ok := ret.Get(0).(func(int64, int64, []string) ([]string, error)); ok {
+		return returnFunc(forgeID, repoID, guids)
 	}
-	if returnFunc, ok := ret.Get(0).(func(int64, []string) []string); ok {
-		r0 = returnFunc(forgeID, guids)
+	if returnFunc, ok := ret.Get(0).(func(int64, int64, []string) []string); ok {
+		r0 = returnFunc(forgeID, repoID, guids)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(int64, []string) error); ok {
-		r1 = returnFunc(forgeID, guids)
+	if returnFunc, ok := ret.Get(1).(func(int64, int64, []string) error); ok {
+		r1 = returnFunc(forgeID, repoID, guids)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -8224,24 +8224,30 @@ type MockStore_WebhookDeliveriesKnown_Call struct {
 
 // WebhookDeliveriesKnown is a helper method to define mock.On call
 //   - forgeID int64
+//   - repoID int64
 //   - guids []string
-func (_e *MockStore_Expecter) WebhookDeliveriesKnown(forgeID any, guids any) *MockStore_WebhookDeliveriesKnown_Call {
-	return &MockStore_WebhookDeliveriesKnown_Call{Call: _e.mock.On("WebhookDeliveriesKnown", forgeID, guids)}
+func (_e *MockStore_Expecter) WebhookDeliveriesKnown(forgeID any, repoID any, guids any) *MockStore_WebhookDeliveriesKnown_Call {
+	return &MockStore_WebhookDeliveriesKnown_Call{Call: _e.mock.On("WebhookDeliveriesKnown", forgeID, repoID, guids)}
 }
 
-func (_c *MockStore_WebhookDeliveriesKnown_Call) Run(run func(forgeID int64, guids []string)) *MockStore_WebhookDeliveriesKnown_Call {
+func (_c *MockStore_WebhookDeliveriesKnown_Call) Run(run func(forgeID int64, repoID int64, guids []string)) *MockStore_WebhookDeliveriesKnown_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 int64
 		if args[0] != nil {
 			arg0 = args[0].(int64)
 		}
-		var arg1 []string
+		var arg1 int64
 		if args[1] != nil {
-			arg1 = args[1].([]string)
+			arg1 = args[1].(int64)
+		}
+		var arg2 []string
+		if args[2] != nil {
+			arg2 = args[2].([]string)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -8252,7 +8258,7 @@ func (_c *MockStore_WebhookDeliveriesKnown_Call) Return(strings []string, err er
 	return _c
 }
 
-func (_c *MockStore_WebhookDeliveriesKnown_Call) RunAndReturn(run func(forgeID int64, guids []string) ([]string, error)) *MockStore_WebhookDeliveriesKnown_Call {
+func (_c *MockStore_WebhookDeliveriesKnown_Call) RunAndReturn(run func(forgeID int64, repoID int64, guids []string) ([]string, error)) *MockStore_WebhookDeliveriesKnown_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -8518,20 +8524,29 @@ func (_c *MockStore_WebhookDeliveryGet_Call) RunAndReturn(run func(id int64) (*m
 }
 
 // WebhookDeliveryUpdate provides a mock function for the type MockStore
-func (_mock *MockStore) WebhookDeliveryUpdate(webhookDelivery *model.WebhookDelivery) error {
+func (_mock *MockStore) WebhookDeliveryUpdate(webhookDelivery *model.WebhookDelivery) (bool, error) {
 	ret := _mock.Called(webhookDelivery)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WebhookDeliveryUpdate")
 	}
 
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*model.WebhookDelivery) error); ok {
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*model.WebhookDelivery) (bool, error)); ok {
+		return returnFunc(webhookDelivery)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*model.WebhookDelivery) bool); ok {
 		r0 = returnFunc(webhookDelivery)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(*model.WebhookDelivery) error); ok {
+		r1 = returnFunc(webhookDelivery)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
 // MockStore_WebhookDeliveryUpdate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WebhookDeliveryUpdate'
@@ -8558,12 +8573,12 @@ func (_c *MockStore_WebhookDeliveryUpdate_Call) Run(run func(webhookDelivery *mo
 	return _c
 }
 
-func (_c *MockStore_WebhookDeliveryUpdate_Call) Return(err error) *MockStore_WebhookDeliveryUpdate_Call {
-	_c.Call.Return(err)
+func (_c *MockStore_WebhookDeliveryUpdate_Call) Return(b bool, err error) *MockStore_WebhookDeliveryUpdate_Call {
+	_c.Call.Return(b, err)
 	return _c
 }
 
-func (_c *MockStore_WebhookDeliveryUpdate_Call) RunAndReturn(run func(webhookDelivery *model.WebhookDelivery) error) *MockStore_WebhookDeliveryUpdate_Call {
+func (_c *MockStore_WebhookDeliveryUpdate_Call) RunAndReturn(run func(webhookDelivery *model.WebhookDelivery) (bool, error)) *MockStore_WebhookDeliveryUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }

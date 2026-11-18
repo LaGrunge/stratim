@@ -15,6 +15,7 @@
 package github
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -64,7 +65,7 @@ func TestHookDeliveries(t *testing.T) {
 	)
 
 	c := &client{API: defaultAPI, url: defaultURL}
-	got, err := c.HookDeliveries(ctx, &model.User{AccessToken: "token"}, &model.Repo{Owner: "octocat", Name: "hello-world"}, "https://ci.example.com/api/hook", since)
+	got, err := c.HookDeliveries(ctx, &model.User{AccessToken: "token"}, &model.Repo{ForgeRemoteID: "paged", Owner: "octocat", Name: "hello-world"}, "https://ci.example.com/api/hook", since)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"", "next1"}, cursors, "pages read until one older than since")
 	assert.Equal(t, []*forge_types.HookDelivery{
@@ -84,7 +85,7 @@ func TestHookDeliveriesWithoutHook(t *testing.T) {
 		}),
 	)
 	c := &client{API: defaultAPI, url: defaultURL}
-	got, err := c.HookDeliveries(ctx, &model.User{AccessToken: "token"}, &model.Repo{Owner: "octocat", Name: "hello-world"}, "https://ci.example.com/api/hook", time.Now())
+	got, err := c.HookDeliveries(ctx, &model.User{AccessToken: "token"}, &model.Repo{ForgeRemoteID: "hookless", Owner: "octocat", Name: "hello-world"}, "https://ci.example.com/api/hook", time.Now())
 	require.NoError(t, err)
 	assert.Empty(t, got)
 }
@@ -106,4 +107,62 @@ func TestRedeliverHook(t *testing.T) {
 	for _, id := range []string{"12", "x/12", "2/x", ""} {
 		assert.Error(t, c.RedeliverHook(ctx, u, r, &forge_types.HookDelivery{ID: id}), id)
 	}
+}
+
+// The webhook's ID is found once, on any page of the repo's hooks, and
+// found again once the webhook is replaced.
+func TestHookDeliveriesFindsTheHookOnce(t *testing.T) {
+	listed, delivered := 0, 0
+	hookID := int64(7)
+	ctx := mockedContext(
+		t, t.Context(),
+		github_mock.WithRequestMatchHandler(github_mock.GetReposHooksByOwnerByRepo, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			listed++
+			if r.URL.Query().Get("page") == "" {
+				w.Header().Set("Link", `<https://api.github.com/repos/octocat/hello-world/hooks?page=2>; rel="next"`)
+				writeJSON(t, w, []*github.Hook{{ID: new(int64(1)), Config: &github.HookConfig{URL: new("https://other.example.com/hook")}}})
+				return
+			}
+			writeJSON(t, w, []*github.Hook{{ID: new(hookID), Config: &github.HookConfig{URL: new("https://ci.example.com/api/hook?access_token=x")}}})
+		})),
+		github_mock.WithRequestMatchHandler(github_mock.GetReposHooksDeliveriesByOwnerByRepoByHookId, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			delivered++
+			if r.URL.Path != fmt.Sprintf("/repos/octocat/hello-world/hooks/%d/deliveries", hookID) {
+				w.WriteHeader(http.StatusNotFound)
+				writeJSON(t, w, map[string]string{"message": "Not Found"})
+				return
+			}
+			writeJSON(t, w, []*github.HookDelivery{})
+		})),
+	)
+	c := &client{API: defaultAPI, url: defaultURL}
+	u, r := &model.User{AccessToken: "token"}, &model.Repo{ForgeRemoteID: "cached", Owner: "octocat", Name: "hello-world"}
+	for range 2 {
+		_, err := c.HookDeliveries(ctx, u, r, "https://ci.example.com/api/hook", time.Now())
+		require.NoError(t, err)
+	}
+	assert.Equal(t, 2, listed, "two pages, once")
+	assert.Equal(t, 2, delivered)
+
+	hookID = 8 // replaced
+	_, err := c.HookDeliveries(ctx, u, r, "https://ci.example.com/api/hook", time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, 4, listed, "found again")
+	assert.Equal(t, 4, delivered, "the stale ID, then the new one")
+}
+
+func TestHookDeliveriesRateLimited(t *testing.T) {
+	ctx := mockedContext(
+		t, t.Context(),
+		github_mock.WithRequestMatchHandler(github_mock.GetReposHooksByOwnerByRepo, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("X-RateLimit-Limit", "5000")
+			w.Header().Set("X-RateLimit-Remaining", "0")
+			w.Header().Set("X-RateLimit-Reset", fmt.Sprint(time.Now().Add(time.Hour).Unix()))
+			w.WriteHeader(http.StatusForbidden)
+			writeJSON(t, w, map[string]string{"message": "API rate limit exceeded"})
+		})),
+	)
+	c := &client{API: defaultAPI, url: defaultURL}
+	_, err := c.HookDeliveries(ctx, &model.User{AccessToken: "token"}, &model.Repo{ForgeRemoteID: "limited", Owner: "octocat", Name: "hello-world"}, "https://ci.example.com/api/hook", time.Now())
+	assert.ErrorIs(t, err, forge_types.ErrRateLimited)
 }

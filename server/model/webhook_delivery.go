@@ -38,26 +38,30 @@ const (
 // again gives the same GUID, which is taken once.
 type WebhookDelivery struct {
 	ID int64 `xorm:"pk autoincr 'id'"`
-	// ForgeID and GUID, the delivery's ID the forge gave, are unique.
+	// ForgeID, RepoID and GUID, the delivery's ID the forge gave, are
+	// unique: a repo's deliveries do not stand for another's.
 	ForgeID int64  `xorm:"UNIQUE(delivery) 'forge_id'"`
+	RepoID  int64  `xorm:"UNIQUE(delivery) INDEX(head) 'repo_id'"`
 	GUID    string `xorm:"UNIQUE(delivery) VARCHAR(100) 'guid'"`
-	RepoID  int64  `xorm:"INDEX 'repo_id'"`
 	// Event is the forge's name of the event, for the logs.
 	Event string `xorm:"VARCHAR(100) 'event'"`
 	// Header and Body are the request's, the body gzipped: what the forge
 	// parses again.
 	Header map[string][]string  `xorm:"json TEXT 'header'"`
 	Body   []byte               `xorm:"LONGBLOB 'body'"`
-	State  WebhookDeliveryState `xorm:"VARCHAR(20) INDEX(due) 'state'"`
+	State  WebhookDeliveryState `xorm:"VARCHAR(20) INDEX(head) 'state'"`
 	// NextTry is when (unix seconds) a pending delivery is tried, or when
 	// the claim on one processing expires.
-	NextTry  int64 `xorm:"INDEX(due) 'next_try'"`
+	NextTry  int64 `xorm:"'next_try'"`
 	Attempts int   `xorm:"'attempts'"`
 	// Error is why the last attempt failed.
 	Error      string `xorm:"TEXT 'error'"`
 	PipelineID int64  `xorm:"'pipeline_id'"`
-	// Received and Updated are unix seconds.
+	// Received and Updated are unix seconds; Sent is when the forge first
+	// sent it, earlier than Received for a delivery that missed the server
+	// and came again.
 	Received int64 `xorm:"'received'"`
+	Sent     int64 `xorm:"'sent'"`
 	Updated  int64 `xorm:"INDEX 'updated'"`
 }
 

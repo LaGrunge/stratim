@@ -24,17 +24,19 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
 
+	"go.woodpecker-ci.org/woodpecker/v3/server"
+	"go.woodpecker-ci.org/woodpecker/v3/server/forge"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/pipeline"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
@@ -64,6 +66,11 @@ const (
 	// The longest error kept of a delivery.
 	maxErrorLen = 1000
 
+	// How long a stopping server waits for the deliveries it processes
+	// before it stops them: what one stopped left half made is settled by
+	// the next server.
+	drainTimeout = 20 * time.Second
+
 	// The deliveries processed at once, each of another repo.
 	defaultWorkers = 4
 	// How often due deliveries are looked for without a new one coming.
@@ -78,14 +85,22 @@ var ErrTooLarge = fmt.Errorf("webhook body over %d bytes", MaxBodyBytes)
 var (
 	deliveryIDHeaders = []string{
 		"X-GitHub-Delivery", "X-Gitea-Delivery", "X-Forgejo-Delivery", "X-Gogs-Delivery",
-		"X-Gitlab-Event-UUID", "X-Request-UUID", "X-Hook-UUID",
+		"X-Gitlab-Event-UUID", "X-Request-UUID",
 	}
 	eventHeaders = []string{
 		"X-GitHub-Event", "X-Gitea-Event", "X-Forgejo-Event", "X-Gogs-Event",
 		"X-Gitlab-Event", "X-Event-Key",
 	}
-	// What is not kept of a request: credentials.
-	droppedHeaders = []string{"Authorization", "Cookie", "Proxy-Authorization"}
+	// What is not kept of a request: credentials, the webhook's token
+	// among them.
+	droppedHeaders = []string{"Authorization", "Cookie", "Proxy-Authorization", "X-Gitlab-Token"}
+)
+
+// The longest delivery ID and event name kept as they are: longer IDs are
+// kept hashed, longer names cut.
+const (
+	maxGUIDLen  = 100
+	maxEventLen = 100
 )
 
 // Options tune an Inbox; zero values take the defaults.
@@ -96,6 +111,8 @@ type Options struct {
 	Poll time.Duration
 	// Now is the clock.
 	Now func() time.Time
+	// ForgeOf gives the forge of a repo; the server's forges if nil.
+	ForgeOf func(*model.Repo) (forge.Forge, error)
 }
 
 // Inbox keeps the webhooks taken and makes pipelines of them.
@@ -104,12 +121,22 @@ type Inbox struct {
 	end     pipeline.WorkflowEnd
 	workers int
 	poll    time.Duration
+	drain   time.Duration
 	now     func() time.Time
+	forgeOf func(*model.Repo) (forge.Forge, error)
 	kick    chan struct{}
 
 	mu   sync.Mutex
 	busy map[int64]bool // the repos a delivery of is processed
+	// late are the deliveries a Reconciler asked again, by repo and GUID:
+	// when they were first sent.
+	late map[lateKey]time.Time
 	wg   sync.WaitGroup
+}
+
+type lateKey struct {
+	repo int64
+	guid string
 }
 
 // New makes an Inbox on s; the pipelines it creates end through end.
@@ -119,9 +146,17 @@ func New(s store.Store, end pipeline.WorkflowEnd, opts Options) *Inbox {
 		end:     end,
 		workers: opts.Workers,
 		poll:    opts.Poll,
+		drain:   drainTimeout,
 		now:     opts.Now,
+		forgeOf: opts.ForgeOf,
 		kick:    make(chan struct{}, 1),
 		busy:    make(map[int64]bool),
+		late:    make(map[lateKey]time.Time),
+	}
+	if in.forgeOf == nil {
+		in.forgeOf = func(repo *model.Repo) (forge.Forge, error) {
+			return server.Config.Services.Manager.ForgeFromRepo(repo)
+		}
 	}
 	if in.workers <= 0 {
 		in.workers = defaultWorkers
@@ -133,23 +168,6 @@ func New(s store.Store, end pipeline.WorkflowEnd, opts Options) *Inbox {
 		in.now = time.Now
 	}
 	return in
-}
-
-// ReadBody reads the body of a webhook, at most MaxBodyBytes: ErrTooLarge
-// past that. A form read already, as looking for a token in it does, is
-// its fields encoded again.
-func ReadBody(r *http.Request) ([]byte, error) {
-	if ct, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); ct == "application/x-www-form-urlencoded" && r.PostForm != nil {
-		return []byte(r.PostForm.Encode()), nil
-	}
-	body, err := io.ReadAll(io.LimitReader(r.Body, MaxBodyBytes+1))
-	if err != nil {
-		return nil, fmt.Errorf("read the webhook body: %w", err)
-	}
-	if len(body) > MaxBodyBytes {
-		return nil, ErrTooLarge
-	}
-	return body, nil
 }
 
 // Receive keeps the webhook of repo, its token checked, its header and
@@ -164,28 +182,44 @@ func (in *Inbox) Receive(repo *model.Repo, header http.Header, body []byte) (boo
 		return false, err
 	}
 	guid := firstHeader(header, deliveryIDHeaders)
-	if guid == "" {
+	switch {
+	case guid == "":
 		// a forge that does not tell: kept, not deduplicated
 		guid, err = randomGUID()
 		if err != nil {
 			return false, err
 		}
+	case len(guid) > maxGUIDLen:
+		sum := sha256.Sum256([]byte(guid))
+		guid = "sha256:" + hex.EncodeToString(sum[:])
 	}
 	kept := header.Clone()
 	for _, h := range droppedHeaders {
 		kept.Del(h)
 	}
 	now := in.now().Unix()
+	sent := now
+	in.mu.Lock()
+	if at, ok := in.late[lateKey{repo.ID, guid}]; ok {
+		sent = at.Unix()
+		delete(in.late, lateKey{repo.ID, guid})
+	}
+	in.mu.Unlock()
+	event := firstHeader(header, eventHeaders)
+	if len(event) > maxEventLen {
+		event = event[:maxEventLen]
+	}
 	d := &model.WebhookDelivery{
 		ForgeID:  repo.ForgeID,
 		GUID:     guid,
 		RepoID:   repo.ID,
-		Event:    firstHeader(header, eventHeaders),
+		Event:    event,
 		Header:   kept,
 		Body:     zipped,
 		State:    model.DeliveryPending,
 		NextTry:  now,
 		Received: now,
+		Sent:     sent,
 		Updated:  now,
 	}
 	created, err := in.store.WebhookDeliveryCreate(d)
@@ -200,6 +234,15 @@ func (in *Inbox) Receive(repo *model.Repo, header http.Header, body []byte) (boo
 	return created, nil
 }
 
+// ExpectLate tells the delivery guid of repo, which the forge first sent
+// then, comes again late: made into a pipeline only if no later one of its
+// branch was made meanwhile.
+func (in *Inbox) ExpectLate(repo *model.Repo, guid string, sent time.Time) {
+	in.mu.Lock()
+	defer in.mu.Unlock()
+	in.late[lateKey{repo.ID, guid}] = sent
+}
+
 // Kick has Run look for due deliveries now.
 func (in *Inbox) Kick() {
 	select {
@@ -209,19 +252,33 @@ func (in *Inbox) Kick() {
 }
 
 // Run makes pipelines of the deliveries kept, until ctx is done; then it
-// waits for the ones it processes.
+// waits for the ones it processes, stopping them after drainTimeout.
 func (in *Inbox) Run(ctx context.Context) {
 	poll := time.NewTicker(in.poll)
 	defer poll.Stop()
 	purge := time.NewTicker(purgeEvery)
 	defer purge.Stop()
+	// not stopped with the server at once: a pipeline half made is worse
+	// than a stop a little later
+	work, stopWork := context.WithCancelCause(context.WithoutCancel(ctx))
+	defer stopWork(nil)
 
 	in.purge()
 	for {
-		in.dispatch(ctx)
+		in.dispatch(ctx, work)
 		select {
 		case <-ctx.Done():
-			in.wg.Wait()
+			drained := make(chan struct{})
+			go func() {
+				in.wg.Wait()
+				close(drained)
+			}()
+			select {
+			case <-drained:
+			case <-time.After(in.drain):
+				stopWork(errDrainTimeout)
+				<-drained
+			}
 			return
 		case <-in.kick:
 		case <-poll.C:
@@ -233,7 +290,11 @@ func (in *Inbox) Run(ctx context.Context) {
 
 // dispatch starts processing the deliveries due, one per repo at a time,
 // in order, as many as there are workers.
-func (in *Inbox) dispatch(ctx context.Context) {
+func (in *Inbox) dispatch(ctx, work context.Context) {
+	if ctx.Err() != nil {
+		// stopping: only what was claimed is finished
+		return
+	}
 	now := in.now()
 	due, err := in.store.WebhookDeliveriesDue(now.Unix(), dueBatch)
 	if err != nil {
@@ -263,9 +324,7 @@ func (in *Inbox) dispatch(ctx context.Context) {
 		in.busy[d.RepoID] = true
 		in.mu.Unlock()
 		in.wg.Go(func() {
-			// not stopped with the server: a pipeline half made is worse
-			// than a stop a little later
-			procCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), processTimeout)
+			procCtx, cancel := context.WithTimeout(work, processTimeout)
 			defer cancel()
 			in.handle(procCtx, d.ID)
 			in.mu.Lock()
@@ -306,9 +365,13 @@ func (in *Inbox) handle(ctx context.Context, id int64) {
 	default:
 		logger.Debug().Str("state", string(d.State)).Int64("pipeline-id", d.PipelineID).Msg("webhook processed")
 	}
-	if err := in.store.WebhookDeliveryUpdate(d); err != nil {
+	held, err := in.store.WebhookDeliveryUpdate(d)
+	switch {
+	case err != nil:
 		// the claim expires, the next attempt finds the pipeline if made
 		logger.Error().Err(err).Msg("webhook inbox: cannot record a delivery")
+	case !held:
+		logger.Warn().Msg("webhook inbox: the claim on a delivery expired while it was processed")
 	}
 }
 
@@ -388,6 +451,8 @@ func truncate(s string) string {
 	}
 	return string(r[:maxErrorLen])
 }
+
+var errDrainTimeout = errors.New("the server stopped")
 
 var errStopped = errors.New("the server stopped while it created this pipeline: restart it")
 

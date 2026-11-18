@@ -24,8 +24,14 @@ import (
 // The columns a delivery's processing changes.
 var webhookDeliveryUpdateCols = []string{"state", "next_try", "error", "pipeline_id", "updated"}
 
-// WebhookDeliveryCreate stores a delivery unless its forge's delivery with
-// its GUID is stored already: false then.
+// The columns a delivery that failed and came again is queued again with.
+var webhookDeliveryRequeueCols = []string{
+	"event", "header", "body", "state", "next_try", "attempts", "error", "pipeline_id", "received", "sent", "updated",
+}
+
+// WebhookDeliveryCreate stores a delivery unless the repo's delivery with
+// its GUID is stored already: false then. One stored that failed is queued
+// again with it instead, as a delivery asked again by hand: true.
 func (s storage) WebhookDeliveryCreate(d *model.WebhookDelivery) (bool, error) {
 	created := false
 	err := retryWrite(func() error {
@@ -34,21 +40,30 @@ func (s storage) WebhookDeliveryCreate(d *model.WebhookDelivery) (bool, error) {
 			created = true
 			return nil
 		}
-		if errors.Is(wrapInsert(0, err), types.ErrInsertDuplicateDetected) {
-			return nil
+		if !errors.Is(wrapInsert(0, err), types.ErrInsertDuplicateDetected) {
+			return lockErr(err)
 		}
+		requeued, err := s.engine.
+			Where("forge_id = ? AND repo_id = ? AND guid = ? AND state = ?", d.ForgeID, d.RepoID, d.GUID, model.DeliveryFailed).
+			Cols(webhookDeliveryRequeueCols...).Update(&model.WebhookDelivery{
+			Event: d.Event, Header: d.Header, Body: d.Body, State: d.State, NextTry: d.NextTry,
+			Received: d.Received, Sent: d.Sent, Updated: d.Updated,
+		})
+		created = requeued == 1
 		return lockErr(err)
 	})
 	return created, err
 }
 
 // WebhookDeliveriesDue lists, by ID, at most limit deliveries due at now
-// (unix seconds): pending ones whose turn came, processing ones whose claim
-// expired. Without their header and body.
+// (unix seconds): of each repo, the first not settled, if it is pending and
+// its turn came or processing and its claim expired. A repo's deliveries
+// thus go one at a time, in order. Without their header and body.
 func (s storage) WebhookDeliveriesDue(now int64, limit int) ([]*model.WebhookDelivery, error) {
 	var due []*model.WebhookDelivery
 	return due, s.engine.Omit("header", "body").
-		In("state", model.DeliveryPending, model.DeliveryProcessing).
+		Where("id IN (SELECT MIN(id) FROM webhook_deliveries WHERE state IN (?, ?) GROUP BY repo_id)",
+			model.DeliveryPending, model.DeliveryProcessing).
 		And("next_try <= ?", now).
 		Asc("id").Limit(limit).Find(&due)
 }
@@ -86,22 +101,28 @@ func (s storage) WebhookDeliveryGet(id int64) (*model.WebhookDelivery, error) {
 }
 
 // WebhookDeliveryUpdate writes the delivery's state, next try, error,
-// pipeline and update time.
-func (s storage) WebhookDeliveryUpdate(d *model.WebhookDelivery) error {
-	return retryWrite(func() error {
-		return wrapUpdate(s.engine.ID(d.ID).Cols(webhookDeliveryUpdateCols...).Update(d))
+// pipeline and update time, as the claim of its attempt holds: false if
+// the claim was lost, another attempt taking the delivery.
+func (s storage) WebhookDeliveryUpdate(d *model.WebhookDelivery) (bool, error) {
+	held := false
+	err := retryWrite(func() error {
+		n, err := s.engine.Where("id = ? AND state = ? AND attempts = ?", d.ID, model.DeliveryProcessing, d.Attempts).
+			Cols(webhookDeliveryUpdateCols...).Update(d)
+		held = n == 1
+		return wrapUpdate(n, err)
 	})
+	return held, err
 }
 
-// WebhookDeliveriesKnown tells which of guids the forge's deliveries stored
+// WebhookDeliveriesKnown tells which of guids the repo's deliveries stored
 // have.
-func (s storage) WebhookDeliveriesKnown(forgeID int64, guids []string) ([]string, error) {
+func (s storage) WebhookDeliveriesKnown(forgeID, repoID int64, guids []string) ([]string, error) {
 	if len(guids) == 0 {
 		return nil, nil
 	}
 	var known []string
 	return known, s.engine.Table("webhook_deliveries").Cols("guid").
-		Where("forge_id = ?", forgeID).In("guid", guids).Find(&known)
+		Where("forge_id = ? AND repo_id = ?", forgeID, repoID).In("guid", guids).Find(&known)
 }
 
 // WebhookDeliveriesPurge deletes at most limit deliveries settled before

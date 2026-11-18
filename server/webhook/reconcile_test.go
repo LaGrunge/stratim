@@ -19,6 +19,7 @@ package webhook
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -27,9 +28,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server"
+	"go.woodpecker-ci.org/woodpecker/v3/server/forge"
 	forge_mocks "go.woodpecker-ci.org/woodpecker/v3/server/forge/mocks"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forge/types"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/pipeline"
 	manager_mocks "go.woodpecker-ci.org/woodpecker/v3/server/services/mocks"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store/datastore"
 )
@@ -76,7 +79,7 @@ func TestReconcile(t *testing.T) {
 	attempt := func(id, guid string, minutes, status int) *types.HookDelivery {
 		return &types.HookDelivery{ID: id, GUID: guid, Event: "push", DeliveredAt: at(minutes), StatusCode: status}
 	}
-	redeliverer.EXPECT().HookDeliveries(mock.Anything, mock.Anything, mock.Anything, "https://ci.example.com", now.Add(-reconcileWindow)).
+	redeliverer.EXPECT().HookDeliveries(mock.Anything, mock.Anything, mock.Anything, "https://ci.example.com", now.Add(-attemptsWindow)).
 		Return([]*types.HookDelivery{
 			// newest first, as GitHub lists them
 			attempt("8", "stubborn", -2, 502),
@@ -103,20 +106,58 @@ func TestReconcile(t *testing.T) {
 			return nil
 		})
 
-	r := NewReconciler(s, ReconcilerOptions{Link: "https://ci.example.com", Now: func() time.Time { return now }})
+	inbox := New(s, pipeline.WorkflowEnd{}, Options{})
+	r := NewReconciler(s, ReconcilerOptions{Link: "https://ci.example.com", Now: func() time.Time { return now }, Inbox: inbox})
 	assert.Equal(t, 2, r.Once(t.Context()), "the refused one is not counted")
 	assert.Equal(t, []string{"-2", "0", "7"}, asked, "the latest attempt of each, oldest first")
+	assert.Equal(t, at(-6), inbox.late[lateKey{keeping.ID, "missed"}], "the inbox expects it late, sent at its first attempt")
 }
 
 func TestUnreached(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
-	got := unreached([]*types.HookDelivery{
-		{ID: "1", GUID: "a", DeliveredAt: now, StatusCode: 500},
-		{ID: "2", GUID: "", DeliveredAt: now, StatusCode: 0},
-		{ID: "3", GUID: "a", DeliveredAt: now.Add(time.Second), StatusCode: 0},
-		{ID: "4", GUID: "b", DeliveredAt: now, StatusCode: 204},
+	since := now.Add(-reconcileWindow)
+	at := func(minutes int) time.Time { return now.Add(time.Duration(minutes) * time.Minute) }
+	attempts := func(guid string, n, firstMinutes int) []*types.HookDelivery {
+		var list []*types.HookDelivery
+		for i := range n {
+			list = append(list, &types.HookDelivery{ID: fmt.Sprintf("%s-%d", guid, i), GUID: guid, DeliveredAt: at(firstMinutes + i)})
+		}
+		return list
+	}
+	var all []*types.HookDelivery
+	all = append(all, attempts("three", 3, -10)...)
+	all = append(all, attempts("four", 4, -20)...)
+	// first sent before the window, asked again in it since
+	all = append(all, attempts("old", 2, -61)...)
+	all = append(all, &types.HookDelivery{ID: "x", GUID: "", DeliveredAt: now})
+	all = append(all, &types.HookDelivery{ID: "r1", GUID: "reached", DeliveredAt: at(-5), StatusCode: 500},
+		&types.HookDelivery{ID: "r2", GUID: "reached", DeliveredAt: at(-4), StatusCode: 204})
+
+	got := unreached(all, since)
+	require.Len(t, got, 1, "three attempts are asked again, four are not")
+	assert.Equal(t, "three-2", got[0].ID, "the latest attempt")
+	assert.Equal(t, at(-10), got[0].sent, "sent at the first")
+	assert.Empty(t, unreached(nil, since))
+}
+
+func TestReconcileStopsForARateLimitedOwner(t *testing.T) {
+	s := datastore.NewTestStore(t)
+	user := &model.User{ForgeID: 1, ForgeRemoteID: "1", Login: "owner", Hash: "hash"}
+	require.NoError(t, s.CreateUser(user))
+	for _, name := range []string{"a", "b"} {
+		require.NoError(t, s.CreateRepo(&model.Repo{
+			ForgeID: 1, ForgeRemoteID: model.ForgeRemoteID(name), Owner: "owner", Name: name, FullName: "owner/" + name,
+			IsActive: true, UserID: user.ID, WebhookSecret: "secret",
+		}))
+	}
+	redeliverer := forge_mocks.NewMockHookRedeliverer(t)
+	keeper := &redeliveringForge{MockForge: forge_mocks.NewMockForge(t), MockHookRedeliverer: redeliverer}
+	redeliverer.EXPECT().HookDeliveries(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, fmt.Errorf("listing: %w", types.ErrRateLimited)).Once()
+
+	r := NewReconciler(s, ReconcilerOptions{
+		Link:    "https://ci.example.com",
+		ForgeOf: func(*model.Repo) (forge.Forge, error) { return keeper, nil },
 	})
-	require.Len(t, got, 1)
-	assert.Equal(t, "3", got[0].ID)
-	assert.Empty(t, unreached(nil))
+	assert.Zero(t, r.Once(t.Context()), "the second repo of the owner is not listed")
 }
