@@ -54,11 +54,16 @@ local afterVendor = { depends_on: ['vendor'] };
     // The same scenarios on MariaDB. Every scenario recreates its database, so
     // it must stay distinct from the mariadb job's (e2e_test here, test
     // there): the two jobs share the service and run at the same time.
+    // The server stays away for the minutes a deploy or a database restart
+    // take here (see TestServerAwayDuringStep), not the seconds of test-e2e.
     'test-e2e-mariadb': goStep([
       waitForMariadb,
-      'make test-e2e E2E_TIMEOUT=600s E2E_COVERAGE_FILE=e2e-mariadb-coverage.out',
+      'make test-e2e E2E_TIMEOUT=900s E2E_COVERAGE_FILE=e2e-mariadb-coverage.out',
     ], afterVendor {
-      environment: { STRATIM_E2E_DATASOURCE: 'root@tcp(mariadb:3306)/e2e_test?parseTime=true' },
+      environment: {
+        STRATIM_E2E_DATASOURCE: 'root@tcp(mariadb:3306)/e2e_test?parseTime=true',
+        STRATIM_E2E_SERVER_AWAY: '3m',
+      },
       when: onChange,  // same conditions as the mariadb service it needs
     }),
 

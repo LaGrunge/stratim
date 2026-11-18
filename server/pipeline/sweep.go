@@ -60,12 +60,44 @@ func SweepCanceledWorkflows(ctx context.Context, end WorkflowEnd, now time.Time)
 	return nil
 }
 
-// RunCanceledWorkflowsSweep sweeps the canceled workflows now and then every
-// interval, until ctx ends.
+// UnendedPipelinesGrace is how long after its last workflow ended a
+// pipeline still running is taken as left so: the end of that workflow
+// writes it in the meantime, or its agent's Done tried again does.
+const UnendedPipelinesGrace = 2 * time.Minute
+
+// SweepUnendedPipelines writes the ends of at most SweepBatch pipelines
+// still pending or running whose workflows all ended longer than
+// UnendedPipelinesGrace before now: the store failed as their last workflow
+// ended, and no agent tries again for a workflow the server ended itself
+// (settled, swept, canceled).
+func SweepUnendedPipelines(ctx context.Context, end WorkflowEnd, now time.Time) error {
+	pipelines, err := end.Store.PipelinesLeftUnended(now.Add(-UnendedPipelinesGrace).Unix(), SweepBatch)
+	if err != nil {
+		return err
+	}
+	for _, pipeline := range pipelines {
+		logger := log.With().Int64("pipeline_id", pipeline.ID).Logger()
+		repo, err := end.Store.GetRepo(pipeline.RepoID)
+		if err != nil {
+			logger.Error().Err(err).Msg("cannot load the repo of a pipeline left unended")
+			continue
+		}
+		if err := end.EndPipeline(ctx, logger, repo, pipeline); err != nil {
+			logger.Error().Err(err).Msg("cannot end a pipeline whose workflows all ended")
+		}
+	}
+	return nil
+}
+
+// RunCanceledWorkflowsSweep sweeps the canceled workflows, and the
+// pipelines left unended, now and then every interval, until ctx ends.
 func RunCanceledWorkflowsSweep(ctx context.Context, end WorkflowEnd, interval time.Duration) {
 	for {
 		if err := SweepCanceledWorkflows(ctx, end, time.Now()); err != nil {
 			log.Error().Err(err).Msg("cannot sweep the workflows of canceled pipelines")
+		}
+		if err := SweepUnendedPipelines(ctx, end, time.Now()); err != nil {
+			log.Error().Err(err).Msg("cannot sweep the pipelines left unended")
 		}
 		select {
 		case <-ctx.Done():

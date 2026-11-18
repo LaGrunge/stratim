@@ -95,6 +95,9 @@ type ServerEnv struct {
 	stopQueue context.CancelCauseFunc
 	stopGRPC  func()
 	ctx       context.Context
+	// rpcStore is the store the gRPC service uses: Store, failing when told
+	// (see FailWorkflowFinish).
+	rpcStore *FaultyStore
 
 	eventsV2Once sync.Once
 	eventsV2Base string
@@ -201,7 +204,8 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	}
 	go pipeline.RunCanceledWorkflowsSweep(t.Context(), end, SweepInterval) //nolint:contextcheck
 
-	grpcAddr, stopGRPC := startGRPCServer(ctx, t, memStore, end, "127.0.0.1:0")
+	rpcStore := &FaultyStore{Store: memStore}
+	grpcAddr, stopGRPC := startGRPCServer(ctx, t, rpcStore, end, "127.0.0.1:0")
 
 	return &ServerEnv{
 		GRPCAddr:   grpcAddr,
@@ -224,6 +228,7 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 		stopQueue:    stopQueue,
 		stopGRPC:     stopGRPC,
 		ctx:          ctx,
+		rpcStore:     rpcStore,
 	}
 }
 
@@ -236,9 +241,21 @@ func newScheduler(ctx context.Context, s store.Store, q queue.Queue, ps pubsub.P
 // is lost, it starts from the store; the agents connected reconnect.
 func (env *ServerEnv) RestartServer(t *testing.T) {
 	t.Helper()
+	env.StopServer()
+	env.StartServerAgain(t)
+}
+
+// StopServer stops the server's gRPC service and its queue, as a server
+// that went away: its agents cannot reach it until StartServerAgain.
+func (env *ServerEnv) StopServer() {
 	env.stopGRPC()
 	env.stopQueue(nil)
+}
 
+// StartServerAgain starts the server StopServer stopped, on the same store
+// and address: the queue starts from the store, the agents reconnect.
+func (env *ServerEnv) StartServerAgain(t *testing.T) {
+	t.Helper()
 	configLock.Lock()
 	queueCtx, stopQueue := context.WithCancelCause(env.ctx)
 	t.Cleanup(func() { stopQueue(nil) })
@@ -251,7 +268,19 @@ func (env *ServerEnv) RestartServer(t *testing.T) {
 	env.stopQueue = stopQueue
 	configLock.Unlock()
 
-	_, env.stopGRPC = startGRPCServer(env.ctx, t, env.Store, env.WorkflowEnd, env.GRPCAddr)
+	_, env.stopGRPC = startGRPCServer(env.ctx, t, env.rpcStore, env.WorkflowEnd, env.GRPCAddr)
+}
+
+// FailWorkflowFinish has the next n writes of a workflow's end its agent
+// reports fail with err, as the database going away would.
+func (env *ServerEnv) FailWorkflowFinish(n int, err error) {
+	env.rpcStore.failWorkflowFinish(n, err)
+}
+
+// WorkflowFinishFailed tells how many writes of a workflow's end failed so
+// far, as FailWorkflowFinish told.
+func (env *ServerEnv) WorkflowFinishFailed() int {
+	return env.rpcStore.workflowFinishFailed()
 }
 
 // StopStatuses stops the sender of commit statuses as a server that stops

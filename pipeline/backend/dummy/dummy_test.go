@@ -17,6 +17,7 @@ package dummy_test
 import (
 	"context"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -257,4 +258,28 @@ func TestWaitStepCanceledBySleep(t *testing.T) {
 	// DestroyStep must succeed even though the step was canceled mid-sleep.
 	assert.NoError(t, dummyEngine.DestroyStep(ctx, step, taskUUID))
 	assert.NoError(t, dummyEngine.DestroyWorkflow(ctx, nil, taskUUID))
+}
+
+// A ticking step writes a line every tick while it sleeps.
+func TestTailStepTicks(t *testing.T) {
+	engine := dummy.New()
+	ctx := t.Context()
+	step := &types.Step{
+		Name:        "ticks",
+		UUID:        "SID_TICK",
+		Type:        types.StepTypeCommands,
+		Environment: map[string]string{dummy.EnvKeyStepSleep: "50ms", dummy.EnvKeyStepTick: "10ms"},
+	}
+	require.NoError(t, engine.SetupWorkflow(ctx, nil, "WID_TICK"))
+	require.NoError(t, engine.StartStep(ctx, step, "WID_TICK"))
+
+	reader, err := engine.TailStep(ctx, step, "WID_TICK")
+	require.NoError(t, err)
+	out, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	assert.True(t, strings.HasSuffix(string(out), "------------------\ntick 1\ntick 2\ntick 3\ntick 4\ntick 5\n"), string(out))
+
+	step.Environment[dummy.EnvKeyStepTick] = "never"
+	_, err = engine.TailStep(ctx, step, "WID_TICK")
+	assert.Error(t, err)
 }

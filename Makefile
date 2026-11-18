@@ -223,7 +223,7 @@ test-lib: ## Test lib code
 # With STRATIM_E2E_DATASOURCE set the e2e tests run on MariaDB, which needs a
 # longer timeout; run in parallel with the sqlite job, they need their own
 # coverage file.
-E2E_TIMEOUT ?= 180s
+E2E_TIMEOUT ?= 300s
 E2E_COVERAGE_FILE ?= e2e-coverage.out
 
 test-e2e: ## Test by running yaml config and compare expected result

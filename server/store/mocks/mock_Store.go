@@ -5816,6 +5816,74 @@ func (_c *MockStore_PipelineStart_Call) RunAndReturn(run func(pipeline *model.Pi
 	return _c
 }
 
+// PipelinesLeftUnended provides a mock function for the type MockStore
+func (_mock *MockStore) PipelinesLeftUnended(endedBefore int64, limit int) ([]*model.Pipeline, error) {
+	ret := _mock.Called(endedBefore, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PipelinesLeftUnended")
+	}
+
+	var r0 []*model.Pipeline
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int64, int) ([]*model.Pipeline, error)); ok {
+		return returnFunc(endedBefore, limit)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int64, int) []*model.Pipeline); ok {
+		r0 = returnFunc(endedBefore, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*model.Pipeline)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int64, int) error); ok {
+		r1 = returnFunc(endedBefore, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_PipelinesLeftUnended_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PipelinesLeftUnended'
+type MockStore_PipelinesLeftUnended_Call struct {
+	*mock.Call
+}
+
+// PipelinesLeftUnended is a helper method to define mock.On call
+//   - endedBefore int64
+//   - limit int
+func (_e *MockStore_Expecter) PipelinesLeftUnended(endedBefore any, limit any) *MockStore_PipelinesLeftUnended_Call {
+	return &MockStore_PipelinesLeftUnended_Call{Call: _e.mock.On("PipelinesLeftUnended", endedBefore, limit)}
+}
+
+func (_c *MockStore_PipelinesLeftUnended_Call) Run(run func(endedBefore int64, limit int)) *MockStore_PipelinesLeftUnended_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int64
+		if args[0] != nil {
+			arg0 = args[0].(int64)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_PipelinesLeftUnended_Call) Return(pipelines []*model.Pipeline, err error) *MockStore_PipelinesLeftUnended_Call {
+	_c.Call.Return(pipelines, err)
+	return _c
+}
+
+func (_c *MockStore_PipelinesLeftUnended_Call) RunAndReturn(run func(endedBefore int64, limit int) ([]*model.Pipeline, error)) *MockStore_PipelinesLeftUnended_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RegistryCreate provides a mock function for the type MockStore
 func (_mock *MockStore) RegistryCreate(registry *model.Registry) error {
 	ret := _mock.Called(registry)

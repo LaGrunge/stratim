@@ -36,6 +36,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/queue"
 	"go.woodpecker-ci.org/woodpecker/v3/server/scheduler"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
+	"go.woodpecker-ci.org/woodpecker/v3/server/store/transient"
 )
 
 type ctxKey struct{}
@@ -481,6 +482,11 @@ func (s *RPC) Done(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 	// check workflow's own state to prevent finishing an already-finished or blocked workflow
 	if err := checkWorkflowState(workflow.State); err != nil {
 		s.releaseEnded(c, strWorkflowID, workflow.State)
+		// a Done tried again: its first try may have ended the workflow but
+		// not its steps or its pipeline
+		if endErr := s.endRestOfEnded(c, repo, currentPipeline, workflow, state); endErr != nil {
+			return endErr
+		}
 		return err
 	}
 
@@ -516,7 +522,8 @@ func (s *RPC) Done(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 		logger.Error().Err(err).Msgf("pipeline.UpdateWorkflowStatusToDone: cannot update workflow state: %s", err)
 		return err
 	}
-	s.storeSteps(ended)
+	// steps not written: the agent tries again for them (see endRestOfEnded)
+	stepsErr := s.storeSteps(ended)
 
 	// The queue gets the status the workflow was stored with: the workflows
 	// depending on it run or not by it.
@@ -532,6 +539,9 @@ func (s *RPC) Done(c context.Context, strWorkflowID string, state rpc.WorkflowSt
 
 	if err := s.end.Ended(c, logger, repo, currentPipeline, workflow); err != nil {
 		return err
+	}
+	if stepsErr != nil {
+		return stepsErr
 	}
 
 	return s.updateAgentLastWork(agent)
@@ -602,6 +612,11 @@ func (s *RPC) Log(c context.Context, stepUUID string, rpcLogEntries []*rpc.LogEn
 
 	if err = server.Config.Services.LogStore.LogAppend(c, step, logEntries); err != nil {
 		log.Error().Err(err).Msg("could not store log entries")
+		// the store away for a while: the agent sends the lines again,
+		// which drops the ones written already
+		if transient.Is(err) {
+			return fmt.Errorf("store log entries: %w", err)
+		}
 	}
 
 	return nil
@@ -702,14 +717,40 @@ func (s *RPC) releaseEnded(c context.Context, workflowID string, state model.Sta
 	}
 }
 
+// endRestOfEnded writes what a Done whose workflow ended already may not
+// have written, the store failing after the workflow's end: the ends of
+// its steps still running, as state tells, and the end of its pipeline if
+// it was its last workflow. Both writes are compare-and-set, so a Done sent
+// again after one that wrote everything changes nothing. The agent tries
+// again on the error of either.
+func (s *RPC) endRestOfEnded(c context.Context, repo *model.Repo, currentPipeline *model.Pipeline, workflow *model.Workflow, state rpc.WorkflowState) error {
+	if !workflow.State.IsDone() {
+		return nil
+	}
+	if err := s.storeSteps(s.completeChildrenIfParentCompleted(workflow, state)); err != nil {
+		return err
+	}
+	if currentPipeline.Status.IsDone() {
+		return nil
+	}
+	logger := log.With().
+		Str("repo_id", fmt.Sprint(repo.ID)).
+		Str("pipeline_id", fmt.Sprint(currentPipeline.ID)).
+		Str("workflow_id", fmt.Sprint(workflow.ID)).Logger()
+	return s.end.EndPipeline(c, logger, repo, currentPipeline)
+}
+
 // storeSteps writes the ends of steps not ended meanwhile, logging what it
 // cannot.
-func (s *RPC) storeSteps(steps []*model.Step) {
+func (s *RPC) storeSteps(steps []*model.Step) error {
+	var errs error
 	for _, step := range steps {
 		if _, err := s.store.StepFinish(step, model.StatusPending, model.StatusRunning); err != nil {
 			log.Error().Err(err).Msgf("done: cannot update step_id %d child state", step.ID)
+			errs = errors.Join(errs, err)
 		}
 	}
+	return errs
 }
 
 func (s *RPC) getAgentFromContext(ctx context.Context) (*model.Agent, error) {

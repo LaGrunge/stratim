@@ -101,6 +101,21 @@ func (s storage) WorkflowsLeftInCanceledPipelines(canceledBefore int64, limit in
 	return workflows, nil
 }
 
+// PipelinesLeftUnended lists, by ID, at most limit pipelines still pending
+// or running that have workflows, all of them ended before endedBefore.
+func (s storage) PipelinesLeftUnended(endedBefore int64, limit int) ([]*model.Pipeline, error) {
+	notEnded := append([]model.StatusValue{model.StatusCreated, model.StatusBlocked}, unfinished...)
+	pipelines := make([]*model.Pipeline, 0)
+	return pipelines, s.engine.
+		In("status", unfinished).
+		And(builder.In("id", builder.Select("pipeline_id").From("workflows"))).
+		And(builder.NotIn("id", builder.Select("pipeline_id").From("workflows").
+			Where(builder.In("state", notEnded).Or(builder.Gte{"finished": endedBefore})))).
+		OrderBy("id").
+		Limit(limit).
+		Find(&pipelines)
+}
+
 // WorkflowsRunning lists, by ID, at most limit workflows running whose ID is
 // above afterID.
 func (s storage) WorkflowsRunning(afterID int64, limit int) ([]*model.Workflow, error) {

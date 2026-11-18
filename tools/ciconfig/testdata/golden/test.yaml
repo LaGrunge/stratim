@@ -172,11 +172,12 @@ steps:
 - commands:
   - timeout 120 bash -c 'until (exec 3<>/dev/tcp/mariadb/3306) 2>/dev/null; do sleep
     1; done'
-  - make test-e2e E2E_TIMEOUT=600s E2E_COVERAGE_FILE=e2e-mariadb-coverage.out
+  - make test-e2e E2E_TIMEOUT=900s E2E_COVERAGE_FILE=e2e-mariadb-coverage.out
   depends_on:
   - vendor
   environment:
     STRATIM_E2E_DATASOURCE: root@tcp(mariadb:3306)/e2e_test?parseTime=true
+    STRATIM_E2E_SERVER_AWAY: 3m
   image: docker.io/golang:1.27
   name: test-e2e-mariadb
   when:

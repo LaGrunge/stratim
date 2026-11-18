@@ -157,21 +157,33 @@ func (s *WoodpeckerServer) Extend(c context.Context, req *proto.ExtendRequest) (
 }
 
 func (s *WoodpeckerServer) Log(c context.Context, req *proto.LogRequest) (*proto.Empty, error) {
+	err := writeLogBatch(req, func(stepUUID string, entries []*rpc.LogEntry) error {
+		if err := s.peer.Log(c, stepUUID, entries); err != nil {
+			log.Error().Err(err).Msg("could not write log entries")
+			return err
+		}
+		return nil
+	})
+	return new(proto.Empty), err
+}
+
+// writeLogBatch writes the entries of req with write, step by step, in
+// order: all of them, returning the first error. The agent sends the whole
+// batch again on an error: the lines written already are dropped then.
+func writeLogBatch(req *proto.LogRequest, write func(stepUUID string, entries []*rpc.LogEntry) error) error {
 	var (
 		entries  []*rpc.LogEntry
 		stepUUID string
+		firstErr error
 	)
-
-	write := func() error {
-		if len(entries) > 0 {
-			if err := s.peer.Log(c, stepUUID, entries); err != nil {
-				log.Error().Err(err).Msg("could not write log entries")
-				return err
-			}
+	flush := func() {
+		if len(entries) == 0 {
+			return
 		}
-		return nil
+		if err := write(stepUUID, entries); err != nil && firstErr == nil {
+			firstErr = err
+		}
 	}
-
 	for _, reqEntry := range req.GetLogEntries() {
 		entry := &rpc.LogEntry{
 			Data:     reqEntry.GetData(),
@@ -181,16 +193,14 @@ func (s *WoodpeckerServer) Log(c context.Context, req *proto.LogRequest) (*proto
 			Type:     int(reqEntry.GetType()),
 		}
 		if entry.StepUUID != stepUUID {
-			_ = write()
+			flush()
 			stepUUID = entry.StepUUID
-			entries = entries[:0]
+			entries = nil
 		}
 		entries = append(entries, entry)
 	}
-
-	res := new(proto.Empty)
-	err := write()
-	return res, err
+	flush()
+	return firstErr
 }
 
 // RegisterAgent register our agent to the server.

@@ -569,7 +569,7 @@ Max database connections xorm is allowed create.
 ### DATABASE_IDLE_CONNECTIONS
 
 - Name: `WOODPECKER_DATABASE_IDLE_CONNECTIONS`
-- Default: `2`
+- Default: `20`
 
 Amount of database connections xorm will hold open.
 
@@ -578,7 +578,7 @@ Amount of database connections xorm will hold open.
 ### DATABASE_CONNECTION_TIMEOUT
 
 - Name: `WOODPECKER_DATABASE_CONNECTION_TIMEOUT`
-- Default: `3 Seconds`
+- Default: `30 Minutes`
 
 Time an active database connection is allowed to stay open.
 
