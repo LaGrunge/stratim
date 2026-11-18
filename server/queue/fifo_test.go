@@ -1273,8 +1273,9 @@ func TestFifoLeaseManagement(t *testing.T) {
 		assert.NoError(t, q.Done(ctx, got.ID, model.StatusSuccess))
 		wg.Wait()
 
-		// Edge case: Wait on non-existent task should return immediately
-		assert.NoError(t, q.Wait(ctx, "non-existent"))
+		// Edge case: Wait on non-existent task returns at once, telling it
+		// does not hold it
+		assert.ErrorIs(t, q.Wait(ctx, "non-existent"), ErrNotFound)
 
 		dummyTask2 := &model.Task{ID: "wait-2"}
 		assert.NoError(t, q.PushAtOnce(ctx, []*model.Task{dummyTask2}))

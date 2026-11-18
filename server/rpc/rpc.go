@@ -118,7 +118,7 @@ func (s *RPC) Wait(c context.Context, workflowID string) (canceled bool, err err
 		return false, err
 	}
 
-	if err := s.scheduler.Wait(c, workflowID); err != nil {
+	if err := s.waitHeld(c, workflowID); err != nil {
 		if errors.Is(err, queue.ErrCancel) {
 			// we explicit send a cancel signal
 			log.Debug().Str("workflowID", workflowID).Msg("while waiting the queue reported the workflow as canceled")
@@ -135,8 +135,37 @@ func (s *RPC) Wait(c context.Context, workflowID string) (canceled bool, err err
 }
 
 // killedCheckInterval is how often WaitKilled checks the workflow's
-// stored state.
+// stored state, and Wait whether the queue holds a workflow it did not: more
+// often than the queue looks for workflows to adopt (a minute), so that the
+// agent of one adopted listens for a cancel soon after.
 const killedCheckInterval = 15 * time.Second
+
+// waitHeld waits on the workflow of id in the queue, see queue.Queue.Wait.
+// One the queue does not hold, not ended in the store, it waits for: the
+// queue adopts one running that it lost (see queue.WithTaskStore), which this
+// checks every killedCheckInterval, its agent listening for a cancel from
+// then. One ended meanwhile, the server ended it, as for a workflow canceled:
+// ErrCancel, its agent stops.
+func (s *RPC) waitHeld(c context.Context, workflowID string) error {
+	interval := s.killedCheckInterval
+	if interval == 0 {
+		interval = killedCheckInterval
+	}
+	for {
+		err := s.scheduler.Wait(c, workflowID)
+		if !errors.Is(err, queue.ErrNotFound) {
+			return err
+		}
+		if s.workflowEnded(workflowID) {
+			return queue.ErrCancel
+		}
+		select {
+		case <-c.Done():
+			return nil
+		case <-time.After(interval):
+		}
+	}
+}
 
 // WaitKilled blocks, for a workflow its agent was told canceled, until its
 // finalizers are to be stopped too: the queue tells, or the workflow is

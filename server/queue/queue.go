@@ -159,13 +159,15 @@ type Queue interface {
 	// state meanwhile (see rpc.RPC.WaitKilled).
 	WaitKilled(c context.Context, id string) error
 
-	// SetCanceledExpiredHandler sets what settles a canceled running task
-	// whose lease expired before its Done or Error: its agent is gone. The
-	// task is not run again.
+	// SetCanceledExpiredHandler sets what settles a running task whose
+	// lease expired before its Done or Error that is not run again: one
+	// canceled, or one adopted without its config (see WithTaskStore). Its
+	// agent is gone.
 	SetCanceledExpiredHandler(handler func(task *model.Task))
 
 	// Wait waits until the task is complete.
-	// Also signals via error ErrCancel if workflow got canceled.
+	// Also signals via error ErrCancel if workflow got canceled, and
+	// ErrNotFound for a task it does not hold running.
 	Wait(c context.Context, id string) error
 
 	// Info returns internal queue information.

@@ -16,6 +16,7 @@ package datastore
 
 import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/store/types"
 )
 
 func (s storage) TaskList() ([]*model.Task, error) {
@@ -47,6 +48,26 @@ func (s storage) TaskSetQueued(id string, queued int64) error {
 	return retryWrite(func() error {
 		_, err := s.engine.Where("id = ? AND queued = 0", id).Cols("queued").Update(&model.Task{Queued: queued})
 		return err
+	})
+}
+
+// TaskSetAgent sets the agent the stored task of id is handed out to, 0 for
+// none: types.ErrRecordNotExist if it is not stored. A task not changed, its
+// agent the same already, is stored.
+func (s storage) TaskSetAgent(id string, agentID int64) error {
+	return retryWrite(func() error {
+		changed, err := s.engine.Table(new(model.Task)).Where("id = ?", id).Update(map[string]any{"agent_id": agentID})
+		if err != nil || changed != 0 {
+			return err
+		}
+		exists, err := s.engine.Where("id = ?", id).Exist(new(model.Task))
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return types.ErrRecordNotExist
+		}
+		return nil
 	})
 }
 

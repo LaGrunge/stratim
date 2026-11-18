@@ -33,23 +33,52 @@ import (
 // state survives server restarts.
 const serverConfigQueuePaused = "queue-paused"
 
-// WithTaskStore returns a queue that is backed by the TaskStore. This
-// ensures pending tasks and the paused flag can be restored when the system
-// starts.
+// WithTaskStore returns a queue that is backed by the TaskStore. A task is
+// stored from its push until its Done or Error (or its cancel, if it is not
+// running), the agent it is handed out to with it: when the system starts,
+// the tasks pending are queued again and the ones handed out are held running
+// again, each with a new lease, so that the ones depending on them wait for
+// them, their agents extend and wait on them, and a cancel reaches their
+// agents. The paused flag is restored too.
+//
+// A workflow running that the queue does not hold, as one whose task was
+// handed out by a server that did not store it, is adopted (see
+// adoptOrphans): when the system starts, and every orphansCheckInterval.
 func WithTaskStore(ctx context.Context, q Queue, s store.Store) Queue {
-	tasks, _ := s.TaskList()
+	tasks, err := s.TaskList()
+	if err != nil {
+		log.Error().Err(err).Msg("cannot load the stored tasks")
+	}
 	// in the order they were queued in, the queue's: the store keeps none
 	slices.SortStableFunc(tasks, compareQueued)
 	restoreStamps(s, tasks)
+	pq := &persistentQueue{q, s}
+	stored := make(map[string]struct{}, len(tasks))
 	for _, task := range tasks {
+		stored[task.ID] = struct{}{}
+	}
+	// held running before the pending ones are queued: the ones depending on
+	// them wait for them
+	pending := pq.restoreRunning(tasks)
+	if err == nil {
+		pq.adoptOrphans(ctx, stored)
+	}
+	for _, task := range pending {
 		restoreDepStatus(s, task)
 	}
-	if err := q.PushAtOnce(ctx, tasks); err != nil {
+	if err := q.PushAtOnce(ctx, pending); err != nil {
 		log.Error().Err(err).Msg("PushAtOnce failed")
 	}
-	pq := &persistentQueue{q, s}
 	pq.restorePausedState()
+	go pq.watchOrphans(ctx)
 	return pq
+}
+
+// deleteTask removes the stored task of id, logging what fails.
+func (q *persistentQueue) deleteTask(id string) {
+	if err := q.store.TaskDelete(id); err != nil && !errors.Is(err, types.ErrRecordNotExist) {
+		log.Error().Err(err).Str("task_id", id).Msg("cannot remove a stored task")
+	}
 }
 
 // restoreStamps keeps the stamps of the restored tasks in order. The stamps
@@ -177,7 +206,8 @@ func (q *persistentQueue) PushAtOnce(c context.Context, tasks []*model.Task) err
 	return err
 }
 
-// Poll retrieves and removes a task head of this queue.
+// Poll retrieves a task head of this queue, and stores the agent it is
+// handed out to with it: the task stays stored until its Done.
 func (q *persistentQueue) Poll(c context.Context, agentID int64, f func(*model.Task) (bool, int)) (*model.Task, error) {
 	task, err := q.Queue.Poll(c, agentID, f)
 	if task != nil && task.PipelineID != 0 {
@@ -196,9 +226,7 @@ func (q *persistentQueue) Poll(c context.Context, agentID int64, f func(*model.T
 		case ended:
 			// its dependents see it killed, and the sweep ends the workflow
 			log.Warn().Msgf("pull queue item: %s: pipeline ended, dropping canceled task", task.ID)
-			if deleteErr := q.store.TaskDelete(task.ID); deleteErr != nil && !errors.Is(deleteErr, types.ErrRecordNotExist) {
-				log.Error().Err(deleteErr).Msgf("pull queue item: %s: failed to remove from backup", task.ID)
-			}
+			q.deleteTask(task.ID)
 			if dropErr := q.Queue.Done(c, task.ID, model.StatusKilled); dropErr != nil {
 				log.Error().Err(dropErr).Msgf("pull queue item: %s: failed to drop canceled task", task.ID)
 			}
@@ -206,59 +234,74 @@ func (q *persistentQueue) Poll(c context.Context, agentID int64, f func(*model.T
 		}
 	}
 	if task != nil {
-		log.Debug().Msgf("pull queue item: %s: remove from backup", task.ID)
-		if deleteErr := q.store.TaskDelete(task.ID); deleteErr != nil {
-			if errors.Is(deleteErr, types.ErrRecordNotExist) {
-				// The task is no longer in the backup store, which means it was
+		if stop := q.dropStale(c, task); stop {
+			return nil, nil
+		}
+		if setErr := q.store.TaskSetAgent(task.ID, agentID); setErr != nil {
+			if errors.Is(setErr, types.ErrRecordNotExist) {
+				// The task is no longer in the store, which means it was
 				// already finished/removed (e.g. its workflow was canceled) and
 				// only lingered in the in-memory queue. Handing it to the agent
 				// would loop forever, so drop it from the queue instead.
-				log.Error().Err(deleteErr).Msgf("pull queue item: %s: not found in backup, dropping stale task", task.ID)
-				if dropErr := q.Queue.Error(c, task.ID, deleteErr); dropErr != nil {
+				log.Error().Err(setErr).Msgf("pull queue item: %s: not found in backup, dropping stale task", task.ID)
+				if dropErr := q.Queue.Error(c, task.ID, setErr); dropErr != nil {
 					log.Error().Err(dropErr).Msgf("pull queue item: %s: failed to drop stale task", task.ID)
 				}
 				return nil, nil
 			}
-			log.Error().Err(deleteErr).Msgf("pull queue item: %s: failed to remove from backup", task.ID)
-		} else {
-			log.Debug().Msgf("pull queue item: %s: successfully removed from backup", task.ID)
-
-			workflowID, parseErr := strconv.ParseInt(task.ID, 10, 64)
-			if parseErr != nil {
-				log.Error().Err(parseErr).Msgf("pull queue item: %s: invalid workflow id", task.ID)
-				return task, err
+			// Not handed out with its agent not stored: after a restart it would be queued
+			// again while its agent runs it. It is put back at once, for a
+			// later poll; if the queue cannot, its lease expires and does.
+			log.Error().Err(setErr).Msgf("pull queue item: %s: cannot store its agent, retried later", task.ID)
+			if holder, ok := q.Queue.(*fifo); ok {
+				holder.putBack(task.ID)
 			}
-
-			workflow, loadErr := q.store.WorkflowLoad(workflowID)
-			if loadErr != nil {
-				if errors.Is(loadErr, types.ErrRecordNotExist) {
-					// A queued task without its workflow can never be initialized.
-					// Drop it now instead of letting the agent reject and later
-					// re-poll the same task after its lease expires.
-					log.Error().Err(loadErr).Msgf("pull queue item: %s: workflow missing, dropping stale task", task.ID)
-					if dropErr := q.Queue.Error(c, task.ID, loadErr); dropErr != nil {
-						log.Error().Err(dropErr).Msgf("pull queue item: %s: failed to drop stale task", task.ID)
-					}
-					return nil, nil
-				}
-				log.Error().Err(loadErr).Msgf("pull queue item: %s: failed to load workflow", task.ID)
-				return task, err
-			}
-
-			if isTerminalWorkflowState(workflow.State) {
-				// The task can still exist in the persistent queue while its
-				// workflow was completed through another path. Returning it to an
-				// agent makes RPC.Init reject it as already finished, while the
-				// in-memory task remains running and is resubmitted after timeout.
-				log.Warn().Str("state", string(workflow.State)).Msgf("pull queue item: %s: workflow already terminal, dropping stale task", task.ID)
-				if dropErr := q.Queue.Done(c, task.ID, workflow.State); dropErr != nil {
-					log.Error().Err(dropErr).Msgf("pull queue item: %s: failed to drop terminal task", task.ID)
-				}
-				return nil, nil
-			}
+			return nil, nil
 		}
 	}
 	return task, err
+}
+
+// dropStale drops a polled task whose workflow is missing or ended
+// already, from the queue and the store: it reports whether it did. A task
+// whose workflow cannot be loaded is handed out: its agent's Init tells.
+func (q *persistentQueue) dropStale(c context.Context, task *model.Task) bool {
+	workflowID, parseErr := strconv.ParseInt(task.ID, 10, 64)
+	if parseErr != nil {
+		log.Error().Err(parseErr).Msgf("pull queue item: %s: invalid workflow id", task.ID)
+		return false
+	}
+
+	workflow, loadErr := q.store.WorkflowLoad(workflowID)
+	if loadErr != nil {
+		if errors.Is(loadErr, types.ErrRecordNotExist) {
+			// A queued task without its workflow can never be initialized.
+			// Drop it now instead of letting the agent reject and later
+			// re-poll the same task after its lease expires.
+			log.Error().Err(loadErr).Msgf("pull queue item: %s: workflow missing, dropping stale task", task.ID)
+			q.deleteTask(task.ID)
+			if dropErr := q.Queue.Error(c, task.ID, loadErr); dropErr != nil {
+				log.Error().Err(dropErr).Msgf("pull queue item: %s: failed to drop stale task", task.ID)
+			}
+			return true
+		}
+		log.Error().Err(loadErr).Msgf("pull queue item: %s: failed to load workflow", task.ID)
+		return false
+	}
+
+	if isTerminalWorkflowState(workflow.State) {
+		// The task can still exist in the persistent queue while its
+		// workflow was completed through another path. Returning it to an
+		// agent makes RPC.Init reject it as already finished, while the
+		// in-memory task remains running and is resubmitted after timeout.
+		log.Warn().Str("state", string(workflow.State)).Msgf("pull queue item: %s: workflow already terminal, dropping stale task", task.ID)
+		q.deleteTask(task.ID)
+		if dropErr := q.Queue.Done(c, task.ID, workflow.State); dropErr != nil {
+			log.Error().Err(dropErr).Msgf("pull queue item: %s: failed to drop terminal task", task.ID)
+		}
+		return true
+	}
+	return false
 }
 
 // pipelineEnded reports whether the pipeline of id ended: canceled, or
@@ -271,49 +314,40 @@ func (q *persistentQueue) pipelineEnded(id int64) (bool, error) {
 	return pipeline.Status.IsDone(), nil
 }
 
-// Done signals the task is complete.
+// Done signals the task is complete, and removes it from the store, also
+// when the queue does not hold it (ErrNotFound): it ended.
 func (q *persistentQueue) Done(c context.Context, id string, exitStatus model.StatusValue) error {
-	if err := q.Queue.Done(c, id, exitStatus); err != nil {
-		return err
-	}
-
-	if deleteErr := q.store.TaskDelete(id); deleteErr != nil {
-		if !errors.Is(deleteErr, types.ErrRecordNotExist) {
-			return deleteErr
-		}
-		log.Debug().Msgf("task %s already removed from store", id)
-	}
-	return nil
+	err := q.Queue.Done(c, id, exitStatus)
+	return errors.Join(err, q.deleteTasks([]string{id}))
 }
 
-// Error signals the task is done with an error.
+// Error signals the task is done with an error, and removes it from the
+// store, also when the queue does not hold it (ErrNotFound): it ended.
 func (q *persistentQueue) Error(c context.Context, id string, err error) error {
-	if err := q.Queue.Error(c, id, err); err != nil {
-		return err
-	}
-
-	if deleteErr := q.store.TaskDelete(id); deleteErr != nil {
-		if !errors.Is(deleteErr, types.ErrRecordNotExist) {
-			return deleteErr
-		}
-		log.Debug().Msgf("task %s already removed from store", id)
-	}
-	return nil
+	queueErr := q.Queue.Error(c, id, err)
+	return errors.Join(queueErr, q.deleteTasks([]string{id}))
 }
 
 // CancelAtOnce cancels the tasks, see Queue, and removes them from the
 // store, also when the queue does not hold some of them (ErrNotFound): the
-// stored ones would be restored after a restart and run.
+// stored ones would be restored after a restart and run. The ones canceling
+// stay stored until their Done, or their lease expires: after a restart they
+// are held canceling again, and their agents' finalizers keep their time.
 func (q *persistentQueue) CancelAtOnce(c context.Context, ids []string, escalate bool) ([]string, error) {
 	canceling, err := q.Queue.CancelAtOnce(c, ids, escalate)
-	return canceling, errors.Join(err, q.deleteTasks(ids))
+	ended := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if !slices.Contains(canceling, id) {
+			ended = append(ended, id)
+		}
+	}
+	return canceling, errors.Join(err, q.deleteTasks(ended))
 }
 
 // PrioritizeAtOnce stores the boost of the tasks first, then moves them to
 // the top of the queue, see Queue: a move that is not stored is not made, a
-// move made is kept after a restart. The store holds the tasks not handed out
-// yet: a task handed out or canceled meanwhile is not in it, and stays as it
-// is.
+// move made is kept after a restart. A task handed out gets it too, as in the
+// queue; one canceled meanwhile is not stored, and stays as it is.
 func (q *persistentQueue) PrioritizeAtOnce(c context.Context, ids []string, boost int64) ([]string, error) {
 	if len(ids) == 0 {
 		return nil, nil

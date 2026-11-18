@@ -100,3 +100,10 @@ func (s storage) WorkflowsLeftInCanceledPipelines(canceledBefore int64, limit in
 	}
 	return workflows, nil
 }
+
+// WorkflowsRunning lists, by ID, at most limit workflows running whose ID is
+// above afterID.
+func (s storage) WorkflowsRunning(afterID int64, limit int) ([]*model.Workflow, error) {
+	workflows := make([]*model.Workflow, 0)
+	return workflows, s.engine.Where("state = ? AND id > ?", model.StatusRunning, afterID).OrderBy("id").Limit(limit).Find(&workflows)
+}

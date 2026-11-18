@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/store/types"
 )
 
 func TestTaskList(t *testing.T) {
@@ -140,4 +141,28 @@ func TestTaskSetBoostConcurrentDelete(t *testing.T) {
 		assert.Equal(t, 1, id%2, "task %s was deleted", task.ID)
 		assert.Equal(t, int64(n-1), task.Boost, "the highest boost stays")
 	}
+}
+
+// TaskSetAgent writes the agent a stored task is handed out to, the same
+// one again included, and tells a task not stored.
+func TestTaskSetAgent(t *testing.T) {
+	store, closer := newTestStore(t, new(model.Task))
+	defer closer()
+
+	assert.NoError(t, store.TaskInsert(&model.Task{ID: "a"}))
+	agentOf := func() int64 {
+		list, err := store.TaskList()
+		assert.NoError(t, err)
+		if assert.Len(t, list, 1) {
+			return list[0].AgentID
+		}
+		return -1
+	}
+
+	assert.NoError(t, store.TaskSetAgent("a", 7))
+	assert.Equal(t, int64(7), agentOf())
+	assert.NoError(t, store.TaskSetAgent("a", 7), "handed out to the same agent again")
+	assert.NoError(t, store.TaskSetAgent("a", 0))
+	assert.Equal(t, int64(0), agentOf())
+	assert.ErrorIs(t, store.TaskSetAgent("missing", 7), types.ErrRecordNotExist)
 }

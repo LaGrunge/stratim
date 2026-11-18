@@ -333,3 +333,40 @@ func TestStepReport(t *testing.T) {
 	assert.Equal(t, int64(3), got.Started, "the report's start stays")
 	assert.Equal(t, int64(9), got.Finished)
 }
+
+// WorkflowsRunning lists the workflows running, by ID, a limit at most, a
+// page after an ID.
+func TestWorkflowsRunning(t *testing.T) {
+	store, closer := newTestStore(t, new(model.Workflow))
+	defer closer()
+
+	require.NoError(t, store.WorkflowsCreate([]*model.Workflow{
+		{PipelineID: 1, PID: 1, Name: "first", State: model.StatusRunning},
+		{PipelineID: 1, PID: 2, Name: "pending", State: model.StatusPending},
+		{PipelineID: 1, PID: 3, Name: "done", State: model.StatusSuccess},
+		{PipelineID: 2, PID: 1, Name: "second", State: model.StatusRunning},
+	}))
+
+	names := func(workflows []*model.Workflow) []string {
+		got := make([]string, 0, len(workflows))
+		for _, w := range workflows {
+			got = append(got, w.Name)
+		}
+		return got
+	}
+	workflows, err := store.WorkflowsRunning(0, 10)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"first", "second"}, names(workflows))
+
+	workflows, err = store.WorkflowsRunning(0, 1)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"first"}, names(workflows), "the limit at most, by ID")
+
+	workflows, err = store.WorkflowsRunning(workflows[0].ID, 1)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"second"}, names(workflows), "the next page")
+
+	workflows, err = store.WorkflowsRunning(workflows[0].ID, 1)
+	require.NoError(t, err)
+	assert.Empty(t, workflows, "past the last")
+}

@@ -121,7 +121,17 @@ func (env *eventsV2Env) wait(ctx context.Context, t *testing.T, id int64, query 
 // wait subscribed to the hub.
 func (env *eventsV2Env) waitAsync(ctx context.Context, t *testing.T, id int64, query string) <-chan *http.Response {
 	t.Helper()
-	before := env.hub.Subscribers()
+	// watching once it read the pipeline: a change from then on comes to it
+	// as an event, not with its first read
+	watching := make(chan struct{}, 1)
+	signal := func() {
+		select {
+		case watching <- struct{}{}:
+		default:
+		}
+	}
+	onWaitWatching.Store(&signal)
+	defer onWaitWatching.Store(nil)
 	done := make(chan *http.Response, 1)
 	go func() {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/api/v2/pipelines/%d/wait?%s", env.srv.URL, id, query), nil)
@@ -137,7 +147,11 @@ func (env *eventsV2Env) waitAsync(ctx context.Context, t *testing.T, id int64, q
 		}
 		done <- resp
 	}()
-	require.Eventually(t, func() bool { return env.hub.Subscribers() > before }, 5*time.Second, 5*time.Millisecond, "the wait subscribes")
+	select {
+	case <-watching:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the wait does not watch the events")
+	}
 	return done
 }
 

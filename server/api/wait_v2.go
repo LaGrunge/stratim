@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -49,6 +50,11 @@ var (
 	// onWaitResubscribe; for tests.
 	onWaitResubscribe = func() {}
 )
+
+// onWaitWatching, when set, is called by a wait that read the pipeline, its
+// condition not met, before it waits for the events; for tests, which then
+// know a change made from now on comes to it as an event.
+var onWaitWatching atomic.Pointer[func()]
 
 // WaitResult is the answer of a wait that ended: the condition is met, or
 // can no longer be.
@@ -203,6 +209,9 @@ func waitPipeline(c *gin.Context, hub *events.Hub, durations *summary.Durations,
 		}
 
 		relevant := until.Watch(snapshot)
+		if watching := onWaitWatching.Load(); watching != nil {
+			(*watching)()
+		}
 		for changed := false; !changed; {
 			select {
 			case <-ctx.Done():

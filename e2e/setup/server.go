@@ -90,6 +90,11 @@ type ServerEnv struct {
 	WorkflowEnd pipeline.WorkflowEnd
 
 	stopStatuses context.CancelCauseFunc
+	// stopQueue and stopGRPC stop the server's queue and its gRPC service,
+	// see RestartServer.
+	stopQueue context.CancelCauseFunc
+	stopGRPC  func()
+	ctx       context.Context
 
 	eventsV2Once sync.Once
 	eventsV2Base string
@@ -134,7 +139,10 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	mgr, err := newTestManager(memStore, mockForge)
 	require.NoError(t, err, "create services manager")
 
-	memQueue, err := queue.New(ctx, queue.Config{Backend: queue.TypeMemory})
+	// as the server does (cmd/server): backed by the store
+	queueCtx, stopQueue := context.WithCancelCause(ctx)
+	t.Cleanup(func() { stopQueue(nil) })
+	memQueue, err := queue.New(queueCtx, queue.Config{Backend: queue.TypeMemory, Store: memStore})
 	require.NoError(t, err, "create queue")
 
 	// Save and restore server.Config around the test. server.Config is a
@@ -158,8 +166,7 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	server.Config.Services.Events = hub
 	durations := summary.NewDurations(0)
 	server.Config.Services.Durations = durations
-	server.Config.Services.Scheduler = scheduler.NewScheduler(t.Context(), memStore, memQueue, ps, //nolint:contextcheck
-		scheduler.WithPipelineObserver(hub), scheduler.WithPipelineObserver(durations))
+	server.Config.Services.Scheduler = newScheduler(t.Context(), memStore, memQueue, ps, hub, durations) //nolint:contextcheck
 	server.Config.Services.Explain = explainer
 	server.Config.Services.Membership = cache.NewMembershipService(memStore)
 	server.Config.Services.Manager = mgr
@@ -194,7 +201,7 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	}
 	go pipeline.RunCanceledWorkflowsSweep(t.Context(), end, SweepInterval) //nolint:contextcheck
 
-	grpcAddr := startGRPCServer(ctx, t, memStore, end)
+	grpcAddr, stopGRPC := startGRPCServer(ctx, t, memStore, end, "127.0.0.1:0")
 
 	return &ServerEnv{
 		GRPCAddr:   grpcAddr,
@@ -214,7 +221,37 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 		WorkflowEnd: end,
 
 		stopStatuses: stopStatuses,
+		stopQueue:    stopQueue,
+		stopGRPC:     stopGRPC,
+		ctx:          ctx,
 	}
+}
+
+func newScheduler(ctx context.Context, s store.Store, q queue.Queue, ps pubsub.PubSub, hub *events.Hub, durations *summary.Durations) scheduler.Scheduler {
+	return scheduler.NewScheduler(ctx, s, q, ps, scheduler.WithPipelineObserver(hub), scheduler.WithPipelineObserver(durations))
+}
+
+// RestartServer restarts the server's queue and its gRPC service on the
+// same store and address, as a deploy does: what the queue holds in memory
+// is lost, it starts from the store; the agents connected reconnect.
+func (env *ServerEnv) RestartServer(t *testing.T) {
+	t.Helper()
+	env.stopGRPC()
+	env.stopQueue(nil)
+
+	configLock.Lock()
+	queueCtx, stopQueue := context.WithCancelCause(env.ctx)
+	t.Cleanup(func() { stopQueue(nil) })
+	restarted, err := queue.New(queueCtx, queue.Config{Backend: queue.TypeMemory, Store: env.Store})
+	require.NoError(t, err, "create queue")
+	sched := newScheduler(t.Context(), env.Store, restarted, env.PubSub, env.Events, env.Durations)
+	server.Config.Services.Scheduler = sched
+	env.WorkflowEnd.Publisher = sched
+	env.Queue = restarted
+	env.stopQueue = stopQueue
+	configLock.Unlock()
+
+	_, env.stopGRPC = startGRPCServer(env.ctx, t, env.Store, env.WorkflowEnd, env.GRPCAddr)
 }
 
 // StopStatuses stops the sender of commit statuses as a server that stops
@@ -278,12 +315,12 @@ func newTestManager(s store.Store, mockForge *forge_mocks.MockForge) (services.M
 // GracefulStop inside Serve) and then blocks until Serve has returned.
 // Without this wait, the next subtest can start while the previous server's
 // goroutines are still live, which races on shared state like server.Config.
-func startGRPCServer(ctx context.Context, t *testing.T, s store.Store, end pipeline.WorkflowEnd) string {
+func startGRPCServer(ctx context.Context, t *testing.T, s store.Store, end pipeline.WorkflowEnd, addr string) (string, func()) {
 	t.Helper()
 
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err, "listen on random port for gRPC")
-	addr := lis.Addr().String()
+	lis, err := net.Listen("tcp", addr)
+	require.NoError(t, err, "listen on %s for gRPC", addr)
+	addr = lis.Addr().String()
 
 	serveCtx, cancel := context.WithCancelCause(ctx)
 	stopped := make(chan struct{})
@@ -301,9 +338,13 @@ func startGRPCServer(ctx context.Context, t *testing.T, s store.Store, end pipel
 		})
 	}()
 
-	t.Cleanup(func() {
-		cancel(nil)
-		<-stopped
-	})
-	return addr
+	var once sync.Once
+	stop := func() {
+		once.Do(func() {
+			cancel(nil)
+			<-stopped
+		})
+	}
+	t.Cleanup(stop)
+	return addr, stop
 }
