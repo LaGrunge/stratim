@@ -15,6 +15,7 @@
 package config_test
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -306,7 +307,8 @@ func TestFetch(t *testing.T) {
 			f.On("File", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("file not found"))
 			f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("directory not found"))
 
-			configFetcher := config.NewForge(
+			configFetcher := config.NewForgeRetryingAfter(
+				time.Millisecond,
 				time.Second*3,
 				3,
 				constant.DefaultConfigOrder,
@@ -334,4 +336,43 @@ func TestFetch(t *testing.T) {
 			assert.ElementsMatch(t, tt.expectedFileNames, matchingFiles, "expected some other pipeline files")
 		})
 	}
+}
+
+func TestFetchRetriesWithBackoff(t *testing.T) {
+	t.Parallel()
+
+	f := mocks.NewMockForge(t)
+	f.On("File", mock.Anything, mock.Anything, mock.Anything, mock.Anything, ".woodpecker.yaml").Twice().Return(nil, fmt.Errorf("forge unavailable"))
+	f.On("File", mock.Anything, mock.Anything, mock.Anything, mock.Anything, ".woodpecker.yaml").Once().Return([]byte("steps: []"), nil)
+
+	const base = 20 * time.Millisecond
+	fetcher := config.NewForgeRetryingAfter(base, time.Second, 3, constant.DefaultConfigOrder, []string{".yaml", ".yml"})
+	start := time.Now()
+	files, err := fetcher.Fetch(t.Context(), f, &model.User{}, &model.Repo{Config: ".woodpecker.yaml"}, &model.Pipeline{}, nil, false)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	assert.GreaterOrEqual(t, time.Since(start), 3*base, "waited base, then twice base")
+}
+
+func TestFetchStopsWaitingWithContext(t *testing.T) {
+	t.Parallel()
+
+	f := mocks.NewMockForge(t)
+	f.On("File", mock.Anything, mock.Anything, mock.Anything, mock.Anything, ".woodpecker.yaml").Once().Return(nil, fmt.Errorf("forge unavailable"))
+
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	fetcher := config.NewForgeRetryingAfter(time.Hour, time.Second, 3, constant.DefaultConfigOrder, []string{".yaml", ".yml"})
+	_, err := fetcher.Fetch(ctx, f, &model.User{}, &model.Repo{Config: ".woodpecker.yaml"}, &model.Pipeline{}, nil, false)
+	assert.ErrorContains(t, err, "forge unavailable", "the last failure, not a wait of an hour")
+}
+
+func TestRetryDelay(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, time.Second, config.RetryDelay(time.Second, 1))
+	assert.Equal(t, 2*time.Second, config.RetryDelay(time.Second, 2))
+	assert.Equal(t, 8*time.Second, config.RetryDelay(time.Second, 4))
+	assert.Equal(t, 10*time.Second, config.RetryDelay(time.Second, 5))
+	assert.Equal(t, 10*time.Second, config.RetryDelay(time.Second, 40))
 }

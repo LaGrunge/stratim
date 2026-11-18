@@ -130,6 +130,7 @@ func seedFixtures(t *testing.T, s store.Store) *Fixtures {
 		Branch:        "main",
 		IsActive:      true,
 		AllowPull:     true,
+		WebhookSecret: TestWebhookSecret,
 	}
 	require.NoError(t, s.CreateRepo(repo), "seed repo")
 

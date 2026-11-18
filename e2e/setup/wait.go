@@ -257,3 +257,17 @@ func WaitForWorkflowsDone(t *testing.T, s store.Store, p *model.Pipeline) []*mod
 	t.Fatalf("timeout waiting for the workflows of pipeline %d to finish: last states=%v", p.ID, states)
 	return nil
 }
+
+// WaitForPipelines waits until the repo has n pipelines, failing the test
+// after timeout; it returns them, newest first.
+func WaitForPipelines(t *testing.T, s store.Store, repo *model.Repo, n int, timeout time.Duration) []*model.Pipeline {
+	t.Helper()
+	var pipelines []*model.Pipeline
+	ok := pollUntil(timeout, func() bool {
+		var err error
+		pipelines, err = s.GetPipelineList(repo, &model.ListOptionsWithAll{All: true}, nil)
+		return err == nil && len(pipelines) >= n
+	})
+	require.True(t, ok, "repo %s has %d pipelines after %v, want %d", repo.FullName, len(pipelines), timeout, n)
+	return pipelines
+}

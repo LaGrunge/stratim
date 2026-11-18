@@ -906,15 +906,6 @@ Maximum number of lines to show in a pipeline log.
 
 ---
 
-### WEBHOOK_SYNC_TIMEOUT
-
-- Name: `WOODPECKER_WEBHOOK_SYNC_TIMEOUT`
-- Default: `5s`
-
-Maximum time to wait for the pipeline creation triggered by an incoming webhook. After that, the server responds with `202 Accepted` and finishes it in the background. `0` disables the fallback and always responds synchronously.
-
----
-
 ### SESSION_EXPIRES
 
 - Name: `WOODPECKER_SESSION_EXPIRES`

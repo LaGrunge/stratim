@@ -19,8 +19,11 @@ package setup
 import (
 	"context"
 	"net"
+	"net/http"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
@@ -46,6 +49,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/services/permissions"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 	"go.woodpecker-ci.org/woodpecker/v3/server/summary"
+	"go.woodpecker-ci.org/woodpecker/v3/server/webhook"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/constant"
 )
 
@@ -102,8 +106,21 @@ type ServerEnv struct {
 	eventsV2Once sync.Once
 	eventsV2Base string
 
-	apiOnce sync.Once
-	apiBase string
+	// Inbox keeps the webhooks the API takes and makes pipelines of them.
+	Inbox *webhook.Inbox
+	// Reconciler has the forge deliver again the webhooks that did not
+	// reach the server; it runs a little after the server starts.
+	Reconciler *webhook.Reconciler
+	// Hooks are the deliveries of webhooks of the forge; see Deliver.
+	Hooks *Deliveries
+	// stopInbox stops the inbox and the reconciler and waits for them.
+	stopInbox func()
+
+	apiOnce    sync.Once
+	apiHandler http.Handler
+	apiMu      sync.Mutex
+	apiBase    string
+	stopAPI    func()
 }
 
 func (env *ServerEnv) DummyPipeline(event model.WebhookEvent) *model.Pipeline {
@@ -138,8 +155,10 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	statuses := newStatuses()
 	served := &Files{files: files}
 	mockForge := newMockForge(t, served, statuses)
+	stubHook(mockForge, fixtures.Repo)
+	hooks := &Deliveries{requests: make(map[string]*hookRequest)}
 
-	mgr, err := newTestManager(memStore, mockForge)
+	mgr, err := newTestManager(memStore, &hookForge{MockForge: mockForge, Deliveries: hooks})
 	require.NoError(t, err, "create services manager")
 
 	// as the server does (cmd/server): backed by the store
@@ -207,7 +226,7 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 	rpcStore := &FaultyStore{Store: memStore}
 	grpcAddr, stopGRPC := startGRPCServer(ctx, t, rpcStore, end, "127.0.0.1:0")
 
-	return &ServerEnv{
+	env := &ServerEnv{
 		GRPCAddr:   grpcAddr,
 		Store:      memStore,
 		Queue:      memQueue,
@@ -229,7 +248,40 @@ func StartServer(ctx context.Context, t *testing.T, files []*forge_types.FileMet
 		stopGRPC:     stopGRPC,
 		ctx:          ctx,
 		rpcStore:     rpcStore,
+
+		Inbox: webhook.New(memStore, end, webhook.Options{Poll: inboxPoll}),
+		Reconciler: webhook.NewReconciler(memStore, webhook.ReconcilerOptions{
+			FirstAfter: reconcileFirstAfter, Link: server.Config.Server.Host,
+		}),
+		Hooks: hooks,
 	}
+	hooks.url = env.apiURL
+	env.startInbox(ctx, t)
+	return env
+}
+
+const (
+	// How often the inbox looks for deliveries due without a new one.
+	inboxPoll = 100 * time.Millisecond
+	// The wait of the reconciler after the server starts.
+	reconcileFirstAfter = 500 * time.Millisecond
+)
+
+// startInbox runs the inbox and the reconciler until StopServer.
+func (env *ServerEnv) startInbox(ctx context.Context, t *testing.T) {
+	t.Helper()
+	ctx, cancel := context.WithCancelCause(ctx)
+	var wg sync.WaitGroup
+	wg.Go(func() { env.Inbox.Run(ctx) })
+	wg.Go(func() { env.Reconciler.Run(ctx) })
+	var once sync.Once
+	env.stopInbox = func() {
+		once.Do(func() {
+			cancel(nil)
+			wg.Wait()
+		})
+	}
+	t.Cleanup(env.stopInbox)
 }
 
 func newScheduler(ctx context.Context, s store.Store, q queue.Queue, ps pubsub.PubSub, hub *events.Hub, durations *summary.Durations) scheduler.Scheduler {
@@ -248,6 +300,13 @@ func (env *ServerEnv) RestartServer(t *testing.T) {
 // StopServer stops the server's gRPC service and its queue, as a server
 // that went away: its agents cannot reach it until StartServerAgain.
 func (env *ServerEnv) StopServer() {
+	env.apiMu.Lock()
+	stopAPI := env.stopAPI
+	env.apiMu.Unlock()
+	if stopAPI != nil {
+		stopAPI()
+	}
+	env.stopInbox()
 	env.stopGRPC()
 	env.stopQueue(nil)
 }
@@ -269,6 +328,10 @@ func (env *ServerEnv) StartServerAgain(t *testing.T) {
 	configLock.Unlock()
 
 	_, env.stopGRPC = startGRPCServer(env.ctx, t, env.rpcStore, env.WorkflowEnd, env.GRPCAddr)
+	env.startInbox(env.ctx, t)
+	if addr := strings.TrimPrefix(env.apiURL(), "http://"); addr != "" {
+		env.serveAPI(t, addr)
+	}
 }
 
 // FailWorkflowFinish has the next n writes of a workflow's end its agent
@@ -310,8 +373,8 @@ func newStatusSender(ctx context.Context, s store.Store, mgr services.Manager) *
 }
 
 // newTestManager builds a services.Manager whose SetupForge always returns
-// the provided MockForge, bypassing real forge instantiation.
-func newTestManager(s store.Store, mockForge *forge_mocks.MockForge) (services.Manager, error) {
+// the provided forge, bypassing real forge instantiation.
+func newTestManager(s store.Store, mockForge forge.Forge) (services.Manager, error) {
 	cmd := &cli.Command{
 		Flags: []cli.Flag{
 			// Config fetch tuning.

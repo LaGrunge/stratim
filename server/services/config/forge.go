@@ -33,6 +33,7 @@ import (
 type forgeFetcher struct {
 	timeout          time.Duration
 	retryCount       uint
+	retryBase        time.Duration
 	configPaths      []string
 	configExtensions []string
 }
@@ -41,6 +42,7 @@ func NewForge(timeout time.Duration, retries uint, configPaths, configExtensions
 	return &forgeFetcher{
 		timeout:          timeout,
 		retryCount:       retries,
+		retryBase:        configRetryBase,
 		configPaths:      configPaths,
 		configExtensions: configExtensions,
 	}
@@ -62,8 +64,15 @@ func (f *forgeFetcher) Fetch(ctx context.Context, forge forge.Forge, user *model
 		configExtensions: f.configExtensions,
 	}
 
-	// try to fetch multiple times
+	// try to fetch multiple times, waiting longer after each failure
 	for i := 0; i < int(f.retryCount); i++ {
+		if i > 0 {
+			select {
+			case <-ctx.Done():
+				return files, err
+			case <-time.After(retryDelay(f.retryBase, i)):
+			}
+		}
 		files, err = ffc.fetch(ctx, strings.TrimSpace(repo.Config))
 		if err != nil {
 			log.Trace().Err(err).Msgf("Fetching config files: Attempt #%d failed", i+1)
@@ -73,6 +82,20 @@ func (f *forgeFetcher) Fetch(ctx context.Context, forge forge.Forge, user *model
 	}
 
 	return files, err
+}
+
+// configRetryBase is the wait after the first failed fetch of a config.
+const configRetryBase = time.Second
+
+// retryDelay is the wait after the nth failed fetch of a config: doubling
+// from base, at most ten times it.
+func retryDelay(base time.Duration, n int) time.Duration {
+	const most = 10
+	d := base
+	for i := 1; i < n && d < most*base; i++ {
+		d *= 2
+	}
+	return min(d, most*base)
 }
 
 type forgeFetcherContext struct {

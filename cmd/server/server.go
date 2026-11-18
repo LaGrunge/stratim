@@ -46,6 +46,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 	"go.woodpecker-ci.org/woodpecker/v3/server/web"
+	"go.woodpecker-ci.org/woodpecker/v3/server/webhook"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/logger"
 	"go.woodpecker-ci.org/woodpecker/v3/version"
 )
@@ -140,6 +141,16 @@ func run(ctx context.Context, c *cli.Command) error {
 	// the statuses not through when the server stopped, in the background
 	server.Config.Services.Statuses.Resend(ctx)
 
+	// the webhooks kept made into pipelines; waited for when the server
+	// stops, before the store is closed
+	inbox := webhook.New(_store, end, webhook.Options{})
+	serviceWaitingGroup.Go(func() error {
+		inbox.Run(ctx)
+		return nil
+	})
+	// the deliveries that did not reach the server asked again
+	go webhook.NewReconciler(_store, webhook.ReconcilerOptions{}).Run(ctx)
+
 	serviceWaitingGroup.Go(func() error {
 		log.Info().Msg("starting cron service ...")
 		if err := cron_scheduler.Run(pipeline.InjectWorkflowEnd(ctx, end), _store); err != nil {
@@ -192,6 +203,7 @@ func run(ctx context.Context, c *cli.Command) error {
 		middleware.Version,
 		middleware.Store(_store),
 		middleware.WorkflowEnd(end),
+		middleware.Inbox(inbox),
 		middleware.Stopping(ctx),
 	)
 

@@ -31,8 +31,27 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/version"
 )
 
+// CreateOption changes how Create creates a pipeline.
+type CreateOption func(*createOptions)
+
+type createOptions struct {
+	onStored func(*model.Pipeline)
+}
+
+// OnStored has Create call fn once the pipeline is stored, before its
+// config is fetched: what made it can tell it made it, should it stop before
+// Create returns. A pipeline filtered after is deleted.
+func OnStored(fn func(*model.Pipeline)) CreateOption {
+	return func(o *createOptions) { o.onStored = fn }
+}
+
 // Create a new pipeline and start it.
-func Create(ctx context.Context, _store store.Store, repo *model.Repo, pipeline *model.Pipeline) (*model.Pipeline, error) {
+func Create(ctx context.Context, _store store.Store, repo *model.Repo, pipeline *model.Pipeline, opts ...CreateOption) (*model.Pipeline, error) {
+	var options createOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	repoUser, err := _store.GetUser(repo.UserID)
 	if err != nil {
 		msg := fmt.Sprintf("failure to find repo owner via id '%d'", repo.UserID)
@@ -71,6 +90,9 @@ func Create(ctx context.Context, _store store.Store, repo *model.Repo, pipeline 
 		msg := fmt.Errorf("failed to save pipeline for %s", repo.FullName)
 		log.Error().Str("repo", repo.FullName).Err(err).Msg(msg.Error())
 		return nil, msg
+	}
+	if options.onStored != nil {
+		options.onStored(pipeline)
 	}
 
 	// fetch the pipeline file from the forge
