@@ -38,11 +38,12 @@ type result struct {
 	pipeline int64
 	err      error
 	// retry tells the attempt failed before a pipeline was stored: another
-	// may succeed.
-	retry bool
+	// may succeed, until giveUp after the delivery was received.
+	retry  bool
+	giveUp time.Duration
 }
 
-func retry(err error) result { return result{err: err, retry: true} }
+func retry(err error) result { return result{err: err, retry: true, giveUp: giveUpAfter} }
 
 func ignored(why string) result {
 	return result{state: model.DeliveryIgnored, err: errors.New(why)}
@@ -86,8 +87,12 @@ func (in *Inbox) process(ctx context.Context, d *model.WebhookDelivery) result {
 		if errors.Is(err, &types.ErrIgnoreEvent{}) {
 			return ignored(err.Error())
 		}
-		// the forge may not answer the calls parsing makes, for now
-		return retry(fmt.Errorf("the forge cannot parse the webhook: %w", err))
+		// the forge may not answer the calls parsing makes, for now; or the
+		// webhook never parses, holding back the repo's next ones: tried
+		// for a shorter while
+		res := retry(fmt.Errorf("the forge cannot parse the webhook: %w", err))
+		res.giveUp = giveUpParsingAfter
+		return res
 	}
 	if pipelineFromForge == nil {
 		return ignored("the webhook makes no pipeline")

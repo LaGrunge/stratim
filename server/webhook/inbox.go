@@ -58,6 +58,9 @@ const (
 	firstRetryDelay = 5 * time.Second
 	maxRetryDelay   = 5 * time.Minute
 	giveUpAfter     = time.Hour
+	// A webhook the forge cannot parse is given up sooner: it holds back
+	// the next ones of its repo.
+	giveUpParsingAfter = 10 * time.Minute
 	// How long settled deliveries are kept: longer than forges deliver
 	// again (GitHub keeps them 3 days).
 	keepSettled = 7 * 24 * time.Hour
@@ -353,7 +356,7 @@ func (in *Inbox) handle(ctx context.Context, id int64) {
 		d.PipelineID = res.pipeline
 	}
 	switch {
-	case res.retry && now.Add(retryDelay(d.Attempts)).Before(time.Unix(d.Received, 0).Add(giveUpAfter)):
+	case res.retry && now.Add(retryDelay(d.Attempts)).Before(time.Unix(d.Received, 0).Add(res.giveUp)):
 		d.State = model.DeliveryPending
 		d.NextTry = now.Add(retryDelay(d.Attempts)).Unix()
 		logger.Warn().Err(res.err).Time("next-try", time.Unix(d.NextTry, 0)).Msg("webhook: no pipeline yet, trying again")

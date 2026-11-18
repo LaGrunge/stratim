@@ -212,8 +212,26 @@ func TestProcessGivesUp(t *testing.T) {
 	}
 	d := fx.delivery(t, "g-1")
 	assert.Equal(t, model.DeliveryFailed, d.State)
-	assert.Less(t, d.Attempts, 30, "given up after an hour")
-	assert.Greater(t, d.Attempts, 10)
+	assert.Less(t, d.Attempts, 5, "a webhook that does not parse is given up after 10 minutes")
+	assert.Greater(t, d.Attempts, 1)
+}
+
+// A failure after the forge parsed it is tried for an hour.
+func TestProcessGivesUpAfterAnHour(t *testing.T) {
+	fx := newFixture(t)
+	fx.forge.EXPECT().Hook(mock.Anything, mock.Anything).Return(fx.repo, skipped(), nil)
+	fx.receive(t, "g-1")
+	// the owner gone: a failure before the pipeline is stored
+	fx.repo.UserID = 999
+	require.NoError(t, fx.store.UpdateRepo(fx.repo))
+	for range 30 {
+		fx.run(t)
+		fx.clock.Add(maxRetryDelay)
+	}
+	d := fx.delivery(t, "g-1")
+	assert.Equal(t, model.DeliveryFailed, d.State)
+	assert.Less(t, d.Attempts, 30)
+	assert.Greater(t, d.Attempts, 10, "tried for an hour")
 }
 
 func TestProcessSettles(t *testing.T) {

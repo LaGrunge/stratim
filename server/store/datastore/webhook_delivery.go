@@ -24,9 +24,10 @@ import (
 // The columns a delivery's processing changes.
 var webhookDeliveryUpdateCols = []string{"state", "next_try", "error", "pipeline_id", "updated"}
 
-// The columns a delivery that failed and came again is queued again with.
+// The columns a delivery that failed and came again is queued again with:
+// not when it was received, which bounds its retries; it gets an attempt.
 var webhookDeliveryRequeueCols = []string{
-	"event", "header", "body", "state", "next_try", "attempts", "error", "pipeline_id", "received", "sent", "updated",
+	"event", "header", "body", "state", "next_try", "attempts", "error", "pipeline_id", "updated",
 }
 
 // WebhookDeliveryCreate stores a delivery unless the repo's delivery with
@@ -46,8 +47,7 @@ func (s storage) WebhookDeliveryCreate(d *model.WebhookDelivery) (bool, error) {
 		requeued, err := s.engine.
 			Where("forge_id = ? AND repo_id = ? AND guid = ? AND state = ?", d.ForgeID, d.RepoID, d.GUID, model.DeliveryFailed).
 			Cols(webhookDeliveryRequeueCols...).Update(&model.WebhookDelivery{
-			Event: d.Event, Header: d.Header, Body: d.Body, State: d.State, NextTry: d.NextTry,
-			Received: d.Received, Sent: d.Sent, Updated: d.Updated,
+			Event: d.Event, Header: d.Header, Body: d.Body, State: d.State, NextTry: d.NextTry, Updated: d.Updated,
 		})
 		created = requeued == 1
 		return lockErr(err)

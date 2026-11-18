@@ -110,7 +110,7 @@ func TestWebhookDeliveryCreateRequeuesFailed(t *testing.T) {
 		assert.True(t, created, "a failed one is queued again")
 		assert.Equal(t, model.DeliveryPending, got.State)
 		assert.EqualValues(t, 900, got.NextTry)
-		assert.EqualValues(t, 900, got.Received)
+		assert.EqualValues(t, 100, got.Received, "received when first: its retries stay bounded")
 		assert.Zero(t, got.Attempts)
 		assert.Empty(t, got.Error)
 		assert.Zero(t, got.PipelineID)
