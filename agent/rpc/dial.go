@@ -24,10 +24,26 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 	grpc_credentials "google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 )
+
+// reconnectParams has an agent try to reconnect to the server it lost at
+// least every reconnectMaxDelay: gRPC's default waits up to two minutes
+// between tries, which a server back after a deploy would wait for.
+var reconnectParams = grpc.ConnectParams{
+	Backoff: backoff.Config{
+		BaseDelay:  time.Second,
+		Multiplier: backoff.DefaultConfig.Multiplier,
+		Jitter:     backoff.DefaultConfig.Jitter,
+		MaxDelay:   reconnectMaxDelay,
+	},
+	MinConnectTimeout: 20 * time.Second, //nolint:mnd
+}
+
+const reconnectMaxDelay = 5 * time.Second
 
 // DialConfig bundles everything Dial needs. Callers build this from a
 // *cli.Command (production) or with literals (tests).
@@ -82,6 +98,7 @@ func Dial(authCtx context.Context, cfg DialConfig) (*AgentConn, error) {
 		Time:    cfg.KeepaliveTime,
 		Timeout: cfg.KeepaliveTimeout,
 	})
+	connectOpts := grpc.WithConnectParams(reconnectParams)
 
 	if after, ok := strings.CutPrefix(cfg.ServerAddr, "unix://"); ok {
 		addr, _ := filepath.Abs(after)
@@ -94,7 +111,7 @@ func Dial(authCtx context.Context, cfg DialConfig) (*AgentConn, error) {
 		cfg.ServerAddr = "unix://" + addr
 	}
 
-	authConn, err := grpc.NewClient(cfg.ServerAddr, transport, keepaliveOpts)
+	authConn, err := grpc.NewClient(cfg.ServerAddr, transport, keepaliveOpts, connectOpts)
 	if err != nil {
 		return nil, fmt.Errorf("create auth gRPC connection: %w", err)
 	}
@@ -108,7 +125,7 @@ func Dial(authCtx context.Context, cfg DialConfig) (*AgentConn, error) {
 	}
 
 	mainConn, err := grpc.NewClient(
-		cfg.ServerAddr, transport, keepaliveOpts,
+		cfg.ServerAddr, transport, keepaliveOpts, connectOpts,
 		grpc.WithUnaryInterceptor(authInterceptor.Unary()),
 		grpc.WithStreamInterceptor(authInterceptor.Stream()),
 	)

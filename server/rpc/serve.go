@@ -68,6 +68,7 @@ func Serve(ctx context.Context, cfg ServeConfig) error {
 	grpcServer := grpc.NewServer(
 		grpc.StreamInterceptor(authorizer.StreamInterceptor),
 		grpc.ChainUnaryInterceptor(
+			unavailableOnTransientStoreError,
 			authorizer.UnaryInterceptor,
 			releaseOnShutdownInterceptor(grpcCtx),
 		),

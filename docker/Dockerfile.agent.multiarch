@@ -2,7 +2,7 @@ FROM --platform=$BUILDPLATFORM docker.io/golang:1.27 AS build
 
 RUN groupadd -g 1000 woodpecker && \
   useradd -u 1000 -g 1000 woodpecker && \
-  mkdir -p /etc/woodpecker
+  mkdir -p /etc/woodpecker /tmp-empty
 
 # add backward compatible timezone names (US/Eastern, Asia/Calcutta, ...) to match alpine images
 RUN apt update && \
@@ -24,6 +24,8 @@ COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build /etc/passwd /etc/passwd
 COPY --from=build /etc/group /etc/group
 COPY --from=build --chown=woodpecker:woodpecker /etc/woodpecker /etc
+# the logs not sent yet wait here while the server is away
+COPY --from=build --chmod=1777 /tmp-empty /tmp
 
 FROM scratch
 ENV GODEBUG=netdns=go

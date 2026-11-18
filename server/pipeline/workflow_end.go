@@ -89,7 +89,9 @@ func WorkflowEndFromContext(ctx context.Context) (WorkflowEnd, bool) {
 // errNoWorkflowEnd is a cancel given no WorkflowEnd to end workflows with.
 var errNoWorkflowEnd = errors.New("pipeline: no workflow end to cancel with")
 
-// Ended follows the end of workflow, of currentPipeline.
+// Ended follows the end of workflow, of currentPipeline. It returns the
+// error of writing the pipeline's end, if that is what the workflow's end
+// made, once it followed the rest: EndPipeline writes it later.
 func (e WorkflowEnd) Ended(c context.Context, logger zerolog.Logger, repo *model.Repo, currentPipeline *model.Pipeline, workflow *model.Workflow) error {
 	event := currentPipeline.Event
 	var err error
@@ -98,32 +100,7 @@ func (e WorkflowEnd) Ended(c context.Context, logger zerolog.Logger, repo *model
 		return err
 	}
 
-	pipelineEnded := false
-	if !model.IsThereRunningStage(currentPipeline.Workflows) {
-		// use the latest finish time of all workflows
-		finished := workflow.Finished
-		for _, w := range currentPipeline.Workflows {
-			finished = max(finished, w.Finished)
-		}
-		if finished == 0 {
-			finished = time.Now().Unix()
-		}
-
-		ended := *currentPipeline
-		ended.Status = PipelineStatus(currentPipeline.Workflows)
-		ended.Finished = finished
-		// only status and finish, and only if not ended already: a pipeline
-		// a cancel killed stays killed
-		if pipelineEnded, err = e.Store.PipelineFinish(&ended); err != nil {
-			logger.Error().Err(err).Msg("cannot update the pipeline's final state")
-		}
-		if pipelineEnded {
-			currentPipeline = &ended
-		} else if latest, err := e.Store.GetPipeline(currentPipeline.ID); err == nil {
-			latest.Workflows = currentPipeline.Workflows
-			currentPipeline = latest
-		}
-	}
+	currentPipeline, pipelineEnded, finishErr := e.finishPipeline(logger, currentPipeline, workflow.Finished)
 
 	e.MarkStatuses(event, workflow.PipelineID, workflow.ID)
 
@@ -156,7 +133,66 @@ func (e WorkflowEnd) Ended(c context.Context, logger zerolog.Logger, repo *model
 		}
 		e.Metrics.WorkflowEnded(repo, currentPipeline, workflow)
 	}
-	return nil
+	return finishErr
+}
+
+// finishPipeline writes the end of currentPipeline, its Workflows loaded,
+// if none of them runs any more: its status by theirs, finished at the
+// latest of their ends (or finished). It returns the pipeline as stored,
+// whether this wrote its end, and the error of writing it.
+func (e WorkflowEnd) finishPipeline(logger zerolog.Logger, currentPipeline *model.Pipeline, finished int64) (*model.Pipeline, bool, error) {
+	if model.IsThereRunningStage(currentPipeline.Workflows) {
+		return currentPipeline, false, nil
+	}
+	for _, w := range currentPipeline.Workflows {
+		finished = max(finished, w.Finished)
+	}
+	if finished == 0 {
+		finished = time.Now().Unix()
+	}
+
+	ended := *currentPipeline
+	ended.Status = PipelineStatus(currentPipeline.Workflows)
+	ended.Finished = finished
+	// only status and finish, and only if not ended already: a pipeline a
+	// cancel killed stays killed
+	won, err := e.Store.PipelineFinish(&ended)
+	if err != nil {
+		logger.Error().Err(err).Msg("cannot update the pipeline's final state")
+		return currentPipeline, false, err
+	}
+	if won {
+		return &ended, true, nil
+	}
+	if latest, err := e.Store.GetPipeline(currentPipeline.ID); err == nil {
+		latest.Workflows = currentPipeline.Workflows
+		return latest, false, nil
+	}
+	return currentPipeline, false, nil
+}
+
+// EndPipeline writes the end of currentPipeline if none of its workflows
+// runs any more and its end was not written, as when writing it failed as
+// its last workflow ended, and follows it: its event, its metrics, the
+// status of a deployment. The ends of its workflows were followed already.
+func (e WorkflowEnd) EndPipeline(c context.Context, logger zerolog.Logger, repo *model.Repo, currentPipeline *model.Pipeline) error {
+	var err error
+	currentPipeline.Workflows, err = e.Store.WorkflowGetTree(currentPipeline)
+	if err != nil {
+		return err
+	}
+	ended, won, err := e.finishPipeline(logger, currentPipeline, 0)
+	if err != nil || !won {
+		return err
+	}
+	logger.Info().Msg("wrote the end of a pipeline whose workflows all ended")
+	if ended.Event == model.EventDeploy {
+		e.MarkStatuses(ended.Event, ended.ID, 0)
+	}
+	if e.Metrics != nil {
+		e.Metrics.PipelineEnded(repo, ended)
+	}
+	return e.Publisher.PublishPipelineEvent(c, repo, ended)
 }
 
 // KillAndEnd kills a running workflow no agent stops any more (see

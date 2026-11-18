@@ -56,6 +56,9 @@ const (
 	// EnvKeyStepEchoEnv lists, comma separated, environment variables the
 	// step prints as NAME=value after its commands.
 	EnvKeyStepEchoEnv = "ECHO_ENV"
+	// EnvKeyStepTick makes the step write "tick N" every so long while it
+	// sleeps (see EnvKeyStepSleep): SLEEP/TICK lines after its output.
+	EnvKeyStepTick = "TICK"
 
 	// Internal const.
 	stepStateStarted   = "started"
@@ -239,7 +242,7 @@ func (e *dummy) WaitStep(ctx context.Context, step *backend_types.Step, taskUUID
 	}, nil
 }
 
-func (e *dummy) TailStep(_ context.Context, step *backend_types.Step, taskUUID string) (io.ReadCloser, error) {
+func (e *dummy) TailStep(ctx context.Context, step *backend_types.Step, taskUUID string) (io.ReadCloser, error) {
 	log.Trace().Str("taskUUID", taskUUID).Msgf("tail logs of step %s", step.Name)
 
 	_, exist := e.kv.Load(workflowKey(taskUUID))
@@ -262,7 +265,41 @@ func (e *dummy) TailStep(_ context.Context, step *backend_types.Step, taskUUID s
 		return nil, fmt.Errorf("expected fail to read stdout of step")
 	}
 
+	if tick, ok := step.Environment[EnvKeyStepTick]; ok {
+		return tickingOutput(ctx, step, tick)
+	}
 	return io.NopCloser(strings.NewReader(dummyExecStepOutput(step))), nil
+}
+
+// tickingOutput is the output of a step writing a line every tick while it
+// sleeps.
+func tickingOutput(ctx context.Context, step *backend_types.Step, tick string) (io.ReadCloser, error) {
+	every, err := time.ParseDuration(tick)
+	if err != nil || every <= 0 {
+		return nil, fmt.Errorf("TailStep: invalid tick %q", tick)
+	}
+	sleep, err := time.ParseDuration(step.Environment[EnvKeyStepSleep])
+	if err != nil {
+		return nil, fmt.Errorf("TailStep: a ticking step needs a sleep: %w", err)
+	}
+	r, w := io.Pipe()
+	go func() {
+		defer w.Close()
+		if _, err := io.WriteString(w, dummyExecStepOutput(step)); err != nil {
+			return
+		}
+		for i := 1; i <= int(sleep/every); i++ {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(every):
+			}
+			if _, err := fmt.Fprintf(w, "tick %d\n", i); err != nil {
+				return
+			}
+		}
+	}()
+	return r, nil
 }
 
 func (e *dummy) DestroyStep(_ context.Context, step *backend_types.Step, taskUUID string) error {

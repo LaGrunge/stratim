@@ -257,6 +257,11 @@ type Store interface {
 	// still pending or running in pipelines killed or canceled before
 	// canceledBefore (unix seconds, their finished), their steps with them.
 	WorkflowsLeftInCanceledPipelines(canceledBefore int64, limit int) ([]*model.Workflow, error)
+	// PipelinesLeftUnended lists, by ID, at most limit pipelines still
+	// pending or running whose workflows all ended before endedBefore (unix
+	// seconds, their finished): their ends not written, as the store failed
+	// when their last workflow ended.
+	PipelinesLeftUnended(endedBefore int64, limit int) ([]*model.Pipeline, error)
 	// WorkflowsRunning lists, by ID, at most limit workflows running whose
 	// ID is above afterID: a page, the next one after its last.
 	WorkflowsRunning(afterID int64, limit int) ([]*model.Workflow, error)

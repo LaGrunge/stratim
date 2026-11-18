@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
@@ -41,6 +42,7 @@ import (
 	log_mocks "go.woodpecker-ci.org/woodpecker/v3/server/services/log/mocks"
 	"go.woodpecker-ci.org/woodpecker/v3/server/store"
 	store_mocks "go.woodpecker-ci.org/woodpecker/v3/server/store/mocks"
+	"go.woodpecker-ci.org/woodpecker/v3/server/store/transient"
 )
 
 // newTestRPC creates an RPC instance with common test infrastructure.
@@ -662,7 +664,7 @@ func TestRPCDone(t *testing.T) {
 	t.Run("reject workflow already finished", func(t *testing.T) {
 		mockStore := store_mocks.NewMockStore(t)
 		agent := defaultAgent()
-		pipeline := defaultPipeline(model.StatusRunning)
+		pipeline := defaultPipeline(model.StatusSuccess)
 		workflow := defaultWorkflow(model.StatusSuccess)
 
 		mockStore.On("WorkflowLoad", int64(30)).Return(workflow, nil)
@@ -676,6 +678,81 @@ func TestRPCDone(t *testing.T) {
 
 		err := rpcInst.Done(ctx, "30", rpc.WorkflowState{Finished: 200})
 		assert.ErrorIs(t, err, ErrAgentIllegalWorkflowReRunStateChange)
+		mockStore.AssertNotCalled(t, "PipelineFinish", mock.Anything)
+	})
+
+	// A Done tried again after its first try wrote the workflow's end but
+	// not its steps' or its pipeline's: they are written then, and only
+	// they.
+	t.Run("workflow already finished ends its steps and pipeline", func(t *testing.T) {
+		mockStore := store_mocks.NewMockStore(t)
+		agent := defaultAgent()
+		pipeline := defaultPipeline(model.StatusRunning)
+		stored := defaultWorkflow(model.StatusSuccess)
+		stored.Finished = 200
+		service := &model.Step{ID: 7, PipelineID: 20, State: model.StatusRunning, Started: 100, Type: model.StepTypeService}
+
+		// each load its own copy, as the store gives
+		mockStore.EXPECT().WorkflowLoad(int64(30)).RunAndReturn(func(int64) (*model.Workflow, error) {
+			w := *stored
+			return &w, nil
+		})
+		mockStore.EXPECT().StepListFromWorkflowFind(mock.Anything).RunAndReturn(func(*model.Workflow) ([]*model.Step, error) {
+			c := *service
+			return []*model.Step{&c}, nil
+		})
+		mockStore.On("GetPipeline", int64(20)).Return(pipeline, nil)
+		mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
+		mockStore.On("AgentFind", int64(1)).Return(agent, nil)
+		mockStore.On("StepFinish", mock.Anything, mock.Anything).Return(true, nil)
+		mockStore.EXPECT().WorkflowGetTree(mock.Anything).RunAndReturn(func(*model.Pipeline) ([]*model.Workflow, error) {
+			w := *stored
+			return []*model.Workflow{&w}, nil
+		})
+		finish := mockStore.On("PipelineFinish", mock.Anything).Return(false, mysql.ErrInvalidConn).Once()
+
+		rpcInst := newTestRPC(t, mockStore, queue.NewMemoryQueue(t.Context()))
+		ctx := context.WithValue(t.Context(), agentIDKey, int64(1))
+
+		err := rpcInst.Done(ctx, "30", rpc.WorkflowState{Started: 100, Finished: 200})
+		assert.True(t, transient.Is(err), "the store failing again: the agent tries again, got %v", err)
+		mockStore.AssertCalled(t, "StepFinish", mock.MatchedBy(func(s *model.Step) bool {
+			return s.ID == 7 && s.State == model.StatusSuccess && s.Finished == 200
+		}), mock.Anything)
+
+		finish.Unset()
+		mockStore.On("PipelineFinish", mock.Anything).Return(true, nil)
+		err = rpcInst.Done(ctx, "30", rpc.WorkflowState{Started: 100, Finished: 200})
+		assert.ErrorIs(t, err, ErrAgentIllegalWorkflowReRunStateChange)
+		mockStore.AssertCalled(t, "PipelineFinish", mock.MatchedBy(func(p *model.Pipeline) bool {
+			return p.Status == model.StatusSuccess && p.Finished == 200
+		}))
+	})
+
+	// A Done sent again while a sibling workflow runs: the pipeline does
+	// not end.
+	t.Run("workflow already finished with a sibling running", func(t *testing.T) {
+		mockStore := store_mocks.NewMockStore(t)
+		pipeline := defaultPipeline(model.StatusRunning)
+		stored := defaultWorkflow(model.StatusSuccess)
+		sibling := &model.Workflow{ID: 31, PipelineID: 20, State: model.StatusRunning}
+
+		mockStore.EXPECT().WorkflowLoad(int64(30)).RunAndReturn(func(int64) (*model.Workflow, error) {
+			w := *stored
+			return &w, nil
+		})
+		mockStore.On("StepListFromWorkflowFind", mock.Anything).Return([]*model.Step{}, nil)
+		mockStore.On("GetPipeline", int64(20)).Return(pipeline, nil)
+		mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
+		mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
+		mockStore.On("WorkflowGetTree", mock.Anything).Return([]*model.Workflow{stored, sibling}, nil)
+
+		rpcInst := newTestRPC(t, mockStore, queue.NewMemoryQueue(t.Context()))
+		ctx := context.WithValue(t.Context(), agentIDKey, int64(1))
+
+		err := rpcInst.Done(ctx, "30", rpc.WorkflowState{Started: 100, Finished: 200})
+		assert.ErrorIs(t, err, ErrAgentIllegalWorkflowReRunStateChange)
+		mockStore.AssertNotCalled(t, "PipelineFinish", mock.Anything)
 	})
 
 	t.Run("reject workflow blocked", func(t *testing.T) {
@@ -772,6 +849,45 @@ func TestRPCLog(t *testing.T) {
 		}
 		err := rpcInst.Log(ctx, "step-uuid-123", entries)
 		assert.NoError(t, err)
+	})
+
+	// The log store away for a while: the agent is told, to send the lines
+	// again; another error of the log store is not its to fix.
+	t.Run("log store errors", func(t *testing.T) {
+		for _, tc := range []struct {
+			name      string
+			err       error
+			transient bool
+		}{
+			{"transient", mysql.ErrInvalidConn, true},
+			{"other", errors.New("disk full"), false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				mockStore := store_mocks.NewMockStore(t)
+				mockLogStore := log_mocks.NewMockService(t)
+				origLogStore := server.Config.Services.LogStore
+				server.Config.Services.LogStore = mockLogStore
+				t.Cleanup(func() { server.Config.Services.LogStore = origLogStore })
+
+				mockStore.On("StepByUUID", "step-uuid-123").Return(defaultStep(model.StatusRunning), nil)
+				mockStore.On("WorkflowByStep", mock.Anything).Return(defaultWorkflow(model.StatusRunning), nil)
+				mockStore.On("WorkflowLoad", int64(30)).Return(defaultWorkflow(model.StatusRunning), nil)
+				mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
+				mockStore.On("GetPipeline", int64(20)).Return(defaultPipeline(model.StatusRunning), nil)
+				mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
+				mockStore.On("AgentUpdate", mock.Anything).Return(nil)
+				mockLogStore.On("LogAppend", mock.Anything, mock.Anything, mock.Anything).Return(tc.err)
+
+				rpcInst := newTestRPC(t, mockStore, nil)
+				ctx := context.WithValue(t.Context(), agentIDKey, int64(1))
+				err := rpcInst.Log(ctx, "step-uuid-123", []*rpc.LogEntry{{StepUUID: "step-uuid-123", Line: 0, Data: []byte("x")}})
+				if tc.transient {
+					assert.True(t, transient.Is(err), "got %v", err)
+				} else {
+					assert.NoError(t, err)
+				}
+			})
+		}
 	})
 
 	t.Run("allow: step finished but pipeline still running (logs draining)", func(t *testing.T) {

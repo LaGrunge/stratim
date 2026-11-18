@@ -53,13 +53,13 @@ var flags = append([]cli.Flag{
 		Sources: cli.EnvVars("WOODPECKER_DATABASE_IDLE_CONNECTIONS"),
 		Name:    "db-max-idle-connections",
 		Usage:   "amount of connections xorm will hold open",
-		Value:   2,
+		Value:   20,
 	},
 	&cli.DurationFlag{
 		Sources: cli.EnvVars("WOODPECKER_DATABASE_CONNECTION_TIMEOUT"),
 		Name:    "db-max-connection-timeout",
 		Usage:   "time an active connection is allowed to stay open",
-		Value:   3 * time.Second,
+		Value:   30 * time.Minute,
 	},
 	&cli.UintFlag{
 		Sources: cli.EnvVars("WOODPECKER_DATABASE_MAX_RETRIES"),

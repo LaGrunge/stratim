@@ -370,3 +370,41 @@ func TestWorkflowsRunning(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, workflows, "past the last")
 }
+
+func TestPipelinesLeftUnended(t *testing.T) {
+	store, closer := newTestStore(t, new(model.Repo), new(model.Pipeline), new(model.Workflow), new(model.Step))
+	defer closer()
+
+	createTestRepo(t, store)
+	unended := &model.Pipeline{RepoID: 1, Number: 1, Status: model.StatusRunning}
+	recent := &model.Pipeline{RepoID: 1, Number: 2, Status: model.StatusRunning}
+	active := &model.Pipeline{RepoID: 1, Number: 3, Status: model.StatusRunning}
+	ended := &model.Pipeline{RepoID: 1, Number: 4, Status: model.StatusSuccess}
+	empty := &model.Pipeline{RepoID: 1, Number: 5, Status: model.StatusPending}
+	blocked := &model.Pipeline{RepoID: 1, Number: 6, Status: model.StatusPending}
+	for _, p := range []*model.Pipeline{unended, recent, active, ended, empty, blocked} {
+		require.NoError(t, store.CreatePipeline(p))
+	}
+	require.NoError(t, store.WorkflowsCreate([]*model.Workflow{
+		{PipelineID: unended.ID, PID: 1, Name: "a", State: model.StatusSuccess, Finished: 100},
+		{PipelineID: unended.ID, PID: 2, Name: "b", State: model.StatusFailure, Finished: 150},
+		{PipelineID: recent.ID, PID: 1, Name: "c", State: model.StatusSuccess, Finished: 300},
+		{PipelineID: active.ID, PID: 1, Name: "d", State: model.StatusSuccess, Finished: 100},
+		{PipelineID: active.ID, PID: 2, Name: "e", State: model.StatusRunning},
+		{PipelineID: ended.ID, PID: 1, Name: "f", State: model.StatusSuccess, Finished: 100},
+		{PipelineID: blocked.ID, PID: 1, Name: "g", State: model.StatusBlocked},
+	}))
+
+	pipelines, err := store.PipelinesLeftUnended(200, 10)
+	require.NoError(t, err)
+	require.Len(t, pipelines, 1, "a workflow ended late, running or blocked, or none: not yet")
+	assert.Equal(t, unended.ID, pipelines[0].ID)
+
+	pipelines, err = store.PipelinesLeftUnended(400, 10)
+	require.NoError(t, err)
+	assert.Len(t, pipelines, 2)
+	pipelines, err = store.PipelinesLeftUnended(400, 1)
+	require.NoError(t, err)
+	require.Len(t, pipelines, 1, "a batch at most")
+	assert.Equal(t, unended.ID, pipelines[0].ID, "by ID")
+}

@@ -51,9 +51,15 @@ const (
 	// Controls the delay between the CI job generating a log record, and web users receiving it.
 	maxLogFlushPeriod time.Duration = time.Second
 
-	// The end of a step waits at most maxLogFlushWait for the log lines
-	// queued before it to be sent.
+	// The end of a step waits at least maxLogFlushWait for the log lines
+	// queued before it to be sent, longer while the server is unreachable
+	// (see flushWait).
 	maxLogFlushWait = 30 * time.Second
+
+	// DefaultConnectionRetryTimeout is how long an agent waits by default for
+	// the server it lost: its workflows keep running meanwhile, as a deploy
+	// or a database restart takes the server away for minutes.
+	DefaultConnectionRetryTimeout = 30 * time.Minute
 )
 
 type client struct {
@@ -70,6 +76,11 @@ type client struct {
 	// logEntryBufferSize sets the buffer size before the log reader is blocking.
 	// If you have enough memory and log bursts, set it higher.
 	logEntryBufferSize int
+	// spool holds the log batches not sent yet; made by processLogs in
+	// spoolDir, keeping at most spoolMaxBytes on disk.
+	spool         *logSpool
+	spoolDir      string
+	spoolMaxBytes int64
 }
 
 // NewGrpcClient returns a new grpc Client.
@@ -78,6 +89,8 @@ func NewGrpcClient(ctx context.Context, conn *grpc.ClientConn, opts ...ClientOpt
 	client.client = proto.NewWoodpeckerClient(conn)
 	client.conn = conn
 	client.logEntryBufferSize = 100
+	client.connectionRetryTimeout = DefaultConnectionRetryTimeout
+	client.spoolMaxBytes = DefaultLogSpoolMaxBytes
 
 	for _, opt := range opts {
 		opt(client)
@@ -98,6 +111,15 @@ func SetConnectionRetryTimeout(d time.Duration) ClientOption {
 	}
 	return func(c *client) {
 		c.connectionRetryTimeout = d
+	}
+}
+
+// SetLogSpool sets the directory the log batches not sent yet wait in, the
+// system's temporary one if empty, and how many bytes of them it keeps.
+func SetLogSpool(dir string, maxBytes int64) ClientOption {
+	return func(c *client) {
+		c.spoolDir = dir
+		c.spoolMaxBytes = maxBytes
 	}
 }
 
@@ -412,18 +434,24 @@ func (c *client) EnqueueLog(logEntry *rpc.LogEntry) {
 }
 
 // flushLogs sends the log entries queued so far, waiting at most
-// maxLogFlushWait.
+// maxLogFlushWait for processLogs to take the flush, and flushWait for them
+// to be sent.
 func (c *client) flushLogs(ctx context.Context) {
 	if c.flushes == nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, maxLogFlushWait)
-	defer cancel()
 	done := make(chan struct{})
+	taken, cancel := context.WithTimeout(ctx, maxLogFlushWait)
+	defer cancel()
 	select {
 	case c.flushes <- done:
-	case <-ctx.Done():
+	case <-taken.Done():
 		return
+	}
+	if wait := c.flushWait(); wait > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, wait)
+		defer cancel()
 	}
 	select {
 	case <-done:
@@ -431,7 +459,26 @@ func (c *client) flushLogs(ctx context.Context) {
 	}
 }
 
+// flushWait is how long a flush waits for the lines queued before it to be
+// sent: as long as their sending tries, for while the server is away, the
+// server takes the end of a step only once it has its log (lines coming
+// after it may be refused); at least maxLogFlushWait. Zero for no limit.
+func (c *client) flushWait() time.Duration {
+	if c.connectionRetryTimeout == 0 {
+		return 0
+	}
+	return max(maxLogFlushWait, c.connectionRetryTimeout)
+}
+
+// processLogs batches the log entries queued and hands the batches to the
+// spool, which sendSpooled sends from: it never waits for the server, so
+// the steps' output is read on while the server is away.
 func (c *client) processLogs(ctx context.Context) {
+	if c.spool == nil {
+		c.spool = newLogSpool(c.spoolDir, c.spoolMaxBytes)
+	}
+	go c.sendSpooled(ctx, c.spool)
+
 	var entries []*proto.LogEntry
 	var bytes int
 
@@ -440,17 +487,13 @@ func (c *client) processLogs(ctx context.Context) {
 			return
 		}
 
-		log.Debug().
+		log.Trace().
 			Int("entries", len(entries)).
 			Int("bytes", bytes).
-			Msg("log drain: sending queued logs")
+			Msg("log drain: queueing logs to send")
 
-		if err := c.sendLogs(ctx, entries); err != nil {
-			log.Error().Err(err).Msg("log drain: could not send logs to server")
-		}
-
-		// even if send failed, we don't have infinite memory; retry has already been used
-		entries = entries[:0]
+		c.spool.push(entries, bytes)
+		entries = nil
 		bytes = 0
 	}
 
@@ -497,7 +540,31 @@ func (c *client) processLogs(ctx context.Context) {
 				}
 			}
 			send()
-			close(done)
+			c.spool.pushFlush(done)
+		}
+	}
+}
+
+// sendSpooled sends the batches of spool in order, until ctx is done. A
+// batch the server does not take is lost: lines in its steps' logs say so.
+func (c *client) sendSpooled(ctx context.Context, spool *logSpool) {
+	defer spool.close()
+	for {
+		item := spool.next(ctx)
+		if item == nil {
+			return
+		}
+		if item.flushed != nil {
+			close(item.flushed)
+			continue
+		}
+		err := c.sendLogs(ctx, item.entries)
+		if err == nil || ctx.Err() != nil {
+			continue
+		}
+		log.Error().Err(err).Int("entries", len(item.entries)).Msg("log drain: could not send logs to server")
+		if !item.marks {
+			spool.pushMarks(item.ranges, lostNotTaken)
 		}
 	}
 }

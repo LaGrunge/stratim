@@ -1,7 +1,7 @@
 # Agent image from a prebuilt binary (scripts/build_images.sh), same layout as
 # the upstream docker/Dockerfile.agent.multiarch.
 FROM --platform=$BUILDPLATFORM docker.io/golang:1.27 AS base
-RUN mkdir -p /etc/woodpecker && \
+RUN mkdir -p /etc/woodpecker /tmp-empty && \
   apt-get update && apt-get install -y --no-install-recommends tzdata-legacy && \
   rm -rf /usr/share/zoneinfo/right
 
@@ -14,6 +14,8 @@ EXPOSE 3000
 COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=base /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=base /etc/woodpecker /etc/woodpecker
+# the logs not sent yet wait here while the server is away
+COPY --from=base --chmod=1777 /tmp-empty /tmp
 COPY agent/linux_${TARGETARCH}/woodpecker-agent /bin/
 HEALTHCHECK CMD ["/bin/woodpecker-agent", "ping"]
 ENTRYPOINT ["/bin/woodpecker-agent"]

@@ -104,6 +104,16 @@ func run(ctx context.Context, c *cli.Command, backends []types.Backend) error {
 
 	agentConfig := readAgentConfig(agentConfigPath)
 
+	spoolMaxBytes, err := logSpoolMaxBytes(c.Int("log-spool-max-size"))
+	if err != nil {
+		return err
+	}
+	if spoolMaxBytes > 0 {
+		if err := agent_rpc.CheckLogSpoolDir(c.String("log-spool-dir")); err != nil {
+			return err
+		}
+	}
+
 	grpcClientCtx, grpcClientCtxCancel := context.WithCancelCause(context.Background())
 	defer grpcClientCtxCancel(nil)
 
@@ -136,6 +146,7 @@ func run(ctx context.Context, c *cli.Command, backends []types.Backend) error {
 		ctx, agentConn.MainConn,
 		agent_rpc.SetConnectionRetryTimeout(c.Duration("retry-timeout")),
 		agent_rpc.SetLogEntryBufferSize(c.Int("log-entry-stream-buffer-size")),
+		agent_rpc.SetLogSpool(c.String("log-spool-dir"), spoolMaxBytes),
 	)
 	agentConfigPersisted := atomic.Bool{}
 
@@ -344,6 +355,18 @@ func runWithRetry(backendEngines []types.Backend) func(ctx context.Context, c *c
 		}
 		return err
 	}
+}
+
+// maxLogSpoolMiB is the most WOODPECKER_LOG_SPOOL_MAX_SIZE takes: 1 TiB.
+const maxLogSpoolMiB = 1 << 20
+
+// logSpoolMaxBytes is how many bytes the log spool keeps on disk, of mib
+// MiB: zero keeps none (only the few MiB in memory).
+func logSpoolMaxBytes(mib int) (int64, error) {
+	if mib < 0 || mib > maxLogSpoolMiB {
+		return 0, fmt.Errorf("WOODPECKER_LOG_SPOOL_MAX_SIZE must be between 0 and %d MiB, got %d", maxLogSpoolMiB, mib)
+	}
+	return int64(mib) << 20, nil //nolint:mnd // MiB
 }
 
 func stringSliceAddToMap(sl []string, m map[string]string) error {

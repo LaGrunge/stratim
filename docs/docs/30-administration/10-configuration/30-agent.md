@@ -274,9 +274,10 @@ Configures if the gRPC server certificate should be verified, only valid when `W
 ## RETRY_TIMEOUT
 
 - Name: `WOODPECKER_RETRY_TIMEOUT`
-- Default: `2m`
+- Default: `30m`
 
 Set how long the agent keeps retrying to reconnect to the server after the gRPC connection is lost before giving up.
+Workflows keep running meanwhile: their state and their logs reach the server once it is back. Logs wait on disk, in `WOODPECKER_LOG_SPOOL_DIR`.
 
 :::warning
 If set to 0 we retry forever.
@@ -295,6 +296,24 @@ If used with local backend, tis can increase your performance in special cases s
 :::warning
 If set to 0 we are always blocking.
 :::
+
+---
+
+## LOG_SPOOL_DIR
+
+- Name: `WOODPECKER_LOG_SPOOL_DIR`
+- Default: the system's temporary directory
+
+Directory the logs not sent to the server yet wait in while it is unreachable. The agent keeps a few MiB of them in memory and the rest here.
+
+---
+
+## LOG_SPOOL_MAX_SIZE
+
+- Name: `WOODPECKER_LOG_SPOOL_MAX_SIZE`
+- Default: `1024`
+
+How many MiB of logs not sent yet the agent keeps on disk, at most `1048576`. Past that, the lines are dropped and the step's log gets a line that says how many are missing. `0` keeps none on disk, only a few MiB in memory. The agent checks at start that it can write to `WOODPECKER_LOG_SPOOL_DIR`, and stops if it cannot.
 
 ---
 

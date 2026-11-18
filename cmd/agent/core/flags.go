@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v3"
+
+	agent_rpc "go.woodpecker-ci.org/woodpecker/v3/agent/rpc"
 )
 
 //nolint:mnd
@@ -73,13 +75,24 @@ var flags = []cli.Flag{
 		Sources: cli.EnvVars("WOODPECKER_RETRY_TIMEOUT"),
 		Name:    "retry-timeout",
 		Usage:   "how long the agent keeps retrying to reconnect to the server after the gRPC connection is lost before giving up, set to 0 to retry forever",
-		Value:   2 * time.Minute,
+		Value:   agent_rpc.DefaultConnectionRetryTimeout,
 	},
 	&cli.IntFlag{
 		Sources: cli.EnvVars("WOODPECKER_LOG_ENTRY_STREAM_BUFFER_SIZE"),
 		Name:    "log-entry-stream-buffer-size",
 		Usage:   "how many log lines an agent can buffer before it blocks io.Pipe, expect one log-entry to be 1 MB in worst case.",
 		Value:   100,
+	},
+	&cli.StringFlag{
+		Sources: cli.EnvVars("WOODPECKER_LOG_SPOOL_DIR"),
+		Name:    "log-spool-dir",
+		Usage:   "directory the logs not sent to the server yet wait in while it is unreachable; the system's temporary directory if empty",
+	},
+	&cli.IntFlag{
+		Sources: cli.EnvVars("WOODPECKER_LOG_SPOOL_MAX_SIZE"),
+		Name:    "log-spool-max-size",
+		Usage:   "how many MiB of logs not sent yet the agent keeps on disk, 0 for none; past that, lines are dropped and the log says so",
+		Value:   int(agent_rpc.DefaultLogSpoolMaxBytes >> 20),
 	},
 	&cli.StringFlag{
 		Sources: cli.EnvVars("WOODPECKER_HOSTNAME"),
