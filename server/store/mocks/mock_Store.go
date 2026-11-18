@@ -7616,6 +7616,63 @@ func (_c *MockStore_TaskList_Call) RunAndReturn(run func() ([]*model.Task, error
 	return _c
 }
 
+// TaskSetAgent provides a mock function for the type MockStore
+func (_mock *MockStore) TaskSetAgent(id string, agentID int64) error {
+	ret := _mock.Called(id, agentID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TaskSetAgent")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string, int64) error); ok {
+		r0 = returnFunc(id, agentID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockStore_TaskSetAgent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TaskSetAgent'
+type MockStore_TaskSetAgent_Call struct {
+	*mock.Call
+}
+
+// TaskSetAgent is a helper method to define mock.On call
+//   - id string
+//   - agentID int64
+func (_e *MockStore_Expecter) TaskSetAgent(id any, agentID any) *MockStore_TaskSetAgent_Call {
+	return &MockStore_TaskSetAgent_Call{Call: _e.mock.On("TaskSetAgent", id, agentID)}
+}
+
+func (_c *MockStore_TaskSetAgent_Call) Run(run func(id string, agentID int64)) *MockStore_TaskSetAgent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_TaskSetAgent_Call) Return(err error) *MockStore_TaskSetAgent_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockStore_TaskSetAgent_Call) RunAndReturn(run func(id string, agentID int64) error) *MockStore_TaskSetAgent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // TaskSetBoost provides a mock function for the type MockStore
 func (_mock *MockStore) TaskSetBoost(ids []string, boost int64) error {
 	ret := _mock.Called(ids, boost)
@@ -8647,6 +8704,68 @@ func (_c *MockStore_WorkflowsReplace_Call) Return(err error) *MockStore_Workflow
 }
 
 func (_c *MockStore_WorkflowsReplace_Call) RunAndReturn(run func(pipeline *model.Pipeline, workflows []*model.Workflow) error) *MockStore_WorkflowsReplace_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WorkflowsRunning provides a mock function for the type MockStore
+func (_mock *MockStore) WorkflowsRunning(limit int) ([]*model.Workflow, error) {
+	ret := _mock.Called(limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WorkflowsRunning")
+	}
+
+	var r0 []*model.Workflow
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int) ([]*model.Workflow, error)); ok {
+		return returnFunc(limit)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int) []*model.Workflow); ok {
+		r0 = returnFunc(limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*model.Workflow)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int) error); ok {
+		r1 = returnFunc(limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStore_WorkflowsRunning_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WorkflowsRunning'
+type MockStore_WorkflowsRunning_Call struct {
+	*mock.Call
+}
+
+// WorkflowsRunning is a helper method to define mock.On call
+//   - limit int
+func (_e *MockStore_Expecter) WorkflowsRunning(limit any) *MockStore_WorkflowsRunning_Call {
+	return &MockStore_WorkflowsRunning_Call{Call: _e.mock.On("WorkflowsRunning", limit)}
+}
+
+func (_c *MockStore_WorkflowsRunning_Call) Run(run func(limit int)) *MockStore_WorkflowsRunning_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int
+		if args[0] != nil {
+			arg0 = args[0].(int)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStore_WorkflowsRunning_Call) Return(workflows []*model.Workflow, err error) *MockStore_WorkflowsRunning_Call {
+	_c.Call.Return(workflows, err)
+	return _c
+}
+
+func (_c *MockStore_WorkflowsRunning_Call) RunAndReturn(run func(limit int) ([]*model.Workflow, error)) *MockStore_WorkflowsRunning_Call {
 	_c.Call.Return(run)
 	return _c
 }

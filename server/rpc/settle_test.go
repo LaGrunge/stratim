@@ -372,3 +372,81 @@ func TestInitMarksStatusesThroughTheEnd(t *testing.T) {
 		}
 	}
 }
+
+// Wait, for a workflow the queue does not hold, as one it lost before it
+// adopts it, listens on: the queue holding it later, a cancel then reaches
+// the agent.
+func TestWaitWorkflowHeldLater(t *testing.T) {
+	mockStore := store_mocks.NewMockStore(t)
+	mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
+	mockStore.On("GetPipeline", int64(20)).Return(defaultPipeline(model.StatusRunning), nil)
+	mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
+	mockStore.On("WorkflowLoad", int64(30)).Return(defaultWorkflow(model.StatusRunning), nil)
+	q := queue.NewMemoryQueue(t.Context())
+	rpcInst := newTestRPC(t, mockStore, q)
+	rpcInst.killedCheckInterval = 20 * time.Millisecond
+	ctx := context.WithValue(t.Context(), agentIDKey, int64(1))
+
+	canceled := make(chan bool, 1)
+	go func() {
+		c, err := rpcInst.Wait(ctx, "30")
+		assert.NoError(t, err)
+		canceled <- c
+	}()
+	select {
+	case <-canceled:
+		t.Fatal("Wait returned for a workflow running the queue does not hold")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	require.NoError(t, q.PushAtOnce(ctx, []*model.Task{{ID: "30"}}))
+	pollCtx, stop := context.WithTimeout(ctx, 5*time.Second)
+	defer stop()
+	_, err := q.Poll(pollCtx, 1, func(*model.Task) (bool, int) { return true, 1 })
+	require.NoError(t, err)
+	time.Sleep(100 * time.Millisecond) // Wait finds it held
+	_, err = q.CancelAtOnce(ctx, []string{"30"}, false)
+	require.NoError(t, err)
+	select {
+	case c := <-canceled:
+		assert.True(t, c, "the cancel reaches the agent")
+	case <-time.After(5 * time.Second):
+		t.Fatal("the cancel did not reach the agent")
+	}
+}
+
+// Wait, for a workflow the queue does not hold that the server ended, tells
+// its agent canceled: it stops.
+func TestWaitWorkflowEndedNotHeld(t *testing.T) {
+	mockStore := store_mocks.NewMockStore(t)
+	mockStore.On("AgentFind", int64(1)).Return(defaultAgent(), nil)
+	mockStore.On("GetPipeline", int64(20)).Return(defaultPipeline(model.StatusRunning), nil)
+	mockStore.On("GetRepo", int64(10)).Return(defaultRepo(), nil)
+	var mu sync.Mutex
+	state := model.StatusRunning
+	mockStore.On("WorkflowLoad", int64(30)).Return(func(int64) (*model.Workflow, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return defaultWorkflow(state), nil
+	})
+	rpcInst := newTestRPC(t, mockStore, queue.NewMemoryQueue(t.Context()))
+	rpcInst.killedCheckInterval = 20 * time.Millisecond
+	ctx := context.WithValue(t.Context(), agentIDKey, int64(1))
+
+	canceled := make(chan bool, 1)
+	go func() {
+		c, err := rpcInst.Wait(ctx, "30")
+		assert.NoError(t, err)
+		canceled <- c
+	}()
+	time.Sleep(100 * time.Millisecond)
+	mu.Lock()
+	state = model.StatusKilled
+	mu.Unlock()
+	select {
+	case c := <-canceled:
+		assert.True(t, c)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Wait did not see the workflow ended")
+	}
+}

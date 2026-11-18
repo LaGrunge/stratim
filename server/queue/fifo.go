@@ -47,6 +47,20 @@ type entry struct {
 	// or once the queue gives up on it: its lease expired or was capped, or
 	// it left the queue. Set when it is canceled.
 	killed chan bool
+	// adopted is set for a task the queue took over running without its
+	// config (see persistentQueue): its lease expiring, it is not run again
+	// but settled, its agent gone, and held running until its Done.
+	adopted bool
+}
+
+// runningTask is a task handed out to an agent before the queue was
+// started: restoreRunning holds it running again.
+type runningTask struct {
+	task *model.Task
+	// canceledAt is when it was canceled, zero if it was not.
+	canceledAt time.Time
+	// adopted is set for one without its config, see entry.
+	adopted bool
 }
 
 // kill closes the killed channel of a canceling entry, once.
@@ -137,6 +151,36 @@ func (q *fifo) PushAtOnce(_ context.Context, tasks []*model.Task) error {
 	q.dirty = true
 	q.Unlock()
 	return nil
+}
+
+// restoreRunning holds tasks handed out to agents before as running, each
+// with a new lease from now: their agents extend it, or it expires. A
+// canceled one is held canceling, as from its cancel. One held already is
+// left as it is.
+func (q *fifo) restoreRunning(tasks []runningTask) {
+	q.Lock()
+	defer q.Unlock()
+	for _, restored := range tasks {
+		task := restored.task
+		if _, ok := q.running[task.ID]; ok {
+			continue
+		}
+		taskEntry := &entry{
+			item:     task,
+			done:     make(chan bool),
+			deadline: time.Now().Add(q.extension),
+			adopted:  restored.adopted,
+		}
+		if !restored.canceledAt.IsZero() {
+			taskEntry.error = NewErrExternal(ErrCancel)
+			close(taskEntry.done)
+			taskEntry.canceling = true
+			taskEntry.canceledAt = restored.canceledAt
+			taskEntry.killed = make(chan bool)
+		}
+		q.running[task.ID] = taskEntry
+	}
+	q.dirty = true
 }
 
 // Poll retrieves and removes a task head of this queue.
@@ -296,23 +340,25 @@ func (q *fifo) finished(ids []string, exitStatus model.StatusValue, err error, e
 
 // Wait waits until the item is done executing.
 // Also signals via error ErrCancel if workflow got canceled, as often as
-// asked once canceled.
+// asked once canceled. ErrNotFound for a task not running: ended already, or
+// one the queue does not hold (yet), see rpc.RPC.Wait.
 func (q *fifo) Wait(ctx context.Context, taskID string) error {
 	q.Lock()
 	state := q.running[taskID]
 	q.Unlock()
-	if state != nil {
-		select {
-		case <-ctx.Done():
-		case <-state.done:
-			// check if we have a wrapped cancel error and unwrap it
-			if errors.Is(state.error, ErrCancel) {
-				return ErrCancel
-			}
-			// or return queue errors and no workflow errors
-			if !errors.Is(state.error, new(ErrExternal)) {
-				return state.error
-			}
+	if state == nil {
+		return ErrNotFound
+	}
+	select {
+	case <-ctx.Done():
+	case <-state.done:
+		// check if we have a wrapped cancel error and unwrap it
+		if errors.Is(state.error, ErrCancel) {
+			return ErrCancel
+		}
+		// or return queue errors and no workflow errors
+		if !errors.Is(state.error, new(ErrExternal)) {
+			return state.error
 		}
 	}
 	return nil
@@ -709,8 +755,8 @@ func depStatus(task *model.Task, status model.StatusValue) model.StatusValue {
 	return status
 }
 
-// SetCanceledExpiredHandler sets what settles a canceled task whose lease
-// expired before its Done.
+// SetCanceledExpiredHandler sets what settles a task whose lease expired
+// before its Done that is not run again: canceled, or adopted.
 func (q *fifo) SetCanceledExpiredHandler(handler func(task *model.Task)) {
 	q.Lock()
 	defer q.Unlock()
@@ -718,8 +764,9 @@ func (q *fifo) SetCanceledExpiredHandler(handler func(task *model.Task)) {
 }
 
 // resubmitExpiredPipelines puts the running tasks whose lease expired back
-// to pending, for another agent. A canceled one is not run again: it is
-// returned, to be settled by the caller once the queue is unlocked.
+// to pending, for another agent. A canceled one, or one adopted without its
+// config, is not run again: it is returned, to be settled by the caller once
+// the queue is unlocked. An adopted one stays running until its Done.
 // Expects the queue to be locked by the caller.
 func (q *fifo) resubmitExpiredPipelines() (canceledExpired []*model.Task) {
 	for taskID, taskState := range q.running {
@@ -727,6 +774,15 @@ func (q *fifo) resubmitExpiredPipelines() (canceledExpired []*model.Task) {
 			log.Info().Str("task_id", taskID).Msg("queue: canceled task expired before its agent reported it done")
 			delete(q.running, taskID)
 			taskState.kill()
+			canceledExpired = append(canceledExpired, taskState.item)
+			continue
+		}
+		if time.Now().After(taskState.deadline) && taskState.adopted {
+			// held until settled: its Done then releases the tasks depending
+			// on it with the state its workflow ended with; if that fails, it
+			// expires again
+			log.Info().Str("task_id", taskID).Msg("queue: adopted task expired, its agent is gone")
+			taskState.deadline = time.Now().Add(q.extension)
 			canceledExpired = append(canceledExpired, taskState.item)
 			continue
 		}

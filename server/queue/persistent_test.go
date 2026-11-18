@@ -36,7 +36,8 @@ func TestPersistentQueuePollDropsStaleTask(t *testing.T) {
 	defer cancel(nil)
 
 	store := store_mocks.NewMockStore(t)
-	store.EXPECT().TaskDelete("1").Return(types.ErrRecordNotExist).Once()
+	store.EXPECT().WorkflowLoad(int64(1)).Return(&model.Workflow{ID: 1, State: model.StatusPending}, nil).Once()
+	store.EXPECT().TaskSetAgent("1", int64(1)).Return(types.ErrRecordNotExist).Once()
 
 	pq := &persistentQueue{Queue: q, store: store}
 
@@ -119,8 +120,9 @@ func TestPersistentQueuePollReturnsLiveTask(t *testing.T) {
 
 	store := store_mocks.NewMockStore(t)
 	store.EXPECT().GetPipeline(int64(9)).Return(&model.Pipeline{ID: 9, Status: model.StatusRunning}, nil).Once()
-	store.EXPECT().TaskDelete("1").Return(nil).Once()
 	store.EXPECT().WorkflowLoad(int64(1)).Return(&model.Workflow{ID: 1, PipelineID: 9, State: model.StatusPending}, nil).Once()
+	// stays stored, with its agent, until its Done
+	store.EXPECT().TaskSetAgent("1", int64(1)).Return(nil).Once()
 
 	pq := &persistentQueue{Queue: q, store: store}
 
@@ -132,6 +134,7 @@ func TestPersistentQueuePollReturnsLiveTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, got)
 	assert.Equal(t, "1", got.ID)
+	store.AssertNotCalled(t, "TaskDelete", mock.Anything)
 }
 
 // The server stopped after a cancel claimed the pipeline and before it
@@ -149,6 +152,7 @@ func TestPersistentQueueRestoredTaskOfCanceledPipeline(t *testing.T) {
 			task.PipelineID = 9
 			dependent := &model.Task{ID: "2", Dependencies: []string{"1"}, DepStatus: make(map[string]model.StatusValue), RunOn: []string{"success", "failure"}}
 			store.EXPECT().TaskList().Return([]*model.Task{task, dependent}, nil).Once()
+			store.EXPECT().WorkflowsRunning(mock.Anything).Return(nil, nil).Once()
 			store.EXPECT().ServerConfigGet(mock.Anything).Return("", types.ErrRecordNotExist).Maybe()
 			store.EXPECT().TaskSetQueued(mock.Anything, mock.Anything).Return(nil).Maybe() // restored unstamped
 			store.EXPECT().TaskDelete("1").Return(nil).Once()
@@ -229,7 +233,7 @@ func TestPersistentQueuePipelineUnknownRetriedLater(t *testing.T) {
 	got, err := pq.Poll(ctx, 1, filterFnTrue)
 	assert.NoError(t, err)
 	assert.Nil(t, got, "not handed out while its pipeline is unknown")
-	store.AssertNotCalled(t, "TaskDelete", mock.Anything)
+	store.AssertNotCalled(t, "TaskSetAgent", mock.Anything, mock.Anything)
 
 	// the next poll does not get it again at once
 	pollCtx, stop := context.WithTimeout(ctx, 100*time.Millisecond)
@@ -238,8 +242,8 @@ func TestPersistentQueuePipelineUnknownRetriedLater(t *testing.T) {
 	assert.Nil(t, got, "held by its lease: no busy loop")
 
 	store.EXPECT().GetPipeline(int64(9)).Return(&model.Pipeline{ID: 9, Status: model.StatusRunning}, nil).Once()
-	store.EXPECT().TaskDelete("1").Return(nil).Once()
 	store.EXPECT().WorkflowLoad(int64(1)).Return(&model.Workflow{ID: 1, PipelineID: 9, State: model.StatusPending}, nil).Once()
+	store.EXPECT().TaskSetAgent("1", int64(1)).Return(nil).Once()
 	waitCtx, stopWait := context.WithTimeout(ctx, 5*time.Second)
 	defer stopWait()
 	got, err = pq.Poll(waitCtx, 1, filterFnTrue)
@@ -255,8 +259,8 @@ func TestPersistentQueueDoneIgnoresAlreadyRemovedBackupTask(t *testing.T) {
 
 	store := store_mocks.NewMockStore(t)
 	store.EXPECT().GetPipeline(int64(9)).Return(&model.Pipeline{ID: 9, Status: model.StatusRunning}, nil).Once()
-	store.EXPECT().TaskDelete("1").Return(nil).Once()
 	store.EXPECT().WorkflowLoad(int64(1)).Return(&model.Workflow{ID: 1, PipelineID: 9, State: model.StatusPending}, nil).Once()
+	store.EXPECT().TaskSetAgent("1", int64(1)).Return(nil).Once()
 	store.EXPECT().TaskDelete("1").Return(types.ErrRecordNotExist).Once()
 
 	pq := &persistentQueue{Queue: q, store: store}
@@ -309,6 +313,7 @@ func TestWithTaskStoreRestoresPausedState(t *testing.T) {
 
 	store := store_mocks.NewMockStore(t)
 	store.EXPECT().TaskList().Return(nil, nil).Once()
+	store.EXPECT().WorkflowsRunning(mock.Anything).Return(nil, nil).Once()
 	store.EXPECT().ServerConfigGet(serverConfigQueuePaused).Return("true", nil).Once()
 
 	pq := WithTaskStore(ctx, q, store)
@@ -322,6 +327,7 @@ func TestWithTaskStoreLeavesQueueRunningWhenNotPaused(t *testing.T) {
 
 	store := store_mocks.NewMockStore(t)
 	store.EXPECT().TaskList().Return(nil, nil).Once()
+	store.EXPECT().WorkflowsRunning(mock.Anything).Return(nil, nil).Once()
 	store.EXPECT().ServerConfigGet(serverConfigQueuePaused).Return("false", nil).Once()
 
 	pq := WithTaskStore(ctx, q, store)
@@ -335,6 +341,7 @@ func TestWithTaskStoreLeavesQueueRunningWhenNoPausedConfig(t *testing.T) {
 
 	store := store_mocks.NewMockStore(t)
 	store.EXPECT().TaskList().Return(nil, nil).Once()
+	store.EXPECT().WorkflowsRunning(mock.Anything).Return(nil, nil).Once()
 	store.EXPECT().ServerConfigGet(serverConfigQueuePaused).Return("", types.ErrRecordNotExist).Once()
 
 	pq := WithTaskStore(ctx, q, store)
@@ -358,6 +365,7 @@ func TestWithTaskStoreRestoresPausedStateAfterRestart(t *testing.T) {
 	defer cancel2(nil)
 
 	store.EXPECT().TaskList().Return(nil, nil).Once()
+	store.EXPECT().WorkflowsRunning(mock.Anything).Return(nil, nil).Once()
 	store.EXPECT().ServerConfigGet(serverConfigQueuePaused).Return("true", nil).Once()
 
 	restored := WithTaskStore(ctx2, q2, store)

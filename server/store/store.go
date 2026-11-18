@@ -167,6 +167,9 @@ type Store interface {
 	// TaskSetQueued sets when the stored task of id was queued, if it was
 	// not set yet (0).
 	TaskSetQueued(id string, queued int64) error
+	// TaskSetAgent sets the agent the stored task of id is handed out to, 0
+	// for none: types.ErrRecordNotExist if it is not stored.
+	TaskSetAgent(id string, agentID int64) error
 
 	// ServerConfig
 	ServerConfigGet(string) (string, error)
@@ -254,6 +257,8 @@ type Store interface {
 	// still pending or running in pipelines killed or canceled before
 	// canceledBefore (unix seconds, their finished), their steps with them.
 	WorkflowsLeftInCanceledPipelines(canceledBefore int64, limit int) ([]*model.Workflow, error)
+	// WorkflowsRunning lists, by ID, at most limit workflows running.
+	WorkflowsRunning(limit int) ([]*model.Workflow, error)
 
 	// BotToken
 	// BotTokenCreate stores a new bot token unless its owner has maxActive
