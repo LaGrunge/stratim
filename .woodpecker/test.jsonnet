@@ -63,6 +63,7 @@ local afterVendor = { depends_on: ['vendor'] };
       environment: {
         STRATIM_E2E_DATASOURCE: 'root@tcp(mariadb:3306)/e2e_test?parseTime=true',
         STRATIM_E2E_SERVER_AWAY: '3m',
+        STRATIM_E2E_HOOK_AWAY: '60s',
       },
       when: onChange,  // same conditions as the mariadb service it needs
     }),

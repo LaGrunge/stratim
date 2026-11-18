@@ -1,0 +1,148 @@
+// Copyright 2026 LaGrunge
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package datastore
+
+import (
+	"errors"
+
+	"go.woodpecker-ci.org/woodpecker/v3/server/model"
+	"go.woodpecker-ci.org/woodpecker/v3/server/store/types"
+)
+
+// The columns a delivery's processing changes.
+var webhookDeliveryUpdateCols = []string{"state", "next_try", "error", "pipeline_id", "updated"}
+
+// The columns a delivery that failed and came again is queued again with:
+// not when it was received, which bounds its retries; it gets an attempt.
+var webhookDeliveryRequeueCols = []string{
+	"event", "header", "body", "state", "next_try", "attempts", "error", "pipeline_id", "updated",
+}
+
+// WebhookDeliveryCreate stores a delivery unless the repo's delivery with
+// its GUID is stored already: false then. One stored that failed is queued
+// again with it instead, as a delivery asked again by hand: true.
+func (s storage) WebhookDeliveryCreate(d *model.WebhookDelivery) (bool, error) {
+	created := false
+	err := retryWrite(func() error {
+		_, err := s.engine.Insert(d)
+		if err == nil {
+			created = true
+			return nil
+		}
+		if !errors.Is(wrapInsert(0, err), types.ErrInsertDuplicateDetected) {
+			return lockErr(err)
+		}
+		requeued, err := s.engine.
+			Where("forge_id = ? AND repo_id = ? AND guid = ? AND state = ?", d.ForgeID, d.RepoID, d.GUID, model.DeliveryFailed).
+			Cols(webhookDeliveryRequeueCols...).Update(&model.WebhookDelivery{
+			Event: d.Event, Header: d.Header, Body: d.Body, State: d.State, NextTry: d.NextTry, Updated: d.Updated,
+		})
+		created = requeued == 1
+		return lockErr(err)
+	})
+	return created, err
+}
+
+// WebhookDeliveriesDue lists, by ID, at most limit deliveries due at now
+// (unix seconds): of each repo, the first not settled, if it is pending and
+// its turn came or processing and its claim expired. A repo's deliveries
+// thus go one at a time, in order. Without their header and body.
+func (s storage) WebhookDeliveriesDue(now int64, limit int) ([]*model.WebhookDelivery, error) {
+	var due []*model.WebhookDelivery
+	return due, s.engine.Omit("header", "body").
+		Where("id IN (SELECT MIN(id) FROM webhook_deliveries WHERE state IN (?, ?) GROUP BY repo_id)",
+			model.DeliveryPending, model.DeliveryProcessing).
+		And("next_try <= ?", now).
+		Asc("id").Limit(limit).Find(&due)
+}
+
+// WebhookDeliveryClaim claims the delivery, as WebhookDeliveriesDue listed
+// it, until (unix seconds), counting an attempt: false if it changed since,
+// taken by another.
+func (s storage) WebhookDeliveryClaim(d *model.WebhookDelivery, until, now int64) (bool, error) {
+	claimed := false
+	err := retryWrite(func() error {
+		res, err := s.engine.Exec(`UPDATE webhook_deliveries
+SET state = ?, next_try = ?, attempts = attempts + 1, updated = ?
+WHERE id = ? AND state = ? AND next_try = ? AND attempts = ?`,
+			model.DeliveryProcessing, until, now, d.ID, d.State, d.NextTry, d.Attempts)
+		if err != nil {
+			return lockErr(err)
+		}
+		n, err := res.RowsAffected()
+		claimed = n == 1
+		return err
+	})
+	if claimed {
+		d.State = model.DeliveryProcessing
+		d.NextTry = until
+		d.Attempts++
+		d.Updated = now
+	}
+	return claimed, err
+}
+
+// WebhookDeliveryGet gets a delivery, its header and body with it.
+func (s storage) WebhookDeliveryGet(id int64) (*model.WebhookDelivery, error) {
+	d := new(model.WebhookDelivery)
+	return d, wrapGet(s.engine.ID(id).Get(d))
+}
+
+// WebhookDeliveryUpdate writes the delivery's state, next try, error,
+// pipeline and update time, as the claim of its attempt holds: false if
+// the claim was lost, another attempt taking the delivery.
+func (s storage) WebhookDeliveryUpdate(d *model.WebhookDelivery) (bool, error) {
+	held := false
+	err := retryWrite(func() error {
+		n, err := s.engine.Where("id = ? AND state = ? AND attempts = ?", d.ID, model.DeliveryProcessing, d.Attempts).
+			Cols(webhookDeliveryUpdateCols...).Update(d)
+		held = n == 1
+		return wrapUpdate(n, err)
+	})
+	return held, err
+}
+
+// WebhookDeliveriesKnown tells which of guids the repo's deliveries stored
+// have.
+func (s storage) WebhookDeliveriesKnown(forgeID, repoID int64, guids []string) ([]string, error) {
+	if len(guids) == 0 {
+		return nil, nil
+	}
+	var known []string
+	return known, s.engine.Table("webhook_deliveries").Cols("guid").
+		Where("forge_id = ? AND repo_id = ?", forgeID, repoID).In("guid", guids).Find(&known)
+}
+
+// WebhookDeliveriesPurge deletes at most limit deliveries settled before
+// (unix seconds), telling how many.
+func (s storage) WebhookDeliveriesPurge(before int64, limit int) (int64, error) {
+	var ids []int64
+	if err := s.engine.Table("webhook_deliveries").Cols("id").
+		In("state", model.DeliveryDone, model.DeliveryIgnored, model.DeliveryFailed).
+		And("updated < ?", before).
+		Asc("id").Limit(limit).Find(&ids); err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	var n int64
+	err := retryWrite(func() error {
+		var err error
+		n, err = s.engine.In("id", ids).Delete(new(model.WebhookDelivery))
+		return lockErr(err)
+	})
+	return n, err
+}

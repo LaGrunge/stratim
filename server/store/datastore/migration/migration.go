@@ -84,6 +84,7 @@ var allBeans = []any{
 	new(model.ForgeStatus),
 	new(model.BotToken),
 	new(model.BotTokenCall),
+	new(model.WebhookDelivery),
 }
 
 // TODO: make xormigrate context aware

@@ -906,12 +906,14 @@ Maximum number of lines to show in a pipeline log.
 
 ---
 
-### WEBHOOK_SYNC_TIMEOUT
+### WEBHOOK_RECONCILE_INTERVAL
 
-- Name: `WOODPECKER_WEBHOOK_SYNC_TIMEOUT`
-- Default: `5s`
+- Name: `WOODPECKER_WEBHOOK_RECONCILE_INTERVAL`
+- Default: `5m`
 
-Maximum time to wait for the pipeline creation triggered by an incoming webhook. After that, the server responds with `202 Accepted` and finishes it in the background. `0` disables the fallback and always responds synchronously.
+How often the server asks the forges that keep webhook deliveries (GitHub) to deliver again the ones that never reached it, for example while it was restarting. It also does so 10 seconds after it starts. Each time costs one or two API calls per active repository, made with the token of the repository's owner; an owner whose calls the forge limits is skipped until the next time. `0` turns it off.
+
+When it stops, the server waits up to 20 seconds for the webhooks it is turning into pipelines; give it a stop timeout longer than that (for example `stop_grace_period: 30s` with Docker Compose).
 
 ---
 

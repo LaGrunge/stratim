@@ -810,6 +810,7 @@ const docTemplate = `{
         },
         "/hook": {
             "post": {
+                "description": "The webhook is kept, then made into a pipeline in the background. A delivery the forge sends again, with the same delivery ID, is taken once.",
                 "produces": [
                     "text/plain"
                 ],
@@ -830,7 +831,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "delivered again, kept already"
+                    },
+                    "202": {
+                        "description": "kept, a pipeline follows if it makes one"
+                    },
+                    "204": {
+                        "description": "the repo is not active"
                     }
                 }
             }

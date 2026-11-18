@@ -26,6 +26,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server/explain/worker"
 	"go.woodpecker-ci.org/woodpecker/v3/server/forgestatus"
 	"go.woodpecker-ci.org/woodpecker/v3/server/services/utils/hostmatcher"
+	"go.woodpecker-ci.org/woodpecker/v3/server/webhook"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/constant"
 	"go.woodpecker-ci.org/woodpecker/v3/shared/logger"
 )
@@ -115,10 +116,10 @@ var flags = append([]cli.Flag{
 		Usage:   "if true fetch repository permissions asynchronous, impacts performance if there are many repositories with possible tradeoff in consistency",
 	},
 	&cli.DurationFlag{
-		Sources: cli.EnvVars("WOODPECKER_WEBHOOK_SYNC_TIMEOUT"),
-		Name:    "webhook-sync-timeout",
-		Usage:   "max time to wait for pipeline creation triggered by an incoming webhook before responding 202 Accepted and finishing it in the background; 0 disables the fallback and always responds synchronously",
-		Value:   5 * time.Second,
+		Sources: cli.EnvVars("WOODPECKER_WEBHOOK_RECONCILE_INTERVAL"),
+		Name:    "webhook-reconcile-interval",
+		Usage:   "how often the server asks the forges that keep webhook deliveries (GitHub) to deliver again the ones that did not reach it; 0 never",
+		Value:   webhook.ReconcileEvery,
 	},
 	&cli.StringFlag{
 		Sources: cli.EnvVars("WOODPECKER_GRPC_ADDR"),

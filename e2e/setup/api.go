@@ -17,9 +17,10 @@
 package setup
 
 import (
+	"net"
 	"net/http"
-	"net/http/httptest"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,20 +35,43 @@ import (
 )
 
 // APIURL serves the whole router of the server over HTTP, once, as the
-// server does: its authentication, its routes and their guards.
+// server does: its authentication, its routes and their guards. StopServer
+// stops serving it, StartServerAgain serves it again at the same address.
 func (env *ServerEnv) APIURL(t *testing.T) string {
 	t.Helper()
 	env.apiOnce.Do(func() {
 		gin.SetMode(gin.TestMode)
-		handler := router.Load(http.NotFound,
+		env.apiHandler = router.Load(http.NotFound,
 			middleware.Store(env.Store),
 			middleware.WorkflowEnd(env.WorkflowEnd),
+			middleware.Inbox(env.Inbox),
 			middleware.Stopping(t.Context()),
 		)
-		srv := httptest.NewServer(handler)
-		t.Cleanup(srv.Close)
-		env.apiBase = srv.URL
+		env.serveAPI(t, "127.0.0.1:0")
 	})
+	return env.apiURL()
+}
+
+// serveAPI serves the router at addr.
+func (env *ServerEnv) serveAPI(t *testing.T, addr string) {
+	t.Helper()
+	lis, err := net.Listen("tcp", addr)
+	require.NoError(t, err, "listen on %s for the API", addr)
+	srv := &http.Server{Handler: env.apiHandler, ReadHeaderTimeout: shortTimeout}
+	go func() { _ = srv.Serve(lis) }()
+	var once sync.Once
+	stop := func() { once.Do(func() { _ = srv.Close() }) }
+	t.Cleanup(stop)
+
+	env.apiMu.Lock()
+	defer env.apiMu.Unlock()
+	env.apiBase = "http://" + lis.Addr().String()
+	env.stopAPI = stop
+}
+
+func (env *ServerEnv) apiURL() string {
+	env.apiMu.Lock()
+	defer env.apiMu.Unlock()
 	return env.apiBase
 }
 
